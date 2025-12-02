@@ -1,0 +1,149 @@
+body {
+	background-color: #ffdbdb;
+	margin: 0;
+
+
+}
+@font-face {
+
+}
+div.tablename {
+	background-color: #373f47;
+	border: 1px solid #b9b9b9;
+	margin-bottom:2px;
+	margin-left: 30px;
+	margin-top: 7px;
+	width: 20%;
+	text-align: center;
+	font-weight: bolder;
+	color: ButtonHighlight;
+}
+table.main{
+margin-left: 3px;
+margin-right: 5px;
+border-collapse: collapse;
+text-align: center;
+margin-left: 15px;
+	
+}
+table.main th{
+background-color: #8e0000;
+border-collapse: collapse;
+border: 1px solid #ff7171;
+
+font-weight: bold;
+font-size: medium;
+color: #fff4e6;
+	
+}
+table.main td{
+background-color: #c7615f;
+border: 1px solid #840000;
+color: #e7eaef;
+	
+}
+table.steps {
+margin-left: 40px;
+border-collapse: collapse;
+text-align: center;
+
+}
+table.steps th{
+background-color: #b22222;
+border-collapse: collapse;
+border: 1px solid #ee0000;
+
+font-weight: bold;
+font-size: medium;
+color: #fff4e6;
+	
+}
+table.steps td{
+background-color: #ffc1c1;
+border: 1px solid #dc143c;
+color: #303947;
+	
+}
+table.bufers{
+margin-left: 250px;
+border-collapse: collapse;
+text-align: center;
+
+	
+}
+table.bufers th{
+background-color: orange;
+border-collapse: collapse;
+border: 1px solid #bf7102;
+
+font-weight: bold;
+font-size: medium;
+color: #fff4e6;
+	
+}
+table.bufers td{
+background-color: #fff3d9;
+border: 1px solid #ffc96f;
+	
+}table.material{
+margin-left: 3px;
+border-collapse: collapse;
+text-align: center;
+	
+}
+table.material th{
+background-color: #222222;
+border-collapse: collapse;
+border: 1px solid #111111;
+font-weight: lighter;
+font-size: medium;
+color: #fff4e6;
+	
+}
+table.material td{
+background-color: #ffeeee;
+border: 1px solid #ee0000;
+	
+}table.reagent{
+margin-left: 250px;
+border-collapse: collapse;
+text-align: center;
+
+	
+}
+table.reagent th{
+background-color: #a40000;
+border-collapse: collapse;
+border: 1px solid #bf7102;
+
+font-weight: bold;
+font-size: medium;
+color: #fff4e6;
+	
+}
+table.reagent td{
+background-color: #a9b3bc;
+border: 1px solid gray;
+	
+}table.xplast{
+margin-left: 3px;
+border-collapse: collapse;
+text-align: center;
+margin: 5px;
+	
+}
+table.xplast th{
+background-color: orange;
+border-collapse: collapse;
+border: 1px solid #bf7102;
+
+font-weight: bold;
+font-size: medium;
+color: #fff4e6;
+	
+}
+table.xplast td{
+background-color: #fff3d9;
+border: 1px solid #ffc96f;
+	
+}

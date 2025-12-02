@@ -237,7 +237,7 @@ function mch($mch_name, $index, $subscr, $action) { # $voc_name - имя таблицы со
 	
 	return $result;
 }
-function ffh($type, $subscr, $name, $value) {
+function ffh($type, $subscr, $name, $value) {# Создает форму хедер на основании типов столбцов таблицы
 	$text = ('<input type="text" name="' . $name . '" size = "' . $size . '" value="' . $value . '" maxlength="' . $maxlength . '"> ');
 	$hidden = ("<input type=\"hidden\" name=\"$name\" value=\"$value\" >");
 	if ($value == 1) {
