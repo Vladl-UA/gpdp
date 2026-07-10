@@ -3,32 +3,20 @@ declare(strict_types=1);
 ini_set('display_errors', '1');
 error_reporting(E_ALL);
 
-// sync: 2026-07-10, STATE.md Волна 1 — редактор подписей (model_labels) и значений словарей (voc_*) через UI, снимает ручную правку адресной строкой/SQL
+// sync: 2026-07-10, Волна 1 — редактор подписей/словарей: выбор таблицы (группы) → форма правки (50%, чередование строк, «Сохранить всё»)
 
 /**
  * GPDP / RNA — редактор подписей и словарей (Волна 1).
  *
- * Отдельный вход, тот же периметр, что у configurator.php (админ-режим,
- * §8 — живой слепок, не кэш; авторизация — известный будущий контур).
- * Назначение — снять ежедневную ручную правку двух вещей:
+ * Ступень 1 (без ?table): список таблиц тремя группами — Главные (нет
+ * dep_/rel_main), Зависимые (есть), Словари (voc_*).
+ * Ступень 2 (?table=X): форма правки подписей одной таблицы, одна
+ * кнопка «Сохранить всё» (один POST); для словаря — плюс значения.
  *
- *   Раздел A «Подписи» — data_short / data_full / data_label_template
- *     в model_labels. Правка — UPDATE одной строки + refresh presentation
- *     (лёгкий, без DDL-lock, §17). Раньше делалось руками через адресную
- *     строку / SQL.
- *   Раздел B «Словари» — значения voc_*-таблиц (id + data_name). Правка —
- *     record_save / record_delete в конкретный voc_ + refresh. Раньше —
- *     ручной SQL.
- *
- * Ничего нового в ядре: страница — UI поверх уже существующих
- * record_save / record_delete / snapshot_refresh_presentation и живого
- * слепка snapshot_build_structure / _presentation / _registry.
- *
- * НЕ входит в Волну 1 (отдельными решениями, §15 каждое):
- *   - ALTER полей (добавить/удалить/переименовать колонку) — режим
- *     конфигуратора, DDL под lock; здесь только подписи, не структура;
- *   - порядок отображения полей — отдельная таблица весов к реестру
- *     (Волна 2), сейчас понятия порядка в системе нет.
+ * Подписи: UPSERT в model_labels + snapshot_refresh_presentation
+ * (лёгкий refresh, §17). Значения словарей: record_save/record_delete.
+ * Ничего нового в ядре. Вне охвата (Волна 2, §15): ALTER полей,
+ * порядок отображения.
  */
 
 require 'config.php';
@@ -44,20 +32,12 @@ if ($db_connection === false) {
 }
 mysqli_set_charset($db_connection, 'utf8mb4');
 
-// --- (auth: контур не утверждён — тот же статус, что у configurator.php) ----
+function h(string $s): string
+{
+    return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+}
 
-// ============================================================================
-// Хелперы записи. Каждый: действие → refresh → результат для флеша.
-// Живой слепок читается заново в каждом хелпере намеренно — правка одной
-// подписи не должна тащить пересборку всего для вызывающего; refresh
-// презентации сам перечитает model_labels целиком.
-// ============================================================================
-
-/**
- * Адрес строки реестра (dep_model_registry) по (kind, owner, element).
- * owner === null для kind='table'. Возвращает id или null, если адреса
- * в реестре нет (рассинхрон — сообщаем, не молча).
- */
+/** id строки реестра по адресу (kind, owner, element); null — адреса нет. */
 function labels_registry_id(mysqli $db, string $kind, ?string $owner, string $element): ?int
 {
     if ($owner === null) {
@@ -72,32 +52,17 @@ function labels_registry_id(mysqli $db, string $kind, ?string $owner, string $el
         mysqli_stmt_bind_param($stmt, 'sss', $kind, $owner, $element);
     }
     mysqli_stmt_execute($stmt);
-    $res = mysqli_stmt_get_result($stmt);
-    $row = mysqli_fetch_assoc($res);
+    $row = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
     return $row ? (int) $row['id'] : null;
 }
 
-/**
- * UPDATE подписи (data_short/data_full/data_label_template) для строки
- * реестра. Пустая строка шаблона → NULL (маяк «нет составной подписи»
- * — сам факт непустого шаблона, §16.1). Пустые short/full допустимы:
- * потребитель падает на data_element/#id, это законно.
- * Строка labels обязана существовать — при создании таблицы/поля
- * configurator_create_table её вставляет; если нет (легаси-рассинхрон)
- * — INSERT, чтобы страница чинила и такие случаи.
- */
-function labels_save_label(
-    mysqli $db,
-    int $registry_id,
-    string $short,
-    string $full,
-    string $template
-): bool {
+/** UPSERT подписи (1:1 с реестром). Пустые строки → NULL. */
+function labels_save_label(mysqli $db, int $registry_id, string $short, string $full, string $template): bool
+{
     $short_v    = $short === '' ? null : $short;
     $full_v     = $full === '' ? null : $full;
     $template_v = trim($template) === '' ? null : trim($template);
 
-    // UPSERT: строка labels — 1:1 с реестром (PK = dep_model_registry).
     $sql = 'INSERT INTO `' . MODEL_LABELS_TABLE . '`
               (dep_model_registry, data_short, data_full, data_label_template)
             VALUES (?, ?, ?, ?)
@@ -110,264 +75,246 @@ function labels_save_label(
     return mysqli_stmt_execute($stmt);
 }
 
-// ============================================================================
-// Обработка POST (PRG — как весь write-цикл системы, §журнал).
-// ============================================================================
+// ---------------------------------------------------------------------------
+// POST (PRG)
+// ---------------------------------------------------------------------------
 
 $flash = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = (string) ($_POST['_action'] ?? '');
+    $table  = (string) ($_POST['table'] ?? '');
 
-    // --- A. Сохранить подпись поля или таблицы ------------------------------
-    if ($action === 'save_label') {
-        $kind    = (string) ($_POST['kind'] ?? '');
-        $owner   = ($_POST['owner'] ?? '') === '' ? null : (string) $_POST['owner'];
-        $element = (string) ($_POST['element'] ?? '');
+    if ($action === 'save_all') {
+        $saved = 0;
+        $errors = 0;
 
-        $registry_id = labels_registry_id($db_connection, $kind, $owner, $element);
-        if ($registry_id === null) {
-            $flash = ['err', "Адрес не найден в реестре: $kind/$owner/$element"];
-        } else {
-            $ok = labels_save_label(
-                $db_connection,
-                $registry_id,
-                (string) ($_POST['data_short'] ?? ''),
-                (string) ($_POST['data_full'] ?? ''),
-                (string) ($_POST['data_label_template'] ?? '')
-            );
-            if ($ok && snapshot_refresh_presentation($db_connection)) {
-                $addr  = $owner === null ? $element : "$owner.$element";
-                $flash = ['ok', "Подпись сохранена: $addr"];
-            } else {
-                $flash = ['err', 'Не удалось сохранить подпись или пересобрать презентацию'];
+        $t_id = labels_registry_id($db_connection, 'table', null, $table);
+        if ($t_id !== null) {
+            labels_save_label(
+                $db_connection, $t_id,
+                (string) ($_POST['t_short'] ?? ''),
+                (string) ($_POST['t_full'] ?? ''),
+                (string) ($_POST['t_template'] ?? '')
+            ) ? $saved++ : $errors++;
+        }
+
+        $f_short = (array) ($_POST['f_short'] ?? []);
+        $f_full  = (array) ($_POST['f_full'] ?? []);
+        foreach ($f_short as $element => $short) {
+            $element = (string) $element;
+            $f_id = labels_registry_id($db_connection, 'field', $table, $element);
+            if ($f_id === null) {
+                $errors++;
+                continue;
             }
+            labels_save_label(
+                $db_connection, $f_id,
+                (string) $short,
+                (string) ($f_full[$element] ?? ''),
+                ''
+            ) ? $saved++ : $errors++;
         }
+
+        $flash = (snapshot_refresh_presentation($db_connection) && $errors === 0)
+            ? ['ok', "Сохранено подписей: $saved"]
+            : ['err', "Сохранено: $saved, с ошибками: $errors"];
     }
 
-    // --- B. Добавить значение в словарь -------------------------------------
-    elseif ($action === 'dict_add') {
-        $table = (string) ($_POST['table'] ?? '');
-        $name  = trim((string) ($_POST['data_name'] ?? ''));
+    elseif ($action === 'dict_add' || $action === 'dict_edit' || $action === 'dict_delete') {
         $snapshot = snapshot_init($db_connection, config()['application']);
+        $id   = (int) ($_POST['id'] ?? 0);
+        $name = trim((string) ($_POST['data_name'] ?? ''));
 
-        if ($name === '') {
-            $flash = ['err', 'Пустое значение словаря не добавляется'];
+        if ($action === 'dict_delete') {
+            $result = record_delete($db_connection, $snapshot, $table, $id);
+            $msg = "Удалено (#$id)";
+        } elseif ($action === 'dict_edit') {
+            $result = ($name === '' || $id === 0)
+                ? ['ok' => false, 'errors' => ['Пустое значение или нет id']]
+                : record_save($db_connection, $snapshot, $table, ['data_name' => $name], $id);
+            $msg = "Изменено (#$id): $name";
         } else {
-            $result = record_save($db_connection, $snapshot, $table, ['data_name' => $name]);
-            if (($result['ok'] ?? false) && snapshot_refresh_presentation($db_connection)) {
-                $flash = ['ok', "Добавлено в $table: $name"];
-            } else {
-                $flash = ['err', 'Не удалось добавить значение: '
-                                 . implode('; ', $result['errors'] ?? ['неизвестно'])];
-            }
+            $result = ($name === '')
+                ? ['ok' => false, 'errors' => ['Пустое значение']]
+                : record_save($db_connection, $snapshot, $table, ['data_name' => $name]);
+            $msg = "Добавлено: $name";
         }
+
+        $flash = (($result['ok'] ?? false) && snapshot_refresh_presentation($db_connection))
+            ? ['ok', $msg]
+            : ['err', implode('; ', $result['errors'] ?? ['неизвестно'])];
     }
 
-    // --- C. Изменить значение словаря ---------------------------------------
-    elseif ($action === 'dict_edit') {
-        $table = (string) ($_POST['table'] ?? '');
-        $id    = (int) ($_POST['id'] ?? 0);
-        $name  = trim((string) ($_POST['data_name'] ?? ''));
-        $snapshot = snapshot_init($db_connection, config()['application']);
-
-        if ($name === '' || $id === 0) {
-            $flash = ['err', 'Пустое значение или отсутствует id'];
-        } else {
-            $result = record_save($db_connection, $snapshot, $table, ['data_name' => $name], $id);
-            if (($result['ok'] ?? false) && snapshot_refresh_presentation($db_connection)) {
-                $flash = ['ok', "Изменено в $table (#$id): $name"];
-            } else {
-                $flash = ['err', 'Не удалось изменить значение: '
-                                 . implode('; ', $result['errors'] ?? ['неизвестно'])];
-            }
-        }
+    $back = $table !== '' ? '?table=' . rawurlencode($table) : '?';
+    if ($flash) {
+        $back .= '&flash=' . rawurlencode($flash[0]) . '&msg=' . rawurlencode($flash[1]);
     }
-
-    // --- D. Удалить значение словаря ----------------------------------------
-    elseif ($action === 'dict_delete') {
-        $table = (string) ($_POST['table'] ?? '');
-        $id    = (int) ($_POST['id'] ?? 0);
-        $snapshot = snapshot_init($db_connection, config()['application']);
-
-        $result = record_delete($db_connection, $snapshot, $table, $id);
-        if (($result['ok'] ?? false) && snapshot_refresh_presentation($db_connection)) {
-            $flash = ['ok', "Удалено из $table (#$id)"];
-        } else {
-            $flash = ['err', 'Не удалось удалить значение: '
-                             . implode('; ', $result['errors'] ?? ['неизвестно'])];
-        }
-    }
-
-    // PRG: перекладываем флеш в GET-параметр и редиректим на себя.
-    $qs = $flash ? ('?flash=' . rawurlencode($flash[0]) . '&msg=' . rawurlencode($flash[1])) : '';
-    header('Location: ' . strtok($_SERVER['REQUEST_URI'], '?') . $qs);
+    header('Location: ' . strtok($_SERVER['REQUEST_URI'], '?') . $back);
     exit;
 }
 
-// Флеш после PRG.
 if (isset($_GET['flash'])) {
     $flash = [(string) $_GET['flash'], (string) ($_GET['msg'] ?? '')];
 }
 
-// ============================================================================
-// Живой слепок для отображения (§8, админ-режим — не кэш).
-// ============================================================================
+// ---------------------------------------------------------------------------
+// Живой слепок (§8, админ-режим — не кэш)
+// ---------------------------------------------------------------------------
 
 $structure    = snapshot_build_structure($db_connection);
 $presentation = snapshot_build_presentation($db_connection);
-$registry     = snapshot_build_registry($db_connection, $structure);
 
 $SYS_PREFIX = defined('SYSTEM_TABLE_PREFIX') ? SYSTEM_TABLE_PREFIX : 'model_';
 
-// Разбор таблиц на два раздела: словари voc_* и всё остальное (предметные).
-$dict_tables    = [];  // voc_* с data_name
-$subject_tables = [];  // предметные (для раздела подписей)
-
-foreach ($structure['tables'] as $t_name => $t_schema) {
-    if (str_starts_with($t_name, $SYS_PREFIX)) {
-        continue; // служебные model_* не показываем
-    }
-    if (str_starts_with($t_name, 'voc_') && isset($t_schema['fields']['data_name'])) {
-        $dict_tables[$t_name] = $t_schema;
-    }
-    $subject_tables[$t_name] = $t_schema; // словари тоже правят подписи — оставляем в обоих
-}
-
-// ============================================================================
-// Вывод.
-// ============================================================================
-
-function h(string $s): string
-{
-    return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
-}
+$selected = (string) ($_GET['table'] ?? '');
+$valid_selected = $selected !== ''
+    && isset($structure['tables'][$selected])
+    && !str_starts_with($selected, $SYS_PREFIX);
 
 echo '<!doctype html><html><head><meta charset="utf-8"><title>Подписи и словари</title>';
 echo render_admin_styles();
+echo '<style>
+.edit-form{max-width:50%}
+.edit-form tr:nth-child(even) td{background:#ececec}
+.save-all{margin-top:12px;padding:6px 18px;background:#eef;border:1px solid #99c;border-radius:4px;cursor:pointer}
+.save-all:hover{background:#dde}
+</style>';
 echo '</head><body>';
-echo '<p><a class="home-link" href="index.php">← Домой</a> · '
-   . '<a class="home-link" href="configurator.php">Конфигуратор</a></p>';
-echo '<h1>Подписи и словари</h1>';
+echo '<p><a class="home-link" href="index.php">← Домой</a>'
+   . ($valid_selected ? ' · <a class="home-link" href="labels.php">← К списку таблиц</a>' : '')
+   . '</p>';
 
 if ($flash !== null) {
-    $cls = $flash[0] === 'ok' ? 'flash-ok' : 'flash-err';
-    echo '<div class="flash ' . $cls . '">' . h($flash[1]) . '</div>';
+    echo '<div class="flash ' . ($flash[0] === 'ok' ? 'flash-ok' : 'flash-err') . '">'
+       . h($flash[1]) . '</div>';
 }
 
-// ----------------------------------------------------------------------------
-// РАЗДЕЛ B — Словари (первым: чаще всего правят именно значения).
-// ----------------------------------------------------------------------------
-echo '<h2>Словари</h2>';
-echo '<p><em>Значения справочников. Изменение подписи самого словаря — '
-   . 'в разделе «Подписи» ниже.</em></p>';
+// ---------------------------------------------------------------------------
+// Ступень 1 — выбор таблицы (три группы)
+// ---------------------------------------------------------------------------
+if (!$valid_selected) {
+    echo '<h1>Подписи и словари</h1>';
 
-if ($dict_tables === []) {
-    echo '<p>Словарей (<code>voc_*</code>) пока нет.</p>';
+    $mains = $deps = $vocs = [];
+    foreach ($structure['tables'] as $t_name => $t_schema) {
+        if (str_starts_with($t_name, $SYS_PREFIX)) {
+            continue;
+        }
+        $full = (string) ($presentation['labels']['table'][$t_name]['data_full'] ?? $t_name);
+        if (str_starts_with($t_name, 'voc_')) {
+            $vocs[$t_name] = $full;
+            continue;
+        }
+        $has_sub = false;
+        foreach ($t_schema['fields'] as $f_name => $_) {
+            if ($f_name === 'rel_main' || str_starts_with($f_name, 'dep_')) {
+                $has_sub = true;
+                break;
+            }
+        }
+        $has_sub ? $deps[$t_name] = $full : $mains[$t_name] = $full;
+    }
+    asort($mains, SORT_NATURAL | SORT_FLAG_CASE);
+    asort($deps, SORT_NATURAL | SORT_FLAG_CASE);
+    asort($vocs, SORT_NATURAL | SORT_FLAG_CASE);
+
+    foreach (['Главные' => $mains, 'Зависимые' => $deps, 'Словари' => $vocs] as $title => $items) {
+        echo '<h3>' . h($title) . '</h3>';
+        if ($items === []) {
+            echo '<p><em>нет</em></p>';
+            continue;
+        }
+        echo '<ul>';
+        foreach ($items as $t_name => $full) {
+            echo '<li><a href="?table=' . rawurlencode($t_name) . '">' . h($full) . '</a>'
+               . ' <span class="badge">' . h($t_name) . '</span></li>';
+        }
+        echo '</ul>';
+    }
+
+    echo '</body></html>';
+    mysqli_close($db_connection);
+    exit;
 }
 
-$snapshot_for_list = snapshot_init($db_connection, config()['application']);
+// ---------------------------------------------------------------------------
+// Ступень 2 — форма правки выбранной таблицы
+// ---------------------------------------------------------------------------
+$t_schema   = $structure['tables'][$selected];
+$t_labels   = $presentation['labels']['table'][$selected] ?? [];
+$is_dict    = str_starts_with($selected, 'voc_') && isset($t_schema['fields']['data_name']);
+$t_full_lbl = (string) ($t_labels['data_full'] ?? '');
 
-foreach ($dict_tables as $t_name => $t_schema) {
-    $t_full = (string) ($presentation['labels']['table'][$t_name]['data_full'] ?? $t_name);
-    echo '<fieldset><legend><strong>' . h($t_full) . '</strong> '
-       . '<span class="badge">' . h($t_name) . '</span></legend>';
+echo '<h1>' . h($t_full_lbl !== '' ? $t_full_lbl : $selected)
+   . ' <span class="badge">' . h($selected) . '</span></h1>';
 
-    $rows = record_list($db_connection, $snapshot_for_list, $t_name, 500);
-    if ($rows === []) {
-        echo '<p><em>пусто</em></p>';
-    } else {
+echo '<form method="post" class="edit-form">';
+echo '<input type="hidden" name="_action" value="save_all">';
+echo '<input type="hidden" name="table" value="' . h($selected) . '">';
+
+echo '<fieldset><legend>Подпись таблицы</legend>';
+echo '<div class="field-row"><span style="min-width:110px">кратко:</span>'
+   . '<input type="text" name="t_short" value="' . h((string) ($t_labels['data_short'] ?? '')) . '" style="flex:1"></div>';
+echo '<div class="field-row"><span style="min-width:110px">полностью:</span>'
+   . '<input type="text" name="t_full" value="' . h($t_full_lbl) . '" style="flex:1"></div>';
+echo '<div class="field-row"><span style="min-width:110px">шаблон объекта:</span>'
+   . '<input type="text" name="t_template" value="' . h((string) ($t_labels['data_label_template'] ?? '')) . '" style="flex:1"></div>';
+echo '</fieldset>';
+
+echo '<fieldset><legend>Подписи полей</legend>';
+echo '<table><tr><th>поле</th><th>кратко</th><th>полностью</th></tr>';
+foreach ($t_schema['fields'] as $f_name => $f_schema) {
+    if (($f_schema['kind'] ?? '') === 'structural') {
+        continue;
+    }
+    $f_labels = $presentation['labels']['field'][$selected][$f_name] ?? [];
+    $key = h($f_name);
+    echo '<tr><td><code>' . $key . '</code></td>'
+       . '<td><input type="text" name="f_short[' . $key . ']" value="'
+       . h((string) ($f_labels['data_short'] ?? '')) . '" style="width:95%"></td>'
+       . '<td><input type="text" name="f_full[' . $key . ']" value="'
+       . h((string) ($f_labels['data_full'] ?? '')) . '" style="width:95%"></td></tr>';
+}
+echo '</table></fieldset>';
+
+echo '<button type="submit" class="save-all">Сохранить всё</button>';
+echo '</form>';
+
+if ($is_dict) {
+    echo '<h2>Значения</h2><div class="edit-form">';
+    $snapshot = snapshot_init($db_connection, config()['application']);
+    $rows = record_list($db_connection, $snapshot, $selected, 500);
+
+    if ($rows !== []) {
         echo '<table><tr><th>id</th><th>значение</th><th></th></tr>';
         foreach ($rows as $row) {
             $rid  = (int) $row['id'];
             $name = (string) ($row['data_name'] ?? '');
-            echo '<tr><td>' . $rid . '</td>';
-            // Инлайн-форма правки значения.
-            echo '<td><form method="post" style="display:flex;gap:6px;margin:0">'
+            echo '<tr><td>' . $rid . '</td>'
+               . '<td><form method="post" style="display:flex;gap:6px;margin:0">'
                . '<input type="hidden" name="_action" value="dict_edit">'
-               . '<input type="hidden" name="table" value="' . h($t_name) . '">'
+               . '<input type="hidden" name="table" value="' . h($selected) . '">'
                . '<input type="hidden" name="id" value="' . $rid . '">'
                . '<input type="text" name="data_name" value="' . h($name) . '" style="flex:1">'
-               . '<button type="submit" class="act" title="сохранить">✓</button>'
-               . '</form></td>';
-            // Удаление отдельной формой (не вложить form в form).
-            echo '<td><form method="post" style="margin:0" '
-               . 'onsubmit="return confirm(\'Удалить «' . h($name) . '»?\')">'
+               . '<button type="submit" class="act" title="сохранить">✓</button></form></td>'
+               . '<td><form method="post" style="margin:0" onsubmit="return confirm(\'Удалить значение?\')">'
                . '<input type="hidden" name="_action" value="dict_delete">'
-               . '<input type="hidden" name="table" value="' . h($t_name) . '">'
+               . '<input type="hidden" name="table" value="' . h($selected) . '">'
                . '<input type="hidden" name="id" value="' . $rid . '">'
-               . '<button type="submit" class="act act-danger" title="удалить">×</button>'
-               . '</form></td></tr>';
+               . '<button type="submit" class="act act-danger" title="удалить">×</button></form></td></tr>';
         }
         echo '</table>';
+    } else {
+        echo '<p><em>пусто</em></p>';
     }
 
-    // Форма добавления нового значения.
     echo '<form method="post" style="display:flex;gap:6px;margin-top:6px">'
        . '<input type="hidden" name="_action" value="dict_add">'
-       . '<input type="hidden" name="table" value="' . h($t_name) . '">'
+       . '<input type="hidden" name="table" value="' . h($selected) . '">'
        . '<input type="text" name="data_name" placeholder="новое значение" style="flex:1">'
-       . '<button type="submit" class="act" title="добавить">+ добавить</button>'
-       . '</form>';
-    echo '</fieldset>';
-}
-
-// ----------------------------------------------------------------------------
-// РАЗДЕЛ A — Подписи (таблицы и их поля).
-// ----------------------------------------------------------------------------
-echo '<h2>Подписи</h2>';
-echo '<p><em>Короткая (шапки таблиц), полная (формы) и шаблон составной '
-   . 'подписи объекта — например <code>{voc_area} №{data_number}</code>. '
-   . 'Пустой шаблон = составной подписи нет.</em></p>';
-
-foreach ($subject_tables as $t_name => $t_schema) {
-    $t_labels   = $presentation['labels']['table'][$t_name] ?? [];
-    $t_short    = (string) ($t_labels['data_short'] ?? '');
-    $t_full     = (string) ($t_labels['data_full'] ?? '');
-    $t_template = (string) ($t_labels['data_label_template'] ?? '');
-
-    echo '<fieldset><legend><strong>' . h($t_full !== '' ? $t_full : $t_name) . '</strong> '
-       . '<span class="badge">' . h($t_name) . '</span></legend>';
-
-    // Подпись самой таблицы (+ шаблон объекта — только для таблиц).
-    echo '<form method="post" style="margin-bottom:10px">'
-       . '<input type="hidden" name="_action" value="save_label">'
-       . '<input type="hidden" name="kind" value="table">'
-       . '<input type="hidden" name="owner" value="">'
-       . '<input type="hidden" name="element" value="' . h($t_name) . '">'
-       . '<div class="field-row"><span style="min-width:120px">таблица:</span>'
-       . '<input type="text" name="data_short" value="' . h($t_short) . '" placeholder="кратко">'
-       . '<input type="text" name="data_full" value="' . h($t_full) . '" placeholder="полностью">'
-       . '</div>'
-       . '<div class="field-row"><span style="min-width:120px">шаблон объекта:</span>'
-       . '<input type="text" name="data_label_template" value="' . h($t_template) . '" '
-       . 'placeholder="{voc_area} №{data_number}" style="flex:1">'
-       . '<button type="submit" class="act" title="сохранить">✓</button></div>'
-       . '</form>';
-
-    // Подписи полей таблицы.
-    echo '<table><tr><th>поле</th><th>кратко</th><th>полностью</th><th></th></tr>';
-    foreach ($t_schema['fields'] as $f_name => $f_schema) {
-        if (($f_schema['kind'] ?? '') === 'structural') {
-            continue; // id / dep_ / rel_main — структурные, подпись не редактируют
-        }
-        $f_labels = $presentation['labels']['field'][$t_name][$f_name] ?? [];
-        $f_short  = (string) ($f_labels['data_short'] ?? '');
-        $f_full   = (string) ($f_labels['data_full'] ?? '');
-
-        echo '<tr><td><code>' . h($f_name) . '</code></td>';
-        echo '<td colspan="3"><form method="post" style="display:flex;gap:6px;margin:0">'
-           . '<input type="hidden" name="_action" value="save_label">'
-           . '<input type="hidden" name="kind" value="field">'
-           . '<input type="hidden" name="owner" value="' . h($t_name) . '">'
-           . '<input type="hidden" name="element" value="' . h($f_name) . '">'
-           . '<input type="text" name="data_short" value="' . h($f_short) . '" placeholder="кратко" style="flex:1">'
-           . '<input type="text" name="data_full" value="' . h($f_full) . '" placeholder="полностью" style="flex:2">'
-           . '<button type="submit" class="act" title="сохранить">✓</button>'
-           . '</form></td></tr>';
-    }
-    echo '</table>';
-    echo '</fieldset>';
+       . '<button type="submit" class="act" title="добавить">+ добавить</button></form>';
+    echo '</div>';
 }
 
 echo '</body></html>';
