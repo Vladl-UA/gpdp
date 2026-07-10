@@ -15,6 +15,8 @@ declare(strict_types=1);
  * маппинга в label.
  */
 
+// sync: 2026-07-10, дизайн — админ-интерфейс во всю ширину окна от левого края (убраны max-width:900px и margin auto)
+
 /**
  * Общий вид админ-интерфейсов (index.php, configurator.php) — один
  * источник CSS, не два независимых куска, которые разойдутся при
@@ -25,7 +27,7 @@ function render_admin_styles(): string
 {
     return <<<CSS
     <style>
-    body{font-family:sans-serif;max-width:900px;margin:2em auto;color:#222;text-align:left}
+    body{font-family:sans-serif;margin:2em;color:#222;text-align:left}
     table{border-collapse:collapse;width:100%;margin-bottom:1em}
     td,th{border:1px solid #ccc;padding:6px 10px;text-align:left}
     td:first-child a{display:block;margin:-6px -10px;padding:6px 10px;color:inherit;text-decoration:none}
