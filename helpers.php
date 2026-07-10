@@ -22,6 +22,24 @@ declare(strict_types=1);
  * $source ОБЯЗАН быть доверенным: он приходит из пакета $data,
  * собранного field_data() по snapshot, — не из request.
  */
+/**
+ * Соединение с БД для админ-страниц: один boot вместо трёх копий
+ * (index.php / configurator.php / labels.php). Конфиг — из config();
+ * при отказе — 500 и выход, страница без БД не имеет смысла.
+ * utf8mb4 обязателен: иначе кириллица задваивается.
+ */
+function admin_db_connect(): mysqli
+{
+    $cfg = config()['db'];
+    $db  = @mysqli_connect($cfg['host'], $cfg['user'], $cfg['password'], $cfg['name']);
+    if ($db === false) {
+        http_response_code(500);
+        exit('Нет соединения с БД: ' . mysqli_connect_error());
+    }
+    mysqli_set_charset($db, 'utf8mb4');
+    return $db;
+}
+
 function lookup_options(mysqli $db_connection, string $source): array
 {
     static $cache = [];

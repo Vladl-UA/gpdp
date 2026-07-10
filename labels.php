@@ -24,13 +24,7 @@ require 'core.php';
 require 'helpers.php';
 require 'render.php';
 
-$cfg = config()['db'];
-$db_connection = @mysqli_connect($cfg['host'], $cfg['user'], $cfg['password'], $cfg['name']);
-if ($db_connection === false) {
-    http_response_code(500);
-    exit('Нет соединения с БД: ' . mysqli_connect_error());
-}
-mysqli_set_charset($db_connection, 'utf8mb4');
+$db_connection = admin_db_connect();
 
 function h(string $s): string
 {
@@ -172,23 +166,16 @@ $valid_selected = $selected !== ''
     && isset($structure['tables'][$selected])
     && !str_starts_with($selected, $SYS_PREFIX);
 
-echo '<!doctype html><html><head><meta charset="utf-8"><title>Подписи и словари</title>';
-echo render_admin_styles();
-echo '<style>
+$extra_head = '<style>
 .edit-form{max-width:50%}
 .edit-form tr:nth-child(even) td{background:#ececec}
 .save-all{margin-top:12px;padding:6px 18px;background:#eef;border:1px solid #99c;border-radius:4px;cursor:pointer}
 .save-all:hover{background:#dde}
 </style>';
-echo '</head><body>';
-echo '<p><a class="home-link" href="index.php">← Домой</a>'
-   . ($valid_selected ? ' · <a class="home-link" href="labels.php">← К списку таблиц</a>' : '')
-   . '</p>';
-
-if ($flash !== null) {
-    echo '<div class="flash ' . ($flash[0] === 'ok' ? 'flash-ok' : 'flash-err') . '">'
-       . h($flash[1]) . '</div>';
-}
+$nav = '<a class="home-link" href="index.php">← Домой</a>'
+     . ($valid_selected ? ' · <a class="home-link" href="labels.php">← К списку таблиц</a>' : '');
+echo render_admin_page_open('Подписи и словари', $nav, $extra_head);
+echo render_admin_flash($flash !== null ? h($flash[1]) : null, ($flash[0] ?? '') === 'ok');
 
 // ---------------------------------------------------------------------------
 // Ступень 1 — выбор таблицы (три группы)

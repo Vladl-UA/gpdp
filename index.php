@@ -26,26 +26,7 @@ require 'helpers.php';
 require 'render.php';
 
 
-$config = config();
-/**
-echo '<pre>';
-print_r($config);
-echo '</pre>';
-*/
-
-$db_connection = mysqli_connect(
-    $config['db']['host'],
-    $config['db']['user'],
-    $config['db']['password'],
-    $config['db']['name']
-);
-
-
-if ($db_connection === false) {
-    http_response_code(500);
-    exit('Нет соединения с БД');
-}
-mysqli_set_charset($db_connection, 'utf8mb4'); // обязательный шаг: иначе кириллица задваивается
+$db_connection = admin_db_connect();
 
 // --- (auth / права: здесь, когда утвердим контур) ------------------------------
 
@@ -101,11 +82,11 @@ if (!$table_requested || $request_action === 'home') {
     }
     asort($root_candidates, SORT_NATURAL | SORT_FLAG_CASE);
 
-    echo '<!doctype html><html><head><meta charset="utf-8"><title>GPDP</title>';
-    echo render_admin_styles();
-    echo '</head><body>';
-    echo '<p><a class="home-link" href="configurator.php">⚙ Конфигуратор</a> · '
-       . '<a class="home-link" href="labels.php">🏷 Подписи и словари</a></p>';
+    echo render_admin_page_open(
+        'GPDP',
+        '<a class="home-link" href="configurator.php">⚙ Конфигуратор</a> · '
+        . '<a class="home-link" href="labels.php">🏷 Подписи и словари</a>'
+    );
     echo '<h2>Главные таблицы</h2><ul>';
     foreach ($root_candidates as $t_name => $t_label) {
         echo '<li><a href="?_table=' . rawurlencode($t_name) . '&_action=view">'
@@ -194,10 +175,10 @@ $table_title = render_escape(
     (string) ($snapshot['presentation']['labels']['table'][$task_table]['data_full'] ?? $task_table)
 );
 
-echo "<!doctype html><html><head><meta charset=\"utf-8\"><title>$table_title</title>";
-echo render_admin_styles();
-echo '</head><body>';
-echo '<p><a class="home-link" href="?_action=home">← Домой</a></p>';
+echo render_admin_page_open(
+    $table_title,
+    '<a class="home-link" href="?_action=home">← Домой</a>'
+);
 echo "<h2>$table_title</h2>";
 
 // --- 6. конвейер + рендер ---------------------------------------------------------

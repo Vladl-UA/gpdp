@@ -31,13 +31,7 @@ require 'core.php';
 require 'helpers.php';
 require 'render.php';
 
-$cfg = config()['db'];
-$db_connection = @mysqli_connect($cfg['host'], $cfg['user'], $cfg['password'], $cfg['name']);
-if ($db_connection === false) {
-    http_response_code(500);
-    exit('Нет соединения с БД: ' . mysqli_connect_error());
-}
-mysqli_set_charset($db_connection, 'utf8mb4');
+$db_connection = admin_db_connect();
 
 // --- (auth: контур не утверждён — см. STATE.md; серьёзный периметр --------
 //      прав по таблицам заявлен как обязательное будущее требование) ------
@@ -432,14 +426,14 @@ if ($caction === 'delete_table' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 $flash    = isset($_GET['_msg']) ? render_escape((string) $_GET['_msg']) : null;
 $flash_ok = ($_GET['_ok'] ?? '1') === '1';
 
-echo '<!doctype html><html><head><meta charset="utf-8"><title>Конфигуратор GPDP</title>';
-echo render_admin_styles();
-echo '</head><body>';
+echo render_admin_page_open(
+    'Конфигуратор GPDP',
+    '<a class="home-link" href="index.php">← Домой</a> · '
+    . '<a class="home-link" href="labels.php">Подписи и словари</a>'
+);
 
 echo '<h1>Конфигуратор БД (v0)</h1>';
-if ($flash !== null) {
-    echo '<div class="flash ' . ($flash_ok ? 'flash-ok' : 'flash-err') . '">' . $flash . '</div>';
-}
+echo render_admin_flash($flash, $flash_ok);
 
 if ($caction === 'new_table') {
 

@@ -15,7 +15,7 @@ declare(strict_types=1);
  * маппинга в label.
  */
 
-// sync: 2026-07-10, дизайн — админ-интерфейс во всю ширину окна от левого края (убраны max-width:900px и margin auto)
+// sync: 2026-07-10, общий каркас админ-страниц: render_admin_page_open/render_admin_flash + полноширинный дизайн
 
 /**
  * Общий вид админ-интерфейсов (index.php, configurator.php) — один
@@ -49,6 +49,42 @@ function render_admin_styles(): string
     .act-danger:hover{background:#fee}
     </style>
     CSS;
+}
+
+/**
+ * Открытие админ-страницы: doctype, head (charset, title, общие стили),
+ * открытый body и строка навигации. Один каркас на index.php /
+ * configurator.php / labels.php — тем же ходом, что render_admin_styles():
+ * страницы остаются хозяевами содержимого, обвязка — одна.
+ *
+ * $nav_html   — готовый HTML строки навигации (ссылки различаются по
+ *               страницам; пустая строка — без навигации);
+ * $extra_head — дополнительный <style>/<meta> конкретной страницы.
+ */
+function render_admin_page_open(string $title, string $nav_html = '', string $extra_head = ''): string
+{
+    $out = '<!doctype html><html><head><meta charset="utf-8"><title>'
+         . render_escape($title) . '</title>'
+         . render_admin_styles()
+         . $extra_head
+         . '</head><body>';
+    if ($nav_html !== '') {
+        $out .= '<p>' . $nav_html . '</p>';
+    }
+    return $out;
+}
+
+/**
+ * Блок флеш-сообщения. null — пустая строка (ничего не выводится).
+ * Экранирование — на вызывающем: часть страниц кладёт в флеш уже
+ * экранированный текст (configurator), часть — сырой (labels).
+ */
+function render_admin_flash(?string $message, bool $ok): string
+{
+    if ($message === null || $message === '') {
+        return '';
+    }
+    return '<div class="flash ' . ($ok ? 'flash-ok' : 'flash-err') . '">' . $message . '</div>';
 }
 
 function render_escape(string $text): string
