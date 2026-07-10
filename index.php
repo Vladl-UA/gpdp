@@ -16,7 +16,7 @@ error_reporting(E_ALL);
  * сырой request не проходит.
  */
 
-// sync: 2026-07-10, STATE.md п.7 (well как корень, карта объекта, навигация «Домой»)
+// sync: 2026-07-10, STATE.md п.7 + меню админ-страниц (конфигуратор, подписи и словари) на домашней
 
 // --- 1. boot -----------------------------------------------------------------
 
@@ -103,7 +103,10 @@ if (!$table_requested || $request_action === 'home') {
 
     echo '<!doctype html><html><head><meta charset="utf-8"><title>GPDP</title>';
     echo render_admin_styles();
-    echo '</head><body><h2>Главные таблицы</h2><ul>';
+    echo '</head><body>';
+    echo '<p><a class="home-link" href="configurator.php">⚙ Конфигуратор</a> · '
+       . '<a class="home-link" href="labels.php">🏷 Подписи и словари</a></p>';
+    echo '<h2>Главные таблицы</h2><ul>';
     foreach ($root_candidates as $t_name => $t_label) {
         echo '<li><a href="?_table=' . rawurlencode($t_name) . '&_action=view">'
             . render_escape($t_label) . '</a></li>';
