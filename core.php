@@ -1,0 +1,1459 @@
+<?php
+declare(strict_types=1);
+
+/**
+ * GPDP / RNA — ядро. То, без чего GPDP не существует.
+ *
+ * Пространство имён функций (формализовано, см. ARCHITECTURE.md):
+ * закрытый словарь семейств ядра + одно открытое множество сущностей.
+ *
+ *   entity_*    реестр сущностей
+ *   field_*     разбор имени, пакет данных, точка исполнения
+ *   snapshot_*  модель: сборка, хранение, lock, два пути обновления
+ *   action_*    карта «действие пользователя → внутренний режим»
+ *   record_*    универсальная запись
+ *   lookup_*    (helpers.php) инструменты сущностей
+ *   render_*    (render.php) вывод
+ *   ent_<id>    (entities.php) паспорта
+ *   <id>_*      (entities.php) функции сущности; префикс = префикс поля БД
+ *
+ * Направление вызовов: index → core → entities → helpers. Не наоборот.
+ *
+ * Принцип тонкой трубы: все проверки живут на границе подготовки,
+ * ровно один раз. Внутрь конвейера недоверенные данные не проходят
+ * по построению, поэтому конвейер ничего не перепроверяет.
+ *
+ * Формула системы:
+ *     $result = ($passport['handlers'][$mode])($data, $mode);
+ */
+
+// --- Классы функций и структурные элементы -----------------------------------
+const ENTITY_FUNCTION_PREFIX = 'ent_';
+
+// Зарезервированные идентификаторы: словарь системы. Сущность не может
+// занять имя семейства ядра/слоя — иначе её функции <id>_* въехали бы
+// в чужое пространство. Проверяется при сборке реестра (не в горячем пути).
+const ENTITY_RESERVED_IDS = [
+    'ent', 'sys', 'rel', 'adm', 'chk', 'fmt',          // классы функций
+    'entity', 'field', 'snapshot', 'action', 'record',  // семейства ядра
+    'lookup', 'render', 'config', 'core', 'index',      // слои и файлы
+];
+
+// Структурные элементы — идентичность, иерархия, связи. Не сущности,
+// интерпретируются ядром напрямую, НИКОГДА не пишутся обычным save.
+// Первичный ключ — id; index остался в археологии.
+const STRUCTURAL_PREFIXES    = ['dep_'];
+const STRUCTURAL_FIELD_NAMES = ['id', 'rel_main', 'active'];
+// 'active' — статус элемента модели (ARCHITECTURE.md §17), допустим в
+// служебных таблицах (model_registry и далее); в предметных — ошибка
+// модели по доктрине, парсер это не проверяет (не его роль), проверка —
+// за конфигуратором/ревью при регистрации предметной таблицы.
+
+/**
+ * Служебные таблицы ядра (ARCHITECTURE.md §17: «семейство model_*»).
+ * Не предметные данные — не проходят классификацию полей структурного
+ * сканера вообще (не entity, не forms, не generic CRUD через ?_table=).
+ * Читаются ТОЛЬКО именованными функциями (snapshot_build_registry,
+ * snapshot_build_presentation), которые знают точные имена колонок
+ * напрямую. Расширяется префиксом: любая будущая model_* таблица
+ * автоматически защищена без правки этой константы.
+ */
+const SYSTEM_TABLE_PREFIX = 'model_';
+
+// Служебная таблица подписей — знание платформы, не предметной модели.
+const MODEL_REGISTRY_TABLE = 'model_registry';
+const MODEL_LABELS_TABLE   = 'model_labels';
+
+// --- Карта действий -----------------------------------------------------------
+// Единственная дверь между пользователем и режимами сущностей.
+// Пользователь выбирает действие, карта выбирает режим, паспорт — функцию.
+// Действия записи (save_new / save_edit / delete) — операции конвейера,
+// а не режимы сущностей: index разводит их до этой карты.
+const ACTION_MODES = [
+    'view' => 'read',
+    'new'  => 'new',
+    'edit' => 'edit',
+];
+
+function action_mode(string $request_action): ?string
+{
+    return ACTION_MODES[$request_action] ?? null;
+}
+
+// ============================================================================
+// entity_* — реестр сущностей
+// ============================================================================
+
+/**
+ * Легальный id сущности: коротко, латиница в нижнем регистре,
+ * начинается с буквы, не входит в словарь зарезервированных.
+ */
+function entity_id_valid(string $entity_id): bool
+{
+    if (in_array($entity_id, ENTITY_RESERVED_IDS, true)) {
+        return false;
+    }
+
+    return (bool) preg_match('/^[a-z][a-z0-9]{1,5}$/', $entity_id);
+}
+
+/**
+ * Сканирует entities.php диффом get_defined_functions().
+ * Кандидат — функция ent_*; Reflection страхует от вызова функции,
+ * требующей аргументов (паспорт всегда без аргументов).
+ */
+function entity_registry_load(string $entities_file): array
+{
+    if (!is_file($entities_file)) {
+        return [];
+    }
+
+    $before = get_defined_functions()['user'];
+    require $entities_file;
+    $after = get_defined_functions()['user'];
+
+    $entities = [];
+
+    foreach (array_diff($after, $before) as $function_name) {
+        if (!str_starts_with($function_name, ENTITY_FUNCTION_PREFIX)) {
+            continue;
+        }
+
+        $entity_id = substr($function_name, strlen(ENTITY_FUNCTION_PREFIX));
+        if (!entity_id_valid($entity_id)) {
+            continue;
+        }
+
+        $reflection = new ReflectionFunction($function_name);
+        if ($reflection->getNumberOfRequiredParameters() > 0) {
+            continue;
+        }
+
+        $passport = $function_name();
+        if (!is_array($passport) || ($passport['id'] ?? null) !== $entity_id) {
+            continue;
+        }
+
+        $entities[$entity_id] = $passport;
+    }
+
+    return $entities;
+}
+
+/** Реестр на текущий запрос: строится один раз, дальше чтение. */
+function entities(): array
+{
+    static $entities = null;
+
+    if ($entities === null) {
+        $entities = entity_registry_load(config()['paths']['entities']);
+    }
+
+    return $entities;
+}
+
+// ============================================================================
+// field_* — разбор имени, пакет данных, точка исполнения
+// ============================================================================
+
+/**
+ * Полный разбор имени поля.
+ * kind: 'entity_field' | 'structural' | 'unknown'.
+ * unknown — ошибка конфигурации; роняет сборку snapshot (fail-fast
+ * на границе), до конвейера такое поле не доживает.
+ */
+function field_parse(string $field_name): array
+{
+    $parsed = [
+        'raw'    => $field_name,
+        'kind'   => 'unknown',
+        'entity' => null,
+        'name'   => null,
+    ];
+
+    if (in_array($field_name, STRUCTURAL_FIELD_NAMES, true)) {
+        $parsed['kind'] = 'structural';
+        $parsed['name'] = $field_name;
+        return $parsed;
+    }
+
+    foreach (STRUCTURAL_PREFIXES as $prefix) {
+        if (str_starts_with($field_name, $prefix)) {
+            $parsed['kind'] = 'structural';
+            $parsed['name'] = substr($field_name, strlen($prefix));
+            return $parsed;
+        }
+    }
+
+    foreach (array_keys(entities()) as $entity_id) {
+        if (str_starts_with($field_name, $entity_id . '_')) {
+            $parsed['kind']   = 'entity_field';
+            $parsed['entity'] = $entity_id;
+            $parsed['name']   = substr($field_name, strlen($entity_id) + 1);
+            return $parsed;
+        }
+    }
+
+    return $parsed;
+}
+
+/** Совместимая обёртка: только идентификатор сущности/структурного элемента. */
+function field_prefix(string $field_name): ?string
+{
+    $parsed = field_parse($field_name);
+
+    return match ($parsed['kind']) {
+        'entity_field' => $parsed['entity'],
+        'structural'   => $parsed['raw'],
+        default        => null,
+    };
+}
+
+/**
+ * Сборка доверенного пакета $data — часть подготовки задания.
+ * Здесь проходит граница: имя поля сверяется со snapshot, подпись
+ * (model_labels, §17) кладётся КАК ЕСТЬ (колонку выбирает потребитель).
+ * null — подсказка из request не подтвердилась моделью.
+ */
+function field_data(
+    array $snapshot,
+    mysqli $db_connection,
+    string $table,
+    string $field_name,
+    mixed $value = null,
+    ?array $row = null
+): ?array {
+    $field_schema = $snapshot['structure']['tables'][$table]['fields'][$field_name] ?? null;
+    if ($field_schema === null || $field_schema['kind'] !== 'entity_field') {
+        return null;
+    }
+
+    return [
+        'table' => $table,
+        'field' => [
+            'raw'    => $field_name,
+            'entity' => $field_schema['entity'],
+            'name'   => substr($field_name, strlen($field_schema['entity']) + 1),
+            'subscr' => $snapshot['presentation']['labels']['field'][$table][$field_name] ?? [],
+            // Скомпилированный словарный адрес (§16.1): разрешён при
+            // сборке снапшота, рантайм из имени НЕ выводит.
+            // null — поле словарь не адресует.
+            'source' => $snapshot['model']['dictionaries'][$field_name]['source_table'] ?? null,
+            // Полная скомпилированная запись словаря (§16.1): для
+            // склада/адреса — источник, для проекции — ещё и план
+            // сборки подписи. Хендлер самодостаточен, карта целиком
+            // ему не нужна.
+            'dict'   => $snapshot['model']['dictionaries'][$field_name] ?? null,
+            'schema' => [
+                'db_type'  => $field_schema['db_type'],
+                'nullable' => $field_schema['nullable'],
+                'key'      => $field_schema['key'],
+            ],
+        ],
+        'value' => $value,
+        'row'   => $row,
+        'db'    => $db_connection, // для helper'ов (lookup_*); сырой SQL из request запрещён
+    ];
+}
+
+/**
+ * Точка исполнения — тонкая труба. Вся GPDP в пределе:
+ *
+ *     $handler($data, $mode)
+ *
+ * Никаких проверок внутри: пакет собран field_data() (граница пройдена),
+ * режим рождён action_mode() или литералом конвейера записи — путей,
+ * которыми сюда попали бы недоверенные данные, не существует.
+ * Callable — только из паспорта.
+ *
+ * null — сущность не заявила handler для режима; что это значит,
+ * решает вызывающий код.
+ */
+function field_exec(array $data, string $mode): ?array
+{
+    $handler = entities()[$data['field']['entity']]['handlers'][$mode] ?? null;
+
+    return $handler === null ? null : $handler($data, $mode);
+}
+
+// ============================================================================
+// snapshot_* — модель: сборка, хранение, lock, два пути обновления
+// ============================================================================
+
+
+/** Минимальная валидность: единая точка для построенного и прочитанного. */
+function snapshot_validate(array $snapshot): bool
+{
+    if (!isset($snapshot['structure']['tables']) || !is_array($snapshot['structure']['tables'])) {
+        return false;
+    }
+    if (!isset($snapshot['presentation']) || !is_array($snapshot['presentation'])) {
+        return false;
+    }
+    // Файл до-словарной эпохи (нет model.dictionaries) невалиден:
+    // load вернёт null → bootstrap пересоберёт. Иначе voc-поля
+    // получили бы source=null и упали бы SQL-ошибкой в глубине.
+    if (!isset($snapshot['model']['dictionaries']) || !is_array($snapshot['model']['dictionaries'])) {
+        return false;
+    }
+    // Аналогично: файл до-графовой эпохи (нет model.relations) →
+    // пересборка на bootstrap. snapshot_validate растёт вместе
+    // с форматом (урок журнала 07-08 про ископаемый снапшот).
+    if (!isset($snapshot['model']['relations']) || !is_array($snapshot['model']['relations'])) {
+        return false;
+    }
+
+    return count($snapshot['structure']['tables']) > 0;
+}
+
+/**
+ * Structural-слой: живое чтение структуры БД. Допустимо только при
+ * bootstrap, явной пересборке и в контуре конфигуратора.
+ */
+function snapshot_build_structure(mysqli $db_connection): array
+{
+    $tables         = [];
+    $unknown_fields = [];
+
+    $tables_result = mysqli_query($db_connection, 'SHOW TABLES');
+    while ($table_row = mysqli_fetch_row($tables_result)) {
+        $table_name = $table_row[0];
+
+        // Служебные таблицы ядра (model_*) — не предметные данные,
+        // классификации полей не подлежат вообще (см. константу выше).
+        if (str_starts_with($table_name, SYSTEM_TABLE_PREFIX)) {
+            continue;
+        }
+
+        $fields = [];
+
+        $columns_result = mysqli_query($db_connection, "SHOW COLUMNS FROM `$table_name`");
+        while ($column_row = mysqli_fetch_assoc($columns_result)) {
+            $field_name = $column_row['Field'];
+            $parsed     = field_parse($field_name);
+
+            if ($parsed['kind'] === 'unknown') {
+                $unknown_fields[] = "$table_name.$field_name";
+            }
+
+            $fields[$field_name] = [
+                'name'     => $field_name,
+                'kind'     => $parsed['kind'],
+                'entity'   => $parsed['entity'],
+                'db_type'  => $column_row['Type'],
+                'nullable' => $column_row['Null'] === 'YES',
+                'key'      => $column_row['Key'],
+            ];
+        }
+
+        $tables[$table_name] = [
+            'name'   => $table_name,
+            'fields' => $fields,
+        ];
+    }
+
+    return ['tables' => $tables, 'unknown_fields' => $unknown_fields];
+}
+
+/**
+ * Model-слой: разрешение словарных адресов (ARCHITECTURE.md §16.1).
+ *
+ * Чистая функция над УЖЕ собранной структурой: живой БД не касается,
+ * ни одного SHOW — всё, что нужно лестнице («существует ли таблица»,
+ * «есть ли data_name»), уже лежит в $structure. Разрешение происходит
+ * один раз на границе сборки; рантайм (voc_handler) читает готовый
+ * source из пакета и НЕ выводит его из имени поля.
+ *
+ * Лестница по каждому имени voc_x:
+ *   1. таблица voc_x существует        → склад   (уровень 0)
+ *   2. её нет, таблица x с data_name   → адрес   (уровень 1),
+ *      label_from = x — хук наследования подписи (§16.1; показ
+ *      унаследованной подписи в presentation — отложен, журнал 07-07)
+ *   3. x есть, data_name нет           → «нужен паспорт словаря»
+ *   4. ни voc_x, ни x                  → «неизвестный адрес словаря»
+ *
+ * Границы (журнал 2026-07-07, согласованы до кода):
+ *   — резолвер КОНВЕНЦИОННЫЙ и временный: первая ступень, не паспортная
+ *     доктрина словарей; проекции/дескрипторы описываются явно на (а2);
+ *   — ключ карты — имя поля: одно имя voc_x = один смысл на всю модель;
+ *     контекстно-разные словари → переход к [owner][field], когда
+ *     реально понадобятся, не раньше;
+ *   — пока таблиц-описателей не существует, существующая voc_x — склад;
+ *     различение склад/дескриптор — строгая граница (а2).
+ */
+/**
+ * Разбор строки-шаблона (§16.3): '{voc_area} №{data_number}' →
+ * последовательность literal|token. Чистая функция СИНТАКСИСА:
+ * что означает токен — решает потребитель. Сегодня потребитель один —
+ * компилятор словарных проекций; названное будущее (журнал 07-08,
+ * не заготовка) — паспорта формул math_: сестринское семейство
+ * разделяет синтаксис ссылки {поле}, но не семантику.
+ *
+ * Непарная скобка — ошибка синтаксиса, не литерал: опечатка ручного
+ * SQL падает громко на границе сборки, а не тихо кривой подписью.
+ */
+function template_parse(string $template): array
+{
+    $parts = preg_split('/\{([a-z0-9_]+)\}/i', $template, -1, PREG_SPLIT_DELIM_CAPTURE);
+    $items = [];
+
+    foreach ($parts as $i => $part) {
+        if ($i % 2 === 1) { // нечётные — имена токенов из capture-группы
+            $items[] = ['kind' => 'token', 'name' => $part];
+            continue;
+        }
+        if ($part === '') {
+            continue;
+        }
+        if (str_contains($part, '{') || str_contains($part, '}')) {
+            return ['items' => [], 'error' => "непарная скобка около «{$part}»"];
+        }
+        $items[] = ['kind' => 'literal', 'value' => $part];
+    }
+
+    return ['items' => $items, 'error' => null];
+}
+
+function snapshot_build_dictionaries(array $structure, array $templates = []): array
+{
+    $map        = [];
+    $unresolved = [];
+
+    // ---- Проход 1: разрешение источника по лестнице §16.1 ----
+    foreach ($structure['tables'] as $table) {
+        foreach ($table['fields'] as $field_name => $field) {
+            if (($field['kind'] ?? '') !== 'entity_field' || ($field['entity'] ?? '') !== 'voc') {
+                continue;
+            }
+            if (isset($map[$field_name])) {
+                continue; // одно имя = один смысл: уже разрешено у другого владельца
+            }
+
+            $bare = substr($field_name, strlen($field['entity']) + 1); // voc_area → area
+
+            // Кандидат-источник: склад (voc_x) прежде адреса (x) —
+            // порядок ступеней (а1) не меняется.
+            $source = null;
+            $family = null;
+            if (isset($structure['tables'][$field_name])) {
+                $source = $field_name;
+                $family = 'warehouse';
+            } elseif (isset($structure['tables'][$bare])) {
+                $source = $bare;
+                $family = 'address';
+            } else {
+                $unresolved[] = "$field_name: неизвестный адрес словаря (нет ни `$field_name`, ни `$bare`)";
+                continue;
+            }
+
+            // Маяк (§16.1 п.2): непустой шаблон на источнике — проекция.
+            // Явный маяк СИЛЬНЕЕ конвенции data_name: проставленный
+            // человеком шаблон не может молча игнорироваться. План
+            // компилируется проходом 2 (там же циклодетект).
+            if (isset($templates[$source])) {
+                $map[$field_name] = [
+                    'source_table' => $source,
+                    'label_column' => null,
+                    'subtype'      => 'projection',
+                    'template'     => $templates[$source],
+                ];
+                continue;
+            }
+
+            // Без маяка — конвенция data_name, как в (а1).
+            if (!isset($structure['tables'][$source]['fields']['data_name'])) {
+                $unresolved[] = $family === 'warehouse'
+                    ? "$field_name: таблица-склад `$source` повреждена (нет data_name, нет шаблона)"
+                    : "$field_name: таблице `$source` нужен паспорт словаря (нет data_name, нет шаблона)";
+                continue;
+            }
+
+            $map[$field_name] = $family === 'warehouse'
+                ? ['source_table' => $source, 'label_column' => 'data_name', 'subtype' => 'warehouse']
+                : ['source_table' => $source, 'label_column' => 'data_name', 'subtype' => 'address', 'label_from' => $source];
+        }
+    }
+
+    // ---- Проход 2: компиляция планов проекций + циклодетект §16.5 ----
+    // План — последовательность [literal|field|dict]. Токен {имя_поля}
+    // ссылается ТОЛЬКО на поле той же строки источника (граница объёма
+    // (а2), журнал 07-08); токены сверяются с whitelist структуры —
+    // fail-fast на несуществующее поле, та же дисциплина, что
+    // «нужен паспорт». Цикл (шаблон А → словарь Б → шаблон Б → А) —
+    // fail-fast сборки с перечнем цепочки.
+    $plans     = [];
+    $visiting  = [];
+    $attempted = []; // источники, на которых compile() уже завершился
+                      // (успехом ИЛИ провалом) — без этого дособорка
+                      // '@table' повторно вызывает compile() на уже
+                      // проваленном источнике и дублирует ошибку
+
+    $compile = function (string $source) use (&$compile, &$plans, &$visiting, &$attempted, &$unresolved, $templates, $structure, $map): bool {
+        if (isset($plans[$source])) {
+            return true;
+        }
+        if (isset($visiting[$source])) {
+            $unresolved[] = 'цикл шаблонов: ' . implode(' → ', array_keys($visiting)) . " → $source";
+            return false;
+        }
+        if (isset($attempted[$source])) {
+            return false; // завершённая РАНЕЕ (не текущая) попытка провалилась —
+                           // ошибка уже в unresolved, не дублируем. Проверка идёт
+                           // ПОСЛЕ visiting: иначе циклический повторный вызов
+                           // (source ещё в работе, attempted уже true) гасится
+                           // здесь молча, не долетая до детекта цикла выше.
+        }
+        $attempted[$source] = true;
+        $visiting[$source]  = true;
+
+        $plan   = [];
+        $clean  = true;
+        $parsed = template_parse($templates[$source]);
+
+        if ($parsed['error'] !== null) {
+            $unresolved[] = "шаблон `$source`: {$parsed['error']}";
+            unset($visiting[$source]);
+            return false;
+        }
+
+        foreach ($parsed['items'] as $item) {
+            if ($item['kind'] === 'literal') {
+                $plan[] = ['kind' => 'literal', 'value' => $item['value']];
+                continue;
+            }
+
+            $token       = $item['name'];
+            $token_field = $structure['tables'][$source]['fields'][$token] ?? null;
+
+            if ($token_field === null) {
+                $unresolved[] = "шаблон `$source`: поле `{$token}` не существует в источнике";
+                $clean        = false;
+                continue;
+            }
+
+            if (($token_field['kind'] ?? '') === 'entity_field' && ($token_field['entity'] ?? '') === 'voc') {
+                if (!isset($map[$token])) {
+                    // словарь-токен не разрешился проходом 1 — его причина
+                    // уже в unresolved, здесь не дублируем, только помечаем
+                    $clean = false;
+                    continue;
+                }
+                if ($map[$token]['subtype'] === 'projection' && !$compile($map[$token]['source_table'])) {
+                    $clean = false;
+                    continue;
+                }
+                $plan[] = ['kind' => 'dict', 'field' => $token];
+                continue;
+            }
+
+            $plan[] = ['kind' => 'field', 'field' => $token];
+        }
+
+        unset($visiting[$source]);
+
+        if (!$clean) {
+            return false;
+        }
+        $plans[$source] = $plan;
+        return true;
+    };
+
+    foreach ($map as $entry) {
+        if ($entry['subtype'] === 'projection') {
+            $compile($entry['source_table']);
+        }
+    }
+
+    // Таблицы с маяком, на которые НИКТО не ссылается voc-полем, в
+    // проход 1 не попали (его вход — voc-поля). Но подпись СОБСТВЕННОГО
+    // объекта (карточка, список, «к чему привязан») не должна зависеть
+    // от наличия входящих ссылок. Дособираем их под ключом '@table' —
+    // '@' невозможен в имени поля, коллизии с voc-ключами исключены;
+    // record_label адресует подпись объекта именно по '@'.($table).
+    foreach ($templates as $table_name => $_) {
+        $self_key = '@' . $table_name;
+        if (isset($map[$self_key]) || !isset($structure['tables'][$table_name])) {
+            continue;
+        }
+        if ($compile($table_name)) {
+            $map[$self_key] = [
+                'source_table' => $table_name,
+                'label_column' => null,
+                'subtype'      => 'projection',
+                'template'     => $templates[$table_name],
+            ];
+        }
+    }
+
+    if ($unresolved !== []) {
+        return ['map' => $map, 'unresolved' => $unresolved];
+    }
+
+    // ---- Вложение дочерних записей в dict-шаги плана ----
+    // Ацикличность доказана компиляцией → рекурсия конечна. Каждая
+    // запись самодостаточна: исполнителю (lookup_labels) не нужна вся
+    // карта — только своя запись из пакета field_data.
+    $embedded = [];
+    $embed    = function (string $voc_field) use (&$embed, &$embedded, &$map, $plans): array {
+        if (isset($embedded[$voc_field])) {
+            return $embedded[$voc_field];
+        }
+        $entry = $map[$voc_field];
+        if ($entry['subtype'] === 'projection') {
+            $plan = [];
+            foreach ($plans[$entry['source_table']] as $item) {
+                if ($item['kind'] === 'dict') {
+                    $item['dict'] = $embed($item['field']);
+                }
+                $plan[] = $item;
+            }
+            $entry['plan'] = $plan;
+        }
+        return $embedded[$voc_field] = $entry;
+    };
+
+    foreach (array_keys($map) as $voc_field) {
+        $map[$voc_field] = $embed($voc_field);
+    }
+
+    return ['map' => $map, 'unresolved' => []];
+}
+
+/**
+ * Model-слой: граф связей (STATE.md «Сейчас» п.3, шаг 2).
+ *
+ * Чистая функция над УЖЕ собранной структурой — ноль SHOW. Легаси
+ * find_dep() перебирал ВСЕ таблицы рантаймом на каждый чих
+ * («с кучей запросов, зато да») — здесь граф компилируется один раз
+ * на границе сборки, рантайм читает готовый индекс (§8).
+ *
+ * Семантика (журнал 07-08, по разбору легаси param.php/button_new,
+ * не только дампу):
+ *   dep_<parent> — FK на строке-ПОТОМКА → непосредственный родитель,
+ *     ставит ссылающуюся таблицу в подчинение: связь ВКЛЮЧЕНИЯ
+ *     в дерево владения. record_children читает по ней.
+ *   rel_main     — связь ПРИНАДЛЕЖНОСТИ корневому досье, ШИРЕ дерева:
+ *     не только сквозной доступ к корню для записей на dep_-линии, но и
+ *     БОКОВЫЕ таблицы вне линии (пласты, замеры, примечания) — те, что
+ *     относятся к центральной записи, но не являются ничьим прямым
+ *     ребёнком. record_children их НЕ видит и не должен; будущая
+ *     record_root_related по relations_root — «Позже». `main` здесь не
+ *     модель, а единственный системный корень: rel_main — частный случай
+ *     rel_<root>, обобщается при мультикорневости (см. STATE.md «Позже»).
+ *     Сейчас компилируется, но НЕ рендерится.
+ *
+ * map:  [parent => [ ['child' => ..., 'fk' => 'dep_parent'], ... ]]
+ * root: [table, ...] — кто несёт rel_main (боковые + линейные вперемешку).
+ * dep_ на несуществующую таблицу — fail-fast (конфигуратор не должен
+ * был позволить; ручной SQL падает громко, та же дисциплина, что
+ * у словарей).
+ */
+function snapshot_build_relations(array $structure): array
+{
+    $map        = [];
+    $root       = [];
+    $unresolved = [];
+
+    foreach ($structure['tables'] as $table_name => $table) {
+        foreach ($table['fields'] as $field_name => $field) {
+            if (($field['kind'] ?? '') !== 'structural') {
+                continue;
+            }
+            if ($field_name === 'rel_main') {
+                $root[] = $table_name;
+                continue;
+            }
+            if (!str_starts_with($field_name, 'dep_')) {
+                continue;
+            }
+
+            $parent = substr($field_name, 4);
+            if (!isset($structure['tables'][$parent])) {
+                $unresolved[] = "$table_name.$field_name: родительская таблица `$parent` не существует";
+                continue;
+            }
+
+            $map[$parent][] = ['child' => $table_name, 'fk' => $field_name];
+        }
+    }
+
+    return ['map' => $map, 'root' => $root, 'unresolved' => $unresolved];
+}
+
+/**
+ * Model-слой: адресное пространство модели (ARCHITECTURE.md §17).
+ * Ключ — полный адрес реестра (data_kind, data_owner, data_element).
+ * Только active=1: неактивный элемент исключается из компиляции здесь,
+ * а не проверкой постфактум — то и есть смысл §17 «active=0 исключает
+ * из model/presentation-компиляции».
+ *
+ * $structure передаётся для лёгкого аудита сирот (доктрина: мусор
+ * реестра инертен, в отчёт сборки, НЕ fail-fast) — сирота реестра
+ * никого не блокирует, пока на неё никто не ссылается (§17).
+ */
+function snapshot_build_registry(mysqli $db_connection, array $structure): array
+{
+    $registry = ['table' => [], 'field' => []];
+    $orphans  = [];
+
+    $sql = 'SELECT id, data_kind, data_owner, data_element FROM `'
+         . MODEL_REGISTRY_TABLE . '` WHERE active = 1';
+    $result = @mysqli_query($db_connection, $sql);
+
+    if ($result === false) {
+        return ['map' => $registry, 'orphans' => $orphans];
+    }
+
+    while ($row = mysqli_fetch_assoc($result)) {
+        $kind    = $row['data_kind'];
+        $owner   = $row['data_owner'];
+        $element = $row['data_element'];
+
+        if ($kind === 'table') {
+            $registry['table'][$element] = $row;
+            if (!isset($structure['tables'][$element])) {
+                $orphans[] = "table:$element";
+            }
+        } elseif ($kind === 'field') {
+            $registry['field'][$owner][$element] = $row;
+            if (!isset($structure['tables'][$owner]['fields'][$element])) {
+                $orphans[] = "field:$owner.$element";
+            }
+        }
+        // неизвестный data_kind: инертен, не наш случай сегодня (§17 —
+        // новые kind вводятся решением, не впрок) — просто игнорируется.
+    }
+
+    return ['map' => $registry, 'orphans' => $orphans];
+}
+
+/**
+ * Presentation-слой: подписи (ARCHITECTURE.md §17 model_labels).
+ * JOIN с реестром — не для отображения, а чтобы получить полный адрес
+ * (kind/owner/element) для ключа: сама labels хранит только FK.
+ * Ключи — той же формы, что у snapshot_build_registry(), той же
+ * причине: потребитель ищет подпись и адрес по одному пути.
+ * Только active=1 — та же компиляционная граница, что у реестра.
+ */
+function snapshot_build_presentation(mysqli $db_connection): array
+{
+    $labels = ['table' => [], 'field' => []];
+
+    $sql = 'SELECT r.data_kind, r.data_owner, r.data_element,
+                    l.data_short, l.data_full, l.data_label_template
+             FROM `' . MODEL_LABELS_TABLE . '` l
+             JOIN `' . MODEL_REGISTRY_TABLE . '` r
+               ON r.id = l.dep_model_registry
+             WHERE r.active = 1';
+    $result = @mysqli_query($db_connection, $sql);
+
+    if ($result !== false) {
+        while ($row = mysqli_fetch_assoc($result)) {
+            $kind    = $row['data_kind'];
+            $owner   = $row['data_owner'];
+            $element = $row['data_element'];
+
+            if ($kind === 'table') {
+                $labels['table'][$element] = $row;
+            } elseif ($kind === 'field') {
+                $labels['field'][$owner][$element] = $row;
+            }
+        }
+    }
+
+    return ['labels' => $labels];
+}
+
+/**
+ * Маяки составных подписей (§16.1 п.2): непустой data_label_template
+ * на строке data_kind='table'. Маяк — данные (model_labels), не
+ * структура: потому presentation читается ДО резолвера словарей.
+ */
+function snapshot_templates(array $presentation): array
+{
+    $templates = [];
+
+    foreach ($presentation['labels']['table'] ?? [] as $table_name => $label_row) {
+        $template = trim((string) ($label_row['data_label_template'] ?? ''));
+        if ($template !== '') {
+            $templates[$table_name] = $template;
+        }
+    }
+
+    return $templates;
+}
+
+/**
+ * Полная сборка. $application — параметры приложения (root_table и т.п.):
+ * принадлежат модели, приходят снаружи, здесь не зашиты.
+ * null при unknown-полях — fail-fast, причина в snapshot_last_error().
+ */
+function snapshot_build(mysqli $db_connection, array $application = []): ?array
+{
+    $structure = snapshot_build_structure($db_connection);
+
+    if ($structure['unknown_fields'] !== []) {
+        snapshot_last_error(
+            'Поля без сущности: ' . implode(', ', $structure['unknown_fields'])
+            . '. Конфигуратор не должен был позволить их создать.'
+        );
+        return null;
+    }
+
+    // Presentation читается ДО резолвера словарей: маяки проекций
+    // (data_label_template) — данные model_labels, не структура (§16.1).
+    $presentation = snapshot_build_presentation($db_connection);
+
+    // Словарные адреса разрешаются здесь, на границе сборки (§16.1).
+    // Fail-fast — ВРЕМЕННАЯ жёсткость под гарантию конфигуратора
+    // (он не даёт создать voc-поле без источника; ручной SQL падает
+    // громко, а не тихо врёт). Стратегически ошибка отдельного
+    // элемента модели → локальная деградация, не 503 (журнал 07-07).
+    $dictionaries = snapshot_build_dictionaries(
+        ['tables' => $structure['tables']],
+        snapshot_templates($presentation)
+    );
+
+    if ($dictionaries['unresolved'] !== []) {
+        snapshot_last_error(
+            'Словари не разрешены: ' . implode('; ', $dictionaries['unresolved'])
+            . '. Конфигуратор не должен был позволить такое состояние.'
+        );
+        return null;
+    }
+
+    $registry = snapshot_build_registry($db_connection, ['tables' => $structure['tables']]);
+
+    // Граф связей — та же граница сборки, что словари: fail-fast на
+    // dep_ в никуда, рантайм читает готовый индекс.
+    $relations = snapshot_build_relations(['tables' => $structure['tables']]);
+    if ($relations['unresolved'] !== []) {
+        snapshot_last_error(
+            'Связи не разрешены: ' . implode('; ', $relations['unresolved'])
+            . '. Конфигуратор не должен был позволить такое состояние.'
+        );
+        return null;
+    }
+
+    return [
+        'generated_at' => date('Y-m-d H:i:s'),
+        'structure'    => ['tables' => $structure['tables']],
+        'model'        => [
+            'registry'       => $registry['map'],
+            'dictionaries'   => $dictionaries['map'],
+            'relations'      => $relations['map'],
+            'relations_root' => $relations['root'],
+        ],
+        'presentation' => $presentation,
+        'application'  => $application,
+        // Диагностика, не контракт: сироты реестра не блокируют сборку
+        // (§17 — мусор инертен), но видны для аудита конфигуратором.
+        'registry_orphans' => $registry['orphans'],
+    ];
+}
+
+/** Последняя ошибка сборки/обновления (для dev/debug-вывода). */
+function snapshot_last_error(?string $set = null): ?string
+{
+    static $error = null;
+
+    if ($set !== null) {
+        $error = $set;
+    }
+
+    return $error;
+}
+
+/**
+ * Атомарное сохранение: temp file → контрольное чтение → rename().
+ * Формат — PHP return array: include + opcache, без json_decode.
+ */
+function snapshot_save(array $snapshot): bool
+{
+    if (!snapshot_validate($snapshot)) {
+        return false;
+    }
+
+    $file     = config()['paths']['snapshot'];
+    $tmp_file = $file . '.tmp';
+    $content  = "<?php\nreturn " . var_export($snapshot, true) . ";\n";
+
+    if (file_put_contents($tmp_file, $content, LOCK_EX) === false) {
+        return false;
+    }
+
+    $check = @include $tmp_file;
+    if (!is_array($check) || !snapshot_validate($check)) {
+        @unlink($tmp_file);
+        return false;
+    }
+
+    return rename($tmp_file, $file);
+}
+
+/** Чтение из файла; null = «рабочего снапшота сейчас нет». */
+function snapshot_load(): ?array
+{
+    $file = config()['paths']['snapshot'];
+
+    if (!is_file($file)) {
+        return null;
+    }
+
+    try {
+        $snapshot = include $file;
+    } catch (\Throwable $e) {
+        return null;
+    }
+
+    if (!is_array($snapshot) || !snapshot_validate($snapshot)) {
+        return null;
+    }
+
+    return $snapshot;
+}
+
+// --- lock: только для structural-изменений (DDL) ------------------------------
+
+function snapshot_lock_read(): ?array
+{
+    $file = config()['paths']['lock'];
+
+    if (!is_file($file)) {
+        return null;
+    }
+
+    $lock = json_decode((string) file_get_contents($file), true);
+
+    return is_array($lock) ? $lock : null;
+}
+
+/**
+ * Атомарный захват через fopen('x'). $source: 'auto_ddl' | 'manual' |
+ * 'bootstrap' — чтобы автоматический процесс не снял чужую блокировку.
+ */
+function snapshot_lock_acquire(string $source, string $reason): bool
+{
+    $handle = @fopen(config()['paths']['lock'], 'x');
+    if ($handle === false) {
+        return false;
+    }
+
+    fwrite($handle, json_encode(
+        ['source' => $source, 'reason' => $reason, 'started_at' => time()],
+        JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE
+    ));
+    fclose($handle);
+
+    return true;
+}
+
+function snapshot_lock_release(string $source): bool
+{
+    $lock = snapshot_lock_read();
+    if ($lock === null) {
+        return true;
+    }
+    if ($lock['source'] !== $source) {
+        return false;
+    }
+
+    return unlink(config()['paths']['lock']);
+}
+
+/**
+ * Принудительное снятие — только явное административное действие,
+ * обязанное сначала пересобрать и провалидировать snapshot.
+ */
+function snapshot_lock_force_release(): bool
+{
+    $file = config()['paths']['lock'];
+
+    return !is_file($file) || unlink($file);
+}
+
+// --- два пути обновления -------------------------------------------------------
+
+/** Тяжёлый путь: пересборка structural-слоя. Всегда через lock. */
+function snapshot_rebuild_structure(mysqli $db_connection, string $lock_source, array $application = []): bool
+{
+    if (!snapshot_lock_acquire($lock_source, 'Пересборка structural-слоя snapshot')) {
+        return false;
+    }
+
+    try {
+        $snapshot = snapshot_build($db_connection, $application);
+        if ($snapshot === null) {
+            return false;
+        }
+
+        return snapshot_save($snapshot);
+    } finally {
+        snapshot_lock_release($lock_source);
+    }
+}
+
+/**
+ * Лёгкий путь: обновление presentation-слоя БЕЗ DDL-lock — изменение
+ * подписи не блокирует систему. Под чужим lock отступает: пересборка
+ * прочитает свежие подписи сама.
+ */
+function snapshot_refresh_presentation(mysqli $db_connection): bool
+{
+    if (snapshot_lock_read() !== null) {
+        return false;
+    }
+
+    $snapshot = snapshot_load();
+    if ($snapshot === null) {
+        return false;
+    }
+
+    $presentation = snapshot_build_presentation($db_connection);
+
+    // Шаблоны составных подписей живут в model_labels → правка подписи
+    // может менять словарный слой. Пересборка словарей — обязательная
+    // часть ЛЮБОГО refresh'а presentation (§16.6: не DDL, lock не нужен,
+    // нужен refresh модельного слоя). Кривой шаблон → refresh отклонён,
+    // старый снапшот цел — fail-safe вместо частичного применения.
+    $dictionaries = snapshot_build_dictionaries(
+        $snapshot['structure'],
+        snapshot_templates($presentation)
+    );
+    if ($dictionaries['unresolved'] !== []) {
+        snapshot_last_error('Refresh отклонён, словари не разрешены: '
+            . implode('; ', $dictionaries['unresolved']));
+        return false;
+    }
+
+    $snapshot['presentation']          = $presentation;
+    $snapshot['model']['dictionaries'] = $dictionaries['map'];
+    $snapshot['generated_at']          = date('Y-m-d H:i:s');
+
+    return snapshot_save($snapshot);
+}
+
+/**
+ * Model-слой: лёгкий refresh, без DDL-lock (§8) — тот же путь, что у
+ * presentation, симметрично. Валидация по structural — берём его из
+ * уже загруженного снапшота, не пересобираем: structural не менялся,
+ * лишь потому и разрешён refresh без lock.
+ */
+function snapshot_refresh_model(mysqli $db_connection): bool
+{
+    if (snapshot_lock_read() !== null) {
+        return false;
+    }
+
+    $snapshot = snapshot_load();
+    if ($snapshot === null) {
+        return false;
+    }
+
+    $registry = snapshot_build_registry($db_connection, $snapshot['structure']);
+
+    // Словарный слой зависит и от структуры (не менялась — refresh без
+    // lock и разрешён), и от шаблонов в model_labels — пересобираем
+    // симметрично refresh_presentation, с тем же fail-safe.
+    $presentation = snapshot_build_presentation($db_connection);
+    $dictionaries = snapshot_build_dictionaries(
+        $snapshot['structure'],
+        snapshot_templates($presentation)
+    );
+    if ($dictionaries['unresolved'] !== []) {
+        snapshot_last_error('Refresh отклонён, словари не разрешены: '
+            . implode('; ', $dictionaries['unresolved']));
+        return false;
+    }
+
+    $snapshot['model']['registry']     = $registry['map'];
+    $snapshot['model']['dictionaries'] = $dictionaries['map'];
+    $snapshot['presentation']          = $presentation;
+    $snapshot['registry_orphans']      = $registry['orphans'];
+    $snapshot['generated_at']          = date('Y-m-d H:i:s');
+
+    return snapshot_save($snapshot);
+}
+
+/**
+ * Главная точка входа обычного запроса.
+ * null — штатный сигнал «модель сейчас недоступна», не ошибка.
+ */
+function snapshot_init(mysqli $db_connection, array $application = []): ?array
+{
+    // Лок уважается ОДИНАКОВО в обеих ветках, первым шагом: означает
+    // «структура сейчас в незавершённом состоянии» — не про способ
+    // хранения кэша, dev-режим этого не отменяет (STATE.md, разговор
+    // про мультиинженерный режим).
+    if (snapshot_lock_read() !== null) {
+        return null;
+    }
+
+    if ((config()['snapshot']['mode'] ?? 'cached') === 'live') {
+        // Та же snapshot_build(), что и cached-путь — второго пути
+        // сборки нет (§15.8). Файл не читается и не пишется: staleness
+        // исчезает по построению. Цена — файловый путь (include,
+        // atomic write, холодный старт) в этой ветке не исполняется;
+        // гарант остаётся один — секция 1 смоука, всегда строящая
+        // + пишущая + читающая настоящий файл в cached-режиме.
+        return snapshot_build($db_connection, $application);
+    }
+
+    $snapshot = snapshot_load();
+    if ($snapshot !== null) {
+        return $snapshot;
+    }
+
+    if (!snapshot_rebuild_structure($db_connection, 'bootstrap', $application)) {
+        return null;
+    }
+
+    return snapshot_load();
+}
+
+// ============================================================================
+// record_* — универсальная запись
+// ============================================================================
+
+/** Заготовка честного результата операции (контракт ARCHITECTURE.md §3). */
+function record_result(string $operation, string $table): array
+{
+    return [
+        'ok'            => false,
+        'operation'     => $operation,
+        'table'         => $table,
+        'id'            => null,
+        'affected_rows' => 0,
+        'errors'        => [],
+    ];
+}
+
+/**
+ * Универсальное сохранение. Сущности SQL не пишут: validate-handler
+ * проверяет и нормализует, конвейер собирает prepared INSERT/UPDATE.
+ *
+ * Граница записи (один раз, здесь):
+ *   - whitelist полей = entity-поля таблицы из snapshot;
+ *     лишние ключи $input молча игнорируются;
+ *   - структурные (id, rel_main, dep_*) не пишутся НИКОГДА —
+ *     reparent является отдельным действием;
+ *   - идентификаторы только из snapshot + backticks, значения — bind.
+ */
+function record_save(
+    mysqli $db_connection,
+    array $snapshot,
+    string $table,
+    array $input,
+    ?int $id = null,
+    array $structural = []
+): array {
+    $operation = $id === null ? 'insert' : 'update';
+    $result    = record_result($operation, $table);
+
+    $table_schema = $snapshot['structure']['tables'][$table] ?? null;
+    if ($table_schema === null) {
+        $result['errors'][] = "Таблица '$table' не существует в известной модели";
+        return $result;
+    }
+
+    // --- validate: собираем нормализованные значения -------------------------
+    $normalized = [];
+
+    foreach ($table_schema['fields'] as $field_name => $field_schema) {
+        if ($field_schema['kind'] !== 'entity_field') {
+            continue;
+        }
+        if (!array_key_exists($field_name, $input)) {
+            continue; // частичное обновление законно
+        }
+
+        $data = field_data($snapshot, $db_connection, $table, $field_name, $input[$field_name]);
+        if ($data === null) {
+            continue;
+        }
+
+        $verdict = field_exec($data, 'validate');
+        if ($verdict === null) {
+            continue; // сущность без validate этим путём не сохраняется
+        }
+
+        if (($verdict['valid'] ?? false) !== true) {
+            foreach ($verdict['errors'] ?? [] as $error) {
+                $result['errors'][] = "$field_name: $error";
+            }
+            continue;
+        }
+
+        $normalized[$field_name] = $verdict['value'];
+    }
+
+    if ($result['errors'] !== []) {
+        return $result; // при ошибках валидации не выполняется ничего
+    }
+
+    if ($normalized === []) {
+        $result['errors'][] = 'Нет ни одного поля для сохранения';
+        return $result;
+    }
+
+    // --- доверенный структурный канал (только INSERT) --------------------------
+    // $structural — НЕ request: значения подготовлены границей (index.php
+    // сверил родителя с model.relations и его существование) и приходят
+    // отдельным параметром, минуя $input. Инвариант «структурные поля не
+    // пишутся из request» цел: сюда попадает подготовленный факт, не
+    // подсказка (§9). На UPDATE канал закрыт — reparent остаётся
+    // отдельным защищённым действием (п.5 «Сейчас»), не задним ходом.
+    if ($operation === 'insert') {
+        foreach ($structural as $field_name => $value) {
+            if (($table_schema['fields'][$field_name]['kind'] ?? '') !== 'structural') {
+                $result['errors'][] = "$field_name: не структурное поле таблицы '$table'";
+                return $result;
+            }
+            $normalized[$field_name] = (int) $value;
+        }
+    }
+
+    // --- запись: prepared statement -------------------------------------------
+    $field_names = array_keys($normalized);
+    $values      = array_values($normalized);
+    $types       = str_repeat('s', count($values)); // MySQL приводит по схеме колонки
+
+    if ($operation === 'insert') {
+        $columns      = '`' . implode('`, `', $field_names) . '`';
+        $placeholders = implode(', ', array_fill(0, count($values), '?'));
+        $sql          = "INSERT INTO `$table` ($columns) VALUES ($placeholders)";
+    } else {
+        $assignments = implode(', ', array_map(
+            static fn(string $name): string => "`$name` = ?",
+            $field_names
+        ));
+        $sql      = "UPDATE `$table` SET $assignments WHERE `id` = ?";
+        $values[] = $id;
+        $types   .= 'i';
+    }
+
+    $statement = mysqli_prepare($db_connection, $sql);
+    if ($statement === false) {
+        $result['errors'][] = 'Ошибка подготовки запроса: ' . mysqli_error($db_connection);
+        return $result;
+    }
+
+    mysqli_stmt_bind_param($statement, $types, ...$values);
+
+    if (!mysqli_stmt_execute($statement)) {
+        $result['errors'][] = 'Ошибка выполнения: ' . mysqli_stmt_error($statement);
+        return $result;
+    }
+
+    $result['ok']            = true;
+    $result['affected_rows'] = mysqli_stmt_affected_rows($statement);
+    $result['id']            = $operation === 'insert' ? mysqli_insert_id($db_connection) : $id;
+
+    return $result;
+}
+
+/** Универсальное удаление по id. Тот же честный результат. */
+function record_delete(mysqli $db_connection, array $snapshot, string $table, int $id): array
+{
+    $result = record_result('delete', $table);
+
+    if (!isset($snapshot['structure']['tables'][$table])) {
+        $result['errors'][] = "Таблица '$table' не существует в известной модели";
+        return $result;
+    }
+
+    $statement = mysqli_prepare($db_connection, "DELETE FROM `$table` WHERE `id` = ? LIMIT 1");
+    if ($statement === false) {
+        $result['errors'][] = 'Ошибка подготовки запроса: ' . mysqli_error($db_connection);
+        return $result;
+    }
+
+    mysqli_stmt_bind_param($statement, 'i', $id);
+
+    if (!mysqli_stmt_execute($statement)) {
+        $result['errors'][] = 'Ошибка выполнения: ' . mysqli_stmt_error($statement);
+        return $result;
+    }
+
+    $result['ok']            = true;
+    $result['id']            = $id;
+    $result['affected_rows'] = mysqli_stmt_affected_rows($statement);
+
+    return $result;
+}
+
+// --- чтение: единственные SELECT'ы рабочего конвейера --------------------------
+// Дирижёр и render SQL не пишут; всё чтение записей — через эти две функции.
+// Возврат — данные, не результат-контракт §3: он принадлежит операциям записи.
+
+/**
+ * Одна запись по id. null — «нет такой записи» ИЛИ «нет такой таблицы»:
+ * для вызывающего оба случая означают 404, различие ему не нужно.
+ */
+/**
+ * Композитная подпись САМОЙ записи (§16.3): заголовок карточки,
+ * строка в списке, «к чему привязан» в блоке родителя. Та же
+ * скомпилированная запись словаря, что рисует опции чужого списка —
+ * но для конкретного id своей таблицы. Лестница §16.1 сбоку:
+ *   есть проекция  → lookup_labels (композит «Мамуринская №31»);
+ *   есть data_name → сырое имя;
+ *   иначе          → «#id» (запись существует, подписи нет).
+ * Никакого нового механизма — обёртка над готовым исполнителем.
+ */
+function record_label(mysqli $db_connection, array $snapshot, string $table, int $id): string
+{
+    // Подпись собственного объекта лежит под ключом '@table' —
+    // резолвер компилирует её для ЛЮБОЙ таблицы с шаблоном, независимо
+    // от входящих ссылок (см. snapshot_build_dictionaries).
+    $dict = $snapshot['model']['dictionaries']['@' . $table] ?? null;
+
+    if ($dict !== null) {
+        return lookup_labels($db_connection, $dict)[$id] ?? "#$id";
+    }
+
+    if (isset($snapshot['structure']['tables'][$table]['fields']['data_name'])) {
+        return lookup_options($db_connection, $table)[$id] ?? "#$id";
+    }
+
+    return "#$id";
+}
+
+/**
+ * Прямые дети записи по скомпилированному графу (model.relations).
+ * Один запрос на дочернюю таблицу (WHERE dep_<parent> = id), никакого
+ * перебора таблиц — граф уже собран сборкой снапшота. Нет связей →
+ * пустой массив, ноль запросов.
+ */
+function record_children(mysqli $db_connection, array $snapshot, string $table, int $id): array
+{
+    $blocks = [];
+
+    foreach ($snapshot['model']['relations'][$table] ?? [] as $relation) {
+        $child = $relation['child'];
+        $fk    = $relation['fk'];
+
+        $statement = mysqli_prepare(
+            $db_connection,
+            "SELECT * FROM `$child` WHERE `$fk` = ? ORDER BY `id` DESC"
+        );
+        if ($statement === false) {
+            continue;
+        }
+        mysqli_stmt_bind_param($statement, 'i', $id);
+        if (!mysqli_stmt_execute($statement)) {
+            continue;
+        }
+
+        $blocks[] = [
+            'table' => $child,
+            'fk'    => $fk,
+            'rows'  => mysqli_fetch_all(mysqli_stmt_get_result($statement), MYSQLI_ASSOC),
+        ];
+    }
+
+    return $blocks;
+}
+
+/**
+ * Карта объекта (STATE.md п.3, «карта = вся глубина сразу»): рекурсивный
+ * обход ВСЕГО дерева зависимостей от записи вниз до листьев, в
+ * структуру — НЕ в HTML. Наследник легаси db_tree(), но с двумя
+ * исправлениями его слабостей: (1) граф читается из скомпилированного
+ * model.relations, не сканированием БД на каждом узле (легаси find_dep);
+ * (2) обход отделён от вывода — здесь только данные, renderer
+ * разворачивает отдельно (легаси мешало обход, SQL и HTML в одной
+ * рекурсии).
+ *
+ * Ограничения глубины НЕТ сознательно (решение Влада 07-09: «карта есть
+ * карта»): дерево тампонажа неглубоко по природе (скважина → ступени →
+ * интервалы → буферы), а искусственный предел был бы оптимизацией под
+ * несуществующую проблему. Ацикличность гарантирована компилятором
+ * графа (dep_ образует дерево владения, не цикл) — рекурсия конечна.
+ *
+ * Узел: ['table', 'id', 'label', 'row', 'fields', 'children' => [block...]],
+ * где block: ['table', 'label' (подпись таблицы), 'fk', 'nodes' => [узел...]].
+ */
+function record_tree(mysqli $db_connection, array $snapshot, string $table, int $id): ?array
+{
+    $row = record_fetch($db_connection, $snapshot, $table, $id);
+    if ($row === null) {
+        return null;
+    }
+
+    $children = [];
+    foreach (record_children($db_connection, $snapshot, $table, $id) as $block) {
+        $nodes = [];
+        foreach ($block['rows'] as $child_row) {
+            $child_node = record_tree($db_connection, $snapshot, $block['table'], (int) $child_row['id']);
+            if ($child_node !== null) {
+                $nodes[] = $child_node;
+            }
+        }
+        $children[] = [
+            'table' => $block['table'],
+            'label' => (string) (
+                $snapshot['presentation']['labels']['table'][$block['table']]['data_full']
+                ?? $block['table']
+            ),
+            'fk'    => $block['fk'],
+            'nodes' => $nodes,
+        ];
+    }
+
+    return [
+        'table'    => $table,
+        'id'       => $id,
+        'label'    => record_label($db_connection, $snapshot, $table, $id),
+        'row'      => $row,
+        'children' => $children,
+    ];
+}
+
+function record_fetch(mysqli $db_connection, array $snapshot, string $table, int $id): ?array
+{
+    if (!isset($snapshot['structure']['tables'][$table])) {
+        return null;
+    }
+
+    $statement = mysqli_prepare($db_connection, "SELECT * FROM `$table` WHERE `id` = ? LIMIT 1");
+    if ($statement === false) {
+        return null;
+    }
+
+    mysqli_stmt_bind_param($statement, 'i', $id);
+
+    if (!mysqli_stmt_execute($statement)) {
+        return null;
+    }
+
+    $row = mysqli_fetch_assoc(mysqli_stmt_get_result($statement));
+
+    return is_array($row) ? $row : null;
+}
+
+/**
+ * Список записей таблицы, свежие сверху. Возвращает массив строк
+ * (возможно пустой) — вызывающий не знает про mysqli_result.
+ * Пагинация/сортировка по полю — слой «Позже» (batch-режимы).
+ */
+function record_list(mysqli $db_connection, array $snapshot, string $table, int $limit = 50): array
+{
+    if (!isset($snapshot['structure']['tables'][$table])) {
+        return [];
+    }
+
+    $statement = mysqli_prepare($db_connection, "SELECT * FROM `$table` ORDER BY `id` DESC LIMIT ?");
+    if ($statement === false) {
+        return [];
+    }
+
+    mysqli_stmt_bind_param($statement, 'i', $limit);
+
+    if (!mysqli_stmt_execute($statement)) {
+        return [];
+    }
+
+    $rows = mysqli_fetch_all(mysqli_stmt_get_result($statement), MYSQLI_ASSOC);
+
+    return $rows;
+}
