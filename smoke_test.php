@@ -1,0 +1,416 @@
+<?php
+declare(strict_types=1);
+
+/**
+ * Смоук-тест конвейера GPDP на тестовой БД gpdp_test.
+ * Не часть системы — инструмент проверки контрактов ARCHITECTURE.md.
+ */
+
+require __DIR__ . '/config.php';
+require __DIR__ . '/core.php';
+require __DIR__ . '/helpers.php';
+require __DIR__ . '/render.php';
+
+// Та же дверь, что у системы: смоук проверяет GPDP в её собственной
+// конфигурации, а не в параллельной (hardcode root — археология).
+$cfg = config()['db'];
+$db_connection = mysqli_connect($cfg['host'], $cfg['user'], $cfg['password'], $cfg['name']);
+if ($db_connection === false) {
+    exit('Смоук не стартовал: нет соединения с БД (' . mysqli_connect_error() . ")\n");
+}
+mysqli_set_charset($db_connection, 'utf8mb4');
+
+function check(string $name, bool $ok, string $details = ''): void
+{
+    echo ($ok ? '  OK  ' : ' FAIL ') . $name . ($details !== '' ? "  [$details]" : '') . "\n";
+    if (!$ok) {
+        exit(1);
+    }
+}
+
+echo "=== 1. Snapshot: bootstrap (state/) ===\n";
+$snapshot = snapshot_init($db_connection, config()['application']);
+check('snapshot построен', $snapshot !== null, (string) snapshot_last_error());
+check('файл лежит в state/', str_contains(config()['paths']['snapshot'], '/state/')
+    && is_file(config()['paths']['snapshot']));
+check('поле voc_mr — сущность voc',
+    $snapshot['structure']['tables']['main']['fields']['voc_mr']['entity'] === 'voc');
+check('поле id — структурное',
+    $snapshot['structure']['tables']['main']['fields']['id']['kind'] === 'structural');
+check('presentation: подпись voc_mr скомпилирована из model_labels',
+    ($snapshot['presentation']['labels']['field']['main']['voc_mr'] ?? []) !== []);
+check('root_table из config, не из ядра',
+    ($snapshot['application']['root_table'] ?? '') === 'main');
+
+echo "\n=== 1а. Словари: адрес разрешён сборкой, не рантаймом (§16.1) ===\n";
+check('voc_mr разрешён как склад в model.dictionaries',
+    ($snapshot['model']['dictionaries']['voc_mr']['subtype'] ?? '') === 'warehouse'
+    && $snapshot['model']['dictionaries']['voc_mr']['source_table'] === 'voc_mr');
+$probe = field_data($snapshot, $db_connection, 'main', 'voc_mr', 1);
+check('пакет несёт скомпилированный source', $probe['field']['source'] === 'voc_mr');
+$probe = field_data($snapshot, $db_connection, 'main', 'data_nkust', 'x');
+check('несловарное поле: source = null', $probe['field']['source'] === null);
+
+// Лестница целиком — на синтетической структуре: резолвер — чистая
+// функция над $structure, живой БД не касается (в этом и смысл (а1):
+// разрешение на границе сборки, ноль интроспекции в рантайме).
+$ladder = ['tables' => [
+    'voc_mr' => ['fields' => ['id' => [], 'data_name' => []]],
+    'area'   => ['fields' => ['id' => [], 'data_name' => []]],
+    'bad'    => ['fields' => ['id' => []]], // таблица без data_name
+    'main'   => ['fields' => [
+        'voc_mr'   => ['kind' => 'entity_field', 'entity' => 'voc'],
+        'voc_area' => ['kind' => 'entity_field', 'entity' => 'voc'],
+    ]],
+]];
+$resolved = snapshot_build_dictionaries($ladder);
+check('склад: voc_mr → voc_mr',
+    $resolved['map']['voc_mr']['subtype'] === 'warehouse'
+    && $resolved['map']['voc_mr']['source_table'] === 'voc_mr');
+check('адрес: voc_area → area, label_from унаследован',
+    $resolved['map']['voc_area']['subtype'] === 'address'
+    && $resolved['map']['voc_area']['source_table'] === 'area'
+    && $resolved['map']['voc_area']['label_from'] === 'area');
+check('чистая лестница: неразрешённых нет', $resolved['unresolved'] === []);
+
+$ladder['tables']['main']['fields']['voc_bad'] = ['kind' => 'entity_field', 'entity' => 'voc'];
+$resolved = snapshot_build_dictionaries($ladder);
+check('x без data_name → «нужен паспорт», fail-fast',
+    count($resolved['unresolved']) === 1
+    && str_contains($resolved['unresolved'][0], 'нужен паспорт'));
+
+$ladder['tables']['main']['fields']['voc_ghost'] = ['kind' => 'entity_field', 'entity' => 'voc'];
+$resolved = snapshot_build_dictionaries($ladder);
+check('источника нет вообще → «неизвестный адрес», fail-fast',
+    count($resolved['unresolved']) === 2
+    && str_contains($resolved['unresolved'][1], 'неизвестный адрес'));
+
+echo "\n=== 1б. Составная подпись: маяк-шаблон (§16.1 п.2, §16.3) ===\n";
+// Синтаксис отделён от семантики: template_parse — чистая единица,
+// компилятор словарей — её первый потребитель (math_ — названное будущее).
+$t = template_parse('{voc_mr} №{data_number}');
+check('template_parse: token / literal / token',
+    $t['error'] === null && count($t['items']) === 3
+    && $t['items'][0] === ['kind' => 'token', 'name' => 'voc_mr']
+    && $t['items'][1] === ['kind' => 'literal', 'value' => ' №']
+    && $t['items'][2] === ['kind' => 'token', 'name' => 'data_number']);
+$t = template_parse('скв. {data_number');
+check('непарная скобка → ошибка синтаксиса, не тихий литерал',
+    $t['error'] !== null && str_contains($t['error'], 'скобка'));
+
+// Резолвер+компилятор — чистые функции: синтетическая структура,
+// синтетические шаблоны, ноль обращений к БД.
+$proj = ['tables' => [
+    'voc_mr' => ['fields' => ['id' => [], 'data_name' => []]],
+    'well'   => ['fields' => [ // БЕЗ data_name — раньше был fail-fast
+        'id'          => [],
+        'voc_mr'      => ['kind' => 'entity_field', 'entity' => 'voc'],
+        'data_number' => ['kind' => 'entity_field', 'entity' => 'data'],
+    ]],
+    'main'   => ['fields' => [
+        'voc_well' => ['kind' => 'entity_field', 'entity' => 'voc'],
+        'voc_mr'   => ['kind' => 'entity_field', 'entity' => 'voc'],
+    ]],
+]];
+$tpl = ['well' => '{voc_mr} №{data_number}'];
+$r   = snapshot_build_dictionaries($proj, $tpl);
+check('маяк спасает таблицу без data_name → проекция',
+    $r['unresolved'] === []
+    && ($r['map']['voc_well']['subtype'] ?? '') === 'projection'
+    && $r['map']['voc_well']['source_table'] === 'well');
+$plan = $r['map']['voc_well']['plan'] ?? [];
+check('план: dict → literal → field, разделитель из шаблона',
+    count($plan) === 3
+    && $plan[0]['kind'] === 'dict'    && $plan[0]['field'] === 'voc_mr'
+    && $plan[1]['kind'] === 'literal' && $plan[1]['value'] === ' №'
+    && $plan[2]['kind'] === 'field'   && $plan[2]['field'] === 'data_number');
+check('дочерняя запись вложена в dict-шаг (исполнителю карта не нужна)',
+    ($plan[0]['dict']['subtype'] ?? '') === 'warehouse'
+    && $plan[0]['dict']['source_table'] === 'voc_mr');
+
+$r = snapshot_build_dictionaries($proj, ['voc_mr' => '{data_name}!', 'well' => '{voc_mr} №{data_number}']);
+check('маяк сильнее конвенции: склад с шаблоном → проекция',
+    $r['unresolved'] === [] && ($r['map']['voc_mr']['subtype'] ?? '') === 'projection');
+
+$r = snapshot_build_dictionaries($proj, ['well' => '{voc_mr} №{no_such_field}']);
+check('токен вне whitelist источника → fail-fast',
+    count($r['unresolved']) === 1
+    && str_contains($r['unresolved'][0], 'не существует'));
+
+// Цикл: well → {voc_area} → area → {voc_well} → well
+$cyc = $proj;
+$cyc['tables']['area'] = ['fields' => [
+    'id'       => [],
+    'voc_well' => ['kind' => 'entity_field', 'entity' => 'voc'],
+]];
+$cyc['tables']['well']['fields']['voc_area'] = ['kind' => 'entity_field', 'entity' => 'voc'];
+$r = snapshot_build_dictionaries($cyc, [
+    'well' => '{voc_area} №{data_number}',
+    'area' => 'скв. {voc_well}',
+]);
+check('цикл шаблонов → fail-fast с перечнем цепочки',
+    $r['unresolved'] !== []
+    && str_contains(implode(';', $r['unresolved']), 'цикл шаблонов')
+    && str_contains(implode(';', $r['unresolved']), '→'));
+
+echo "\n=== 1в. Тумблер snapshot.mode (STATE.md «Сейчас» п.6) ===\n";
+// config() кэширует статически — режим не переключить внутри живого
+// процесса. Но проверять тумблер запуском второго PHP (subprocess)
+// хрупко: зависит от PHP_BINARY/прав на сервере. Проверяем НЕ обёртку
+// config(), а сам механизм напрямую: ветка live в snapshot_init — это
+// буквально `return snapshot_build(...)` без файлового пути. Вызываем
+// snapshot_build() прямо и убеждаемся: (1) собирает валидный снапшот,
+// (2) не создаёт/не трогает файл (build сам по себе не пишет —
+// запись делает только snapshot_save в cached-ветке).
+$live_file   = config()['paths']['snapshot'];
+$live_before = is_file($live_file) ? md5_file($live_file) : null;
+$live_built  = snapshot_build($db_connection, config()['application']);
+$live_after  = is_file($live_file) ? md5_file($live_file) : null;
+
+check('live-путь (snapshot_build): собирает валидный снапшот',
+    $live_built !== null && isset($live_built['model']['dictionaries']));
+check('live-путь: snapshot_build не пишет файл сам по себе',
+    $live_before === $live_after);
+check('тумблер: дефолт cached (прод не получает live молча)',
+    (config()['snapshot']['mode'] ?? 'cached') === 'cached');
+
+echo "\n=== 1г. Граф связей dep_/rel_main (п.3 шаг 2) ===\n";
+// Чистая функция — синтетика по топологии легаси-дампа tt_utf8_fixed.sql.
+$tree = ['tables' => [
+    'main'     => ['fields' => ['id' => ['kind' => 'structural']]],
+    'steps'    => ['fields' => [
+        'id'       => ['kind' => 'structural'],
+        'dep_main' => ['kind' => 'structural'],
+        'rel_main' => ['kind' => 'structural'],
+    ]],
+    'material' => ['fields' => [
+        'id'        => ['kind' => 'structural'],
+        'dep_steps' => ['kind' => 'structural'],
+        'rel_main'  => ['kind' => 'structural'],
+    ]],
+    'bufers'   => ['fields' => [
+        'id'           => ['kind' => 'structural'],
+        'dep_material' => ['kind' => 'structural'],
+        'rel_main'     => ['kind' => 'structural'],
+    ]],
+]];
+$g = snapshot_build_relations($tree);
+check('обратный индекс: main → steps через dep_main',
+    $g['unresolved'] === []
+    && ($g['map']['main'][0] ?? []) === ['child' => 'steps', 'fk' => 'dep_main']);
+check('цепочка 3 уровней: steps → material → bufers',
+    ($g['map']['steps'][0]['child'] ?? '') === 'material'
+    && ($g['map']['material'][0]['child'] ?? '') === 'bufers');
+$root_sorted = $g['root'];
+sort($root_sorted);
+check('rel_main-разрез: кто привязан к корню (компилируется, не рендерится)',
+    $root_sorted === ['bufers', 'material', 'steps']);
+
+$tree['tables']['orphan'] = ['fields' => [
+    'dep_ghost' => ['kind' => 'structural'],
+]];
+$g = snapshot_build_relations($tree);
+check('dep_ в никуда → fail-fast с именем таблицы',
+    count($g['unresolved']) === 1 && str_contains($g['unresolved'][0], 'ghost'));
+
+check('живой снапшот несёт model.relations',
+    isset($snapshot['model']['relations']) && is_array($snapshot['model']['relations']));
+check('у словаря нет детей → record_children пуст, ноль запросов',
+    record_children($db_connection, $snapshot, 'voc_mr', 1) === []);
+check('record_label: подпись объекта по data_name-ветке',
+    record_label($db_connection, $snapshot, 'voc_mr', 1) !== '#1');
+
+echo "\n=== 2. Пространство имён ===\n";
+check('в системе не осталось функций gpdp_*',
+    array_filter(get_defined_functions()['user'],
+        fn($f) => str_starts_with($f, 'gpdp_')) === []);
+check('зарезервированный id отвергается', !entity_id_valid('field') && !entity_id_valid('render'));
+check('легальный id проходит', entity_id_valid('voc') && entity_id_valid('mlt'));
+
+echo "\n=== 3. Парсер и карта действий ===\n";
+$p = field_parse('data_nkust');
+check('data_nkust → entity_field/data/nkust',
+    $p['kind'] === 'entity_field' && $p['entity'] === 'data' && $p['name'] === 'nkust');
+check('dep_main → structural', field_parse('dep_main')['kind'] === 'structural');
+check('footnotes → unknown', field_parse('footnotes')['kind'] === 'unknown');
+check('view → read', action_mode('view') === 'read');
+check('create → null: admin-режимы не рождаются картой', action_mode('create') === null);
+check('rebuild_schema → null', action_mode('rebuild_schema') === null);
+
+echo "\n=== 4. Тонкая труба ===\n";
+$data = field_data($snapshot, $db_connection, 'main', 'data_nkust', 'проверка');
+check('пакет собран: entity внутри, повторный разбор не нужен',
+    $data['field']['entity'] === 'data');
+check('field_data для чужого поля → null (подсказка не подтвердилась)',
+    field_data($snapshot, $db_connection, 'main', 'data_fake', 'x') === null);
+check('field_data для структурного поля → null',
+    field_data($snapshot, $db_connection, 'main', 'id', 1) === null);
+$r = field_exec($data, 'read');
+check('exec: одна строчка, без охраны несуществующих дверей', $r['value'] === 'проверка');
+
+echo "\n=== 5. Запись: validate → универсальный save ===\n";
+$input  = ['data_nkust' => '  Куст-101  ', 'voc_mr' => '2',
+           'id' => '999', 'rel_main' => '777', 'handler' => 'evil_function'];
+$result = record_save($db_connection, $snapshot, 'main', $input);
+check('insert ok', $result['ok'] === true, implode('; ', $result['errors']));
+check('operation result честный',
+    $result['operation'] === 'insert' && $result['id'] > 0 && $result['affected_rows'] === 1);
+$new_id = $result['id'];
+
+$row = mysqli_fetch_assoc(mysqli_query($db_connection, "SELECT * FROM `main` WHERE `id` = $new_id"));
+check('data нормализовано (trim)', $row['data_nkust'] === 'Куст-101');
+check('структурные/чужие ключи input проигнорированы', (int) $row['id'] === $new_id);
+
+$bad = record_save($db_connection, $snapshot, 'main', ['voc_mr' => '999']);
+check('validate ловит несуществующее значение словаря',
+    $bad['ok'] === false && str_contains($bad['errors'][0] ?? '', 'словаре'));
+
+$upd = record_save($db_connection, $snapshot, 'main', ['data_nkust' => 'Куст-102'], $new_id);
+check('update ok', $upd['ok'] === true && $upd['operation'] === 'update');
+
+echo "\n=== 6. Чтение и рендер ===\n";
+$row = record_fetch($db_connection, $snapshot, 'main', $new_id);
+check('record_fetch: существующая запись читается',
+    is_array($row) && (int) $row['id'] === $new_id && $row['data_nkust'] === 'Куст-102');
+check('record_fetch: несуществующий id → null',
+    record_fetch($db_connection, $snapshot, 'main', 999999) === null);
+check('record_fetch: неизвестная таблица → null',
+    record_fetch($db_connection, $snapshot, 'evil', 1) === null);
+
+$list = record_list($db_connection, $snapshot, 'main');
+check('record_list: массив строк, свежие сверху, запись на месте',
+    is_array($list) && (int) ($list[0]['id'] ?? 0) === $new_id);
+check('record_list: лимит соблюдается',
+    count(record_list($db_connection, $snapshot, 'main', 1)) === 1);
+check('record_list: неизвестная таблица → пустой массив',
+    record_list($db_connection, $snapshot, 'evil') === []);
+
+$data = field_data($snapshot, $db_connection, 'main', 'voc_mr', $row['voc_mr'], $row);
+$read = field_exec($data, 'read');
+check('voc read → человекочитаемое значение', $read['value'] === 'Приобское');
+
+$edit = field_exec($data, 'edit');
+check('voc edit → структура choice', $edit['type'] === 'choice' && count($edit['options']) === 4);
+
+// Живое исполнение проекции — без изменений схемы: синтетическая
+// скомпилированная запись над РЕАЛЬНОЙ main (у записи $new_id:
+// data_nkust='Куст-102', voc_mr=2), вложенный словарь — настоящий
+// voc_mr из снапшота. lookup_labels собирает подпись в PHP по плану.
+$live_projection = [
+    'source_table' => 'main',
+    'label_column' => null,
+    'subtype'      => 'projection',
+    'plan'         => [
+        ['kind' => 'field',   'field' => 'data_nkust'],
+        ['kind' => 'literal', 'value' => ' / '],
+        ['kind' => 'dict',    'field' => 'voc_mr',
+         'dict' => $snapshot['model']['dictionaries']['voc_mr']],
+    ],
+];
+$live_labels = lookup_labels($db_connection, $live_projection);
+$mr_label    = lookup_options($db_connection, 'voc_mr')[2] ?? '';
+check('проекция живьём: {data_nkust} / {voc_mr} собрано по плану',
+    $mr_label !== ''
+    && ($live_labels[$new_id] ?? '') === 'Куст-102 / ' . $mr_label);
+
+$html = render_form_element($edit);
+// Подпись сверяется с самим снапшотом (model_labels), не с зашитым
+// словом: смоук не знает, short или full рисует renderer — знает,
+// что рисуется ОДНА ИЗ скомпилированных.
+$label_row  = $snapshot['presentation']['labels']['field']['main']['voc_mr'] ?? [];
+$label_seen = false;
+foreach ([$label_row['data_full'] ?? '', $label_row['data_short'] ?? ''] as $label_candidate) {
+    if ($label_candidate !== '' && str_contains($html, $label_candidate)) {
+        $label_seen = true;
+        break;
+    }
+}
+check('renderer собрал select с подписью из model_labels',
+    $label_seen && str_contains($html, 'selected>Приобское'));
+
+echo "\n=== 7. Lookup-кэш (N+1, теперь в helpers) ===\n";
+$q_before = (int) mysqli_fetch_row(mysqli_query($db_connection, "SHOW SESSION STATUS LIKE 'Questions'"))[1];
+for ($i = 0; $i < 30; $i++) {
+    lookup_options($db_connection, 'voc_mr');
+}
+$q_after = (int) mysqli_fetch_row(mysqli_query($db_connection, "SHOW SESSION STATUS LIKE 'Questions'"))[1];
+check('30 обращений → не 30 SELECT', ($q_after - $q_before) <= 2,
+    'запросов: ' . ($q_after - $q_before));
+
+echo "\n=== 8. Два пути обновления snapshot ===\n";
+// Подпись живёт в model_labels (§17). Таблица subscr физически ещё
+// существует (страховка миграции), но ядро её НЕ читает — обновлять
+// её в этом тесте бессмысленно: подпись бы «не обновилась» вечно.
+$label_before = $snapshot['presentation']['labels']['field']['main']['voc_mr']['data_full'] ?? '';
+$label_update = "UPDATE `model_labels` l
+                 JOIN `model_registry` r ON r.id = l.dep_model_registry
+                 SET l.data_full = %s
+                 WHERE r.data_kind = 'field' AND r.data_owner = 'main'
+                   AND r.data_element = 'voc_mr'";
+mysqli_query($db_connection, sprintf($label_update, "'Родовище'"));
+check('refresh presentation без lock', snapshot_refresh_presentation($db_connection));
+$fresh = snapshot_load();
+check('подпись обновилась из model_labels',
+    ($fresh['presentation']['labels']['field']['main']['voc_mr']['data_full'] ?? '') === 'Родовище');
+check('lock не создавался', snapshot_lock_read() === null);
+$label_restore = $label_before === ''
+    ? 'NULL'
+    : "'" . mysqli_real_escape_string($db_connection, $label_before) . "'";
+mysqli_query($db_connection, sprintf($label_update, $label_restore));
+snapshot_refresh_presentation($db_connection);
+
+snapshot_lock_acquire('manual', 'тест');
+check('под lock snapshot_init → null', snapshot_init($db_connection) === null);
+check('под lock refresh отступает', snapshot_refresh_presentation($db_connection) === false);
+snapshot_lock_release('manual');
+
+echo "\n=== 9. Жизненный цикл index.php (HTTP) ===\n";
+// Контракт «дирижёр не пишет SQL»: в исходнике индекса нет ни SQL-глаголов,
+// ни формирования/исполнения запросов — только connect/charset/close.
+$index_source = (string) file_get_contents(__DIR__ . '/index.php');
+check('в index.php нет SQL и mysqli_query/prepare',
+    preg_match('/mysqli_query|mysqli_prepare|SELECT |INSERT |UPDATE |DELETE /', $index_source) === 0);
+
+// Встроенный сервер PHP; проходим цикл: view → new → save (PRG) → view
+$pid = (int) shell_exec('php -S localhost:8088 -t ' . escapeshellarg(__DIR__) . ' >/dev/null 2>&1 & echo $!');
+usleep(600000);
+
+$view = (string) file_get_contents('http://localhost:8088/index.php?_action=view');
+check('view отрисован с подписями', str_contains($view, 'Куст') && str_contains($view, 'МР'));
+
+$form = (string) file_get_contents('http://localhost:8088/index.php?_action=new');
+check('форма new собрана конвейером', str_contains($form, 'name="data_nkust"')
+    && str_contains($form, '<select name="voc_mr"'));
+check('структурные поля в форму не попали', !str_contains($form, 'name="rel_main"'));
+
+$context = stream_context_create(['http' => [
+    'method'          => 'POST',
+    'header'          => 'Content-Type: application/x-www-form-urlencoded',
+    'content'         => http_build_query([
+        '_action' => 'save_new', '_table' => 'main',
+        'data_nkust' => 'Куст-HTTP', 'voc_mr' => '1',
+    ]),
+    'follow_location' => 0,
+    'ignore_errors'   => true,
+]]);
+file_get_contents('http://localhost:8088/index.php', false, $context);
+$prg = implode(' ', $http_response_header ?? []);
+check('PRG: после записи redirect, не отрисовка',
+    str_contains($prg, '302') && str_contains($prg, '_action=view'));
+
+$view2 = (string) file_get_contents('http://localhost:8088/index.php?_action=view');
+check('запись видна после redirect: словарь отрендерен именем',
+    str_contains($view2, 'Куст-HTTP') && str_contains($view2, 'Самотлор'));
+
+@file_get_contents('http://localhost:8088/index.php?_table=evil&_action=view');
+check('неизвестная таблица отвергнута на границе',
+    str_contains(implode(' ', $http_response_header ?? []), '404'));
+
+exec("kill $pid 2>/dev/null");
+
+echo "\n=== 10. Удаление ===\n";
+mysqli_query($db_connection, "DELETE FROM `main` WHERE `data_nkust` = 'Куст-HTTP'");
+$del = record_delete($db_connection, $snapshot, 'main', $new_id);
+check('delete ok', $del['ok'] === true && $del['affected_rows'] === 1);
+
+echo "\nВСЕ ПРОВЕРКИ ПРОЙДЕНЫ\n";
