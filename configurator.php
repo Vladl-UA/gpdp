@@ -3,7 +3,7 @@ declare(strict_types=1);
 ini_set('display_errors', '1');
 error_reporting(E_ALL);
 
-// sync: 2026-07-11, view-слой п.8г — конфигуратор на общий render_table_directory
+// sync: 2026-07-11, конфигуратор + инструмент ремонта структуры (диагностика/показ/починка)
 
 /**
  * GPDP / RNA — конфигуратор БД (v0).
@@ -393,6 +393,145 @@ function configurator_delete_table(mysqli $db_connection, string $table, array $
 }
 
 // ============================================================================
+// Починка структуры (инструмент ремонта, журнал 2026-07-11).
+// Каждая — под локом, пишет реестр на языке модели, пересобирает снапшот.
+// Адреса перепроверяются по ЖИВОЙ структуре: расхождение могло измениться
+// с момента показа (человек/другая сессия успели починить) — чиним факт,
+// не снимок экрана.
+// ============================================================================
+
+/** Общий хвост: пересобрать снапшот после правки реестра. */
+function configurator_refresh(mysqli $db_connection, array $application): array
+{
+    $snapshot = snapshot_build($db_connection, $application);
+    if ($snapshot === null) {
+        return ['ok' => false, 'errors' => ['Реестр изменён, но snapshot не собрался: ' . (snapshot_last_error() ?? '?')]];
+    }
+    if (!snapshot_save($snapshot)) {
+        return ['ok' => false, 'errors' => ['Snapshot собран, но не сохранён.']];
+    }
+    return ['ok' => true, 'errors' => []];
+}
+
+/** Взять поле-сироту под управление: строка реестра + дефолтная подпись. */
+function configurator_adopt_field(mysqli $db_connection, string $table, string $field, array $application): array
+{
+    if (!snapshot_lock_acquire('configurator', "Регистрация поля: $table.$field")) {
+        return ['ok' => false, 'errors' => ['Схема заблокирована другой операцией.']];
+    }
+    try {
+        $live = snapshot_build_structure($db_connection);
+        $fschema = $live['tables'][$table]['fields'][$field] ?? null;
+        if ($fschema === null || ($fschema['kind'] ?? '') !== 'entity_field') {
+            return ['ok' => false, 'errors' => ["Поле $table.$field не существует или структурное."]];
+        }
+        // Уже зарегистрировано? (могли починить между показом и нажатием)
+        $chk = mysqli_prepare($db_connection, 'SELECT id FROM `' . MODEL_REGISTRY_TABLE
+            . "` WHERE data_kind='field' AND data_owner=? AND data_element=? AND active=1");
+        mysqli_stmt_bind_param($chk, 'ss', $table, $field);
+        mysqli_stmt_execute($chk);
+        if (mysqli_fetch_assoc(mysqli_stmt_get_result($chk))) {
+            return ['ok' => false, 'errors' => ["Поле $table.$field уже под управлением."]];
+        }
+
+        $stmt = mysqli_prepare($db_connection, 'INSERT INTO `' . MODEL_REGISTRY_TABLE
+            . "` (data_kind, data_owner, data_element, active) VALUES ('field', ?, ?, 1)");
+        mysqli_stmt_bind_param($stmt, 'ss', $table, $field);
+        mysqli_stmt_execute($stmt);
+        $rid = mysqli_insert_id($db_connection);
+
+        // Дефолтная подпись = имя поля; осмысленную человек правит в labels.
+        $stmt = mysqli_prepare($db_connection, 'INSERT INTO `' . MODEL_LABELS_TABLE
+            . '` (dep_model_registry, data_short, data_full) VALUES (?, ?, ?)');
+        mysqli_stmt_bind_param($stmt, 'iss', $rid, $field, $field);
+        mysqli_stmt_execute($stmt);
+
+        return configurator_refresh($db_connection, $application);
+    } finally {
+        snapshot_lock_release('configurator');
+    }
+}
+
+/** Взять таблицу-сироту под управление: строка реестра + дефолтная подпись. */
+function configurator_adopt_table(mysqli $db_connection, string $table, array $application): array
+{
+    if (!snapshot_lock_acquire('configurator', "Регистрация таблицы: $table")) {
+        return ['ok' => false, 'errors' => ['Схема заблокирована другой операцией.']];
+    }
+    try {
+        $live = snapshot_build_structure($db_connection);
+        if (!isset($live['tables'][$table])) {
+            return ['ok' => false, 'errors' => ["Таблица $table не существует."]];
+        }
+        $stmt = mysqli_prepare($db_connection, 'INSERT INTO `' . MODEL_REGISTRY_TABLE
+            . "` (data_kind, data_owner, data_element, active) VALUES ('table', NULL, ?, 1)");
+        mysqli_stmt_bind_param($stmt, 's', $table);
+        mysqli_stmt_execute($stmt);
+        $rid = mysqli_insert_id($db_connection);
+
+        $stmt = mysqli_prepare($db_connection, 'INSERT INTO `' . MODEL_LABELS_TABLE
+            . '` (dep_model_registry, data_short, data_full) VALUES (?, ?, ?)');
+        mysqli_stmt_bind_param($stmt, 'iss', $rid, $table, $table);
+        mysqli_stmt_execute($stmt);
+
+        return configurator_refresh($db_connection, $application);
+    } finally {
+        snapshot_lock_release('configurator');
+    }
+}
+
+/** Убрать строку реестра по id (призрак или лишний дубль). Подпись —
+ *  каскадом FK (ON DELETE CASCADE, §17). */
+function configurator_drop_registry_row(mysqli $db_connection, int $id, array $application): array
+{
+    if (!snapshot_lock_acquire('configurator', "Удаление записи реестра: #$id")) {
+        return ['ok' => false, 'errors' => ['Схема заблокирована другой операцией.']];
+    }
+    try {
+        $stmt = mysqli_prepare($db_connection, 'DELETE FROM `' . MODEL_REGISTRY_TABLE . '` WHERE id = ?');
+        mysqli_stmt_bind_param($stmt, 'i', $id);
+        mysqli_stmt_execute($stmt);
+        if (mysqli_affected_rows($db_connection) === 0) {
+            return ['ok' => false, 'errors' => ["Записи реестра #$id нет (уже убрана?)."]];
+        }
+        return configurator_refresh($db_connection, $application);
+    } finally {
+        snapshot_lock_release('configurator');
+    }
+}
+
+/** Удалить поле-сироту ИЗ БД (единственное, что трогает данные — с
+ *  подтверждением на стороне UI). Только entity-поле, только если оно
+ *  действительно вне реестра (иначе это управляемое поле — не сюда). */
+function configurator_drop_column(mysqli $db_connection, string $table, string $field, array $application): array
+{
+    if (!snapshot_lock_acquire('configurator', "Удаление колонки: $table.$field")) {
+        return ['ok' => false, 'errors' => ['Схема заблокирована другой операцией.']];
+    }
+    try {
+        $live = snapshot_build_structure($db_connection);
+        $fschema = $live['tables'][$table]['fields'][$field] ?? null;
+        if ($fschema === null || ($fschema['kind'] ?? '') !== 'entity_field') {
+            return ['ok' => false, 'errors' => ["Поле $table.$field не существует или структурное — не удаляю."]];
+        }
+        // Защита: удаляем только сироту. Под управлением — не наш случай.
+        $chk = mysqli_prepare($db_connection, 'SELECT id FROM `' . MODEL_REGISTRY_TABLE
+            . "` WHERE data_kind='field' AND data_owner=? AND data_element=? AND active=1");
+        mysqli_stmt_bind_param($chk, 'ss', $table, $field);
+        mysqli_stmt_execute($chk);
+        if (mysqli_fetch_assoc(mysqli_stmt_get_result($chk))) {
+            return ['ok' => false, 'errors' => ["Поле $table.$field под управлением — удаление колонки под управлением здесь не делается."]];
+        }
+        if (!mysqli_query($db_connection, 'ALTER TABLE `' . $table . '` DROP COLUMN `' . $field . '`')) {
+            return ['ok' => false, 'errors' => ['DDL: ' . mysqli_error($db_connection)]];
+        }
+        return configurator_refresh($db_connection, $application);
+    } finally {
+        snapshot_lock_release('configurator');
+    }
+}
+
+// ============================================================================
 // Разбор запроса
 // ============================================================================
 
@@ -420,6 +559,35 @@ if ($caction === 'delete_table' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $outcome = configurator_delete_table($db_connection, $table, $application);
     $msg     = $outcome['ok'] ? "Таблица \"$table\" удалена." : implode(' | ', $outcome['errors']);
     header('Location: ?_action=list&_msg=' . rawurlencode($msg) . '&_ok=' . ($outcome['ok'] ? '1' : '0'));
+    exit;
+}
+
+// Починка структуры (кнопки раздела «Состояние модели»). Все → redirect
+// обратно в diagnose (PRG), чтобы человек сразу видел обновлённое
+// состояние (расхождение ушло или осталось с причиной).
+$repair_actions = ['reg_adopt_field', 'reg_adopt_table', 'reg_drop_ghost', 'reg_drop_dup', 'reg_drop_column'];
+if (in_array($caction, $repair_actions, true) && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $table = (string) ($_POST['table'] ?? '');
+    $field = (string) ($_POST['field'] ?? '');
+    $id    = (int) ($_POST['id'] ?? 0);
+
+    $outcome = match ($caction) {
+        'reg_adopt_field' => configurator_adopt_field($db_connection, $table, $field, $application),
+        'reg_adopt_table' => configurator_adopt_table($db_connection, $table, $application),
+        'reg_drop_ghost',
+        'reg_drop_dup'    => configurator_drop_registry_row($db_connection, $id, $application),
+        'reg_drop_column' => configurator_drop_column($db_connection, $table, $field, $application),
+    };
+
+    $ok_msg = match ($caction) {
+        'reg_adopt_field' => "Поле $table.$field взято под управление (подпись — имя поля, поправьте в «Подписи и словари»).",
+        'reg_adopt_table' => "Таблица $table взята под управление.",
+        'reg_drop_ghost'  => "Запись реестра #$id убрана.",
+        'reg_drop_dup'    => "Лишняя запись реестра #$id убрана.",
+        'reg_drop_column' => "Поле $table.$field удалено из базы.",
+    };
+    $msg = $outcome['ok'] ? $ok_msg : implode(' | ', $outcome['errors']);
+    header('Location: ?_action=diagnose&_msg=' . rawurlencode($msg) . '&_ok=' . ($outcome['ok'] ? '1' : '0'));
     exit;
 }
 

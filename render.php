@@ -454,12 +454,14 @@ function render_model_diagnosis(array $diag): string
     $html = '';
 
     // Кнопка починки: скрытая форма POST с действием и адресом.
-    $btn = static function (string $action, array $fields, string $label, string $cls = 'act') use ($h): string {
+    // $confirm — текст подтверждения для необратимых (удаление данных).
+    $btn = static function (string $action, array $fields, string $label, string $cls = 'act', string $confirm = '') use ($h): string {
         $inputs = '<input type="hidden" name="_action" value="' . $h($action) . '">';
         foreach ($fields as $k => $v) {
             $inputs .= '<input type="hidden" name="' . $h((string) $k) . '" value="' . $h((string) $v) . '">';
         }
-        return '<form method="post" style="display:inline;margin:0">' . $inputs
+        $onsub = $confirm !== '' ? ' onsubmit="return confirm(\'' . $h($confirm) . '\')"' : '';
+        return '<form method="post" style="display:inline;margin:0"' . $onsub . '>' . $inputs
              . '<button type="submit" class="' . $h($cls) . '">' . $h($label) . '</button></form> ';
     };
 
@@ -475,7 +477,8 @@ function render_model_diagnosis(array $diag): string
                    . '<td><code>' . $h($of['field']) . '</code></td>'
                    . '<td>' . $h($of['entity']) . '</td><td>'
                    . $btn('reg_adopt_field', $addr, 'взять под управление')
-                   . $btn('reg_drop_column', $addr, 'удалить поле из БД', 'act act-danger')
+                   . $btn('reg_drop_column', $addr, 'удалить поле из БД', 'act act-danger',
+                          'Удалить поле ' . $of['table'] . '.' . $of['field'] . ' из базы? Данные в этом столбце будут потеряны.')
                    . '</td></tr>';
         }
         $html .= '</table>';
