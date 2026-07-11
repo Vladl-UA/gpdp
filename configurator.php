@@ -3,6 +3,8 @@ declare(strict_types=1);
 ini_set('display_errors', '1');
 error_reporting(E_ALL);
 
+// sync: 2026-07-11, view-слой п.8г — конфигуратор: 4 группы таблиц + схема через schema_view/render_schema_card
+
 /**
  * GPDP / RNA — конфигуратор БД (v0).
  *
@@ -625,8 +627,6 @@ if ($caction === 'new_table') {
 } else {
     // --- список: живой слепок, без кэша ------------------------------------
     $structure = snapshot_build_structure($db_connection);
-    $registry  = snapshot_build_registry($db_connection, ['tables' => $structure['tables']]);
-
     // Бейдж «используется как словарь» (уровень 0, §16): множество имён
     // полей вида voc_* среди ВСЕХ таблиц — по конвенции это и есть имена
     // таблиц-словарей, на которые кто-то ссылается.
@@ -641,27 +641,68 @@ if ($caction === 'new_table') {
 
     echo '<h2>Таблицы</h2><p><a href="?_action=new_table">+ новая таблица</a></p>';
 
-    foreach ($structure['tables'] as $table_name => $table_schema) {
-        $label = $registry['map']['table'][$table_name]['id'] ?? null;
-        // подпись — отдельным JOIN'ом presentation обычно, здесь для
-        // v0-списка достаточно имени таблицы, полную подпись покажет
-        // сама таблица при работе через index.php
-        $badge = isset($referenced_as_dict[$table_name]) ? '<span class="badge">словарь</span>' : '';
+    // Действия карточки (навигация конфигуратора), {t} → имя таблицы.
+    $card_actions = [
+        'содержимое'   => 'index.php?_table={t}&_action=view',
+        'редактировать' => '?_action=edit&table={t}',
+        'удалить'       => '?_action=delete_confirm&table={t}',
+    ];
 
-        echo '<table><tr><td colspan="2"><strong>' . render_escape($table_name) . '</strong>' . $badge
-           . '<span style="float:right">'
-           . '<a href="index.php?_table=' . rawurlencode($table_name) . '&_action=view">содержимое</a> '
-           . '<a href="?_action=edit&table=' . rawurlencode($table_name) . '">редактировать</a> '
-           . '<a href="?_action=delete_confirm&table=' . rawurlencode($table_name) . '">удалить</a>'
-           . '</span></td></tr><tr>';
-
-        foreach ($table_schema['fields'] as $fname => $fschema) {
-            if ($fname === 'id') {
-                continue; // родной индекс не показываем, по спецификации
-            }
-            echo '<td>' . render_escape($fname) . '</td>';
+    // Раскладка по группам (классификатор в ядре, один на все страницы).
+    $by_group = ['main' => [], 'dict' => [], 'system' => []];
+    foreach ($structure['tables'] as $t_name => $t_schema) {
+        $g = table_group($t_name, $t_schema);
+        // dependent не верхнего уровня — покажется под своей главной деревом.
+        if ($g === 'dependent') {
+            continue;
         }
-        echo '</tr></table>';
+        $by_group[$g][] = $t_name;
+    }
+    foreach ($by_group as $g => &$names) {
+        sort($names, SORT_NATURAL | SORT_FLAG_CASE);
+    }
+    unset($names);
+
+    // Рекурсивный вывод главной таблицы с её зависимыми (дерево по графу
+    // связей). Дети берутся из скомпилированного model.relations.
+    $render_table_tree = function (string $t_name, int $depth) use (
+        &$render_table_tree, $snapshot, $structure, $card_actions, $referenced_as_dict
+    ): void {
+        $badge = isset($referenced_as_dict[$t_name]) ? '<span class="badge">словарь</span>' : '';
+        echo render_schema_card(schema_view($snapshot, $t_name), $card_actions, $badge, $depth);
+        foreach ($snapshot['model']['relations'][$t_name] ?? [] as $relation) {
+            $render_table_tree($relation['child'], $depth + 1);
+        }
+    };
+
+    echo '<h3>Главные таблицы</h3>';
+    if ($by_group['main'] === []) {
+        echo '<p><em>нет</em></p>';
+    } else {
+        foreach ($by_group['main'] as $t_name) {
+            $render_table_tree($t_name, 0);
+        }
+    }
+
+    echo '<h3>Отчёты</h3><p><em>Отчёты не созданы.</em></p>';
+
+    echo '<h3>Служебные таблицы</h3>';
+    if ($by_group['dict'] === []) {
+        echo '<p><em>нет</em></p>';
+    } else {
+        foreach ($by_group['dict'] as $t_name) {
+            $badge = isset($referenced_as_dict[$t_name]) ? '<span class="badge">словарь</span>' : '';
+            echo render_schema_card(schema_view($snapshot, $t_name), $card_actions, $badge, 0);
+        }
+    }
+
+    echo '<h3>Системные таблицы</h3>';
+    if ($by_group['system'] === []) {
+        echo '<p><em>нет</em></p>';
+    } else {
+        foreach ($by_group['system'] as $t_name) {
+            echo render_schema_card(schema_view($snapshot, $t_name), $card_actions, '', 0);
+        }
     }
 }
 

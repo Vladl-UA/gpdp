@@ -1571,3 +1571,66 @@ function record_form_view(
         'hidden'   => $hidden,
     ];
 }
+
+/**
+ * Классификация таблицы по группе (naming-driven, один источник на все
+ * страницы — домашняя, labels, конфигуратор; ARCHITECTURE §17, критерий
+ * «не переизобретать»). Возврат: 'system' | 'dict' | 'report' | 'main' |
+ * 'dependent'.
+ *
+ *   system   — приставка model_ (к модели данных отношения не имеет);
+ *   dict     — приставка voc_ (словарь/служебная);
+ *   report   — надстройки представления (пока в системе нет; критерий
+ *              распознавания появится вместе с ними);
+ *   dependent — есть dep_/rel_main (показывается под своей главной, не
+ *              верхним уровнем);
+ *   main     — корневая (ничего из вышеперечисленного).
+ */
+function table_group(string $table_name, array $table_schema): string
+{
+    $sys = defined('SYSTEM_TABLE_PREFIX') ? SYSTEM_TABLE_PREFIX : 'model_';
+    if (str_starts_with($table_name, $sys)) {
+        return 'system';
+    }
+    if (str_starts_with($table_name, 'voc_')) {
+        return 'dict';
+    }
+    foreach ($table_schema['fields'] ?? [] as $field_name => $_) {
+        if ($field_name === 'rel_main' || str_starts_with($field_name, 'dep_')) {
+            return 'dependent';
+        }
+    }
+    return 'main';
+}
+
+/**
+ * Сборка представления «схема таблицы» (view-слой, для конфигуратора):
+ * поля таблицы с человеческими подписями — устройство, НЕ записи. БЕЗ
+ * HTML. Структурные поля (id) не показываются; dep_/rel_main тоже (они
+ * не про предметное устройство). Возврат:
+ *   ['table'=>.., 'label'=>.., 'group'=>.., 'fields'=>[['name'=>..,'label'=>..]]]
+ */
+function schema_view(array $snapshot, string $table): array
+{
+    $table_schema = $snapshot['structure']['tables'][$table] ?? ['fields' => []];
+    $t_labels     = $snapshot['presentation']['labels']['table'][$table] ?? [];
+
+    $fields = [];
+    foreach ($table_schema['fields'] as $field_name => $field_schema) {
+        if (($field_schema['kind'] ?? '') !== 'entity_field') {
+            continue; // id/dep_/rel_main — не предметное устройство
+        }
+        $f_labels = $snapshot['presentation']['labels']['field'][$table][$field_name] ?? [];
+        $fields[] = [
+            'name'  => $field_name,
+            'label' => (string) ($f_labels['data_full'] ?? $field_name),
+        ];
+    }
+
+    return [
+        'table'  => $table,
+        'label'  => (string) ($t_labels['data_full'] ?? $table),
+        'group'  => table_group($table, $table_schema),
+        'fields' => $fields,
+    ];
+}

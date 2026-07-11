@@ -15,7 +15,7 @@ declare(strict_types=1);
  * маппинга в label.
  */
 
-// sync: 2026-07-11, view-слой п.8бв — render_record_table/render_record_form (укладчики), render не трогает БД
+// sync: 2026-07-11, view-слой п.8бвг — укладчики: record_table/form + schema_card, render не трогает БД
 
 /**
  * Общий вид админ-интерфейсов (index.php, configurator.php) — один
@@ -49,6 +49,8 @@ function render_admin_styles(): string
     .act-danger:hover{background:#fee}
     .data-list th{background:#f6f6f4;font-weight:500}
     .data-list td:first-child a{font-weight:500}
+    .schema-fields{width:auto;margin:4px 0 0 20px}
+    .schema-fields td{border:none;padding:1px 24px 1px 0;color:#444}
     </style>
     CSS;
 }
@@ -275,5 +277,58 @@ function render_record_form(array $view, string $submit = 'Сохранить'):
         $html .= render_form_element($element);
     }
     $html .= '<p><input type="submit" value="' . render_escape($submit) . '"></p></form>';
+    return $html;
+}
+
+/**
+ * Укладчик «карточка таблицы» для конфигуратора (view-слой п.8г):
+ * заготовка schema_view() → HTML. Подпись + действия + поля в столбик.
+ * Ничего не вычисляет. Действия приходят готовыми ссылками ($actions:
+ * массив [подпись=>href], {t} подставляется на имя таблицы). $badge —
+ * готовый HTML значка или ''. $depth — сдвиг для дерева зависимых.
+ *
+ * Поля раскладываются колонками по $per_col строк (по умолчанию 5):
+ * заполнили колонку — следующая рядом. Пустая таблица — без блока полей.
+ */
+function render_schema_card(array $view, array $actions = [], string $badge = '', int $depth = 0): string
+{
+    $table  = $view['table'];
+    $indent = $depth * 24;
+
+    $html = '<div style="margin-left:' . $indent . 'px;margin-bottom:12px">';
+
+    // Шапка: подпись таблицы + значок + действия.
+    $links = '';
+    foreach ($actions as $label => $href_tpl) {
+        $href = render_escape(str_replace('{t}', rawurlencode($table), $href_tpl));
+        $links .= ' <a class="act" href="' . $href . '">' . render_escape((string) $label) . '</a>';
+    }
+    $html .= '<div><strong>' . render_escape((string) $view['label']) . '</strong> '
+           . '<span class="badge">' . render_escape($table) . '</span>' . $badge
+           . '<span style="float:right">' . $links . '</span></div>';
+
+    // Поля в столбик по $per_col — таблица-раскладка (не данные).
+    $fields  = $view['fields'] ?? [];
+    $per_col = 5;
+    if ($fields !== []) {
+        $rows = [];
+        $cols = array_chunk($fields, $per_col);
+        $height = 0;
+        foreach ($cols as $c) {
+            $height = max($height, count($c));
+        }
+        $html .= '<table class="schema-fields">';
+        for ($r = 0; $r < $height; $r++) {
+            $html .= '<tr>';
+            foreach ($cols as $col) {
+                $cell = $col[$r]['label'] ?? '';
+                $html .= '<td>' . render_escape((string) $cell) . '</td>';
+            }
+            $html .= '</tr>';
+        }
+        $html .= '</table>';
+    }
+
+    $html .= '</div>';
     return $html;
 }
