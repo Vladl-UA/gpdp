@@ -1400,11 +1400,22 @@ function record_tree(mysqli $db_connection, array $snapshot, string $table, int 
         ];
     }
 
+    $columns = record_view_columns($snapshot, $table);
+
     return [
         'table'    => $table,
         'id'       => $id,
         'label'    => record_label($db_connection, $snapshot, $table, $id),
         'row'      => $row,
+        // Готовая заготовка узла (view-слой, п.8б): столбцы + одна строка
+        // с разрешёнными значениями. Рендер её только укладывает, разбор
+        // полей (доступ к БД через словари) остаётся здесь, в ядре.
+        'view'     => [
+            'kind'    => 'table',
+            'table'   => $table,
+            'columns' => $columns,
+            'rows'    => [record_view_row($db_connection, $snapshot, $table, $row, $columns)],
+        ],
         'children' => $children,
     ];
 }
@@ -1456,4 +1467,65 @@ function record_list(mysqli $db_connection, array $snapshot, string $table, int 
     $rows = mysqli_fetch_all(mysqli_stmt_get_result($statement), MYSQLI_ASSOC);
 
     return $rows;
+}
+
+/**
+ * Общие кирпичи view-слоя (STATE.md п.8): столбцы таблицы и одна строка
+ * с готовыми значениями ячеек. Их используют и record_table_view
+ * (список), и record_tree (карта) — один способ сборки на оба экрана.
+ * Структурные поля (id/dep_/rel_main) в представление не попадают.
+ */
+function record_view_columns(array $snapshot, string $table): array
+{
+    $fields  = $snapshot['structure']['tables'][$table]['fields'] ?? [];
+    $columns = [];
+    foreach ($fields as $field_name => $field_schema) {
+        if (($field_schema['kind'] ?? '') !== 'entity_field') {
+            continue;
+        }
+        $labels = $snapshot['presentation']['labels']['field'][$table][$field_name] ?? [];
+        $columns[] = [
+            'field' => $field_name,
+            'label' => (string) ($labels['data_short'] ?? $field_name),
+        ];
+    }
+    return $columns;
+}
+
+/**
+ * Одна строка представления из уже прочитанной строки БД: для каждого
+ * столбца зовёт field_exec(read) — значение готово к показу (voc-число
+ * разрешено в подпись). HTML не рождается: только данные.
+ */
+function record_view_row(
+    mysqli $db_connection, array $snapshot, string $table, array $row, array $columns
+): array {
+    $cells = [];
+    foreach ($columns as $column) {
+        $field_name = $column['field'];
+        $data   = field_data($snapshot, $db_connection, $table, $field_name, $row[$field_name] ?? null, $row);
+        $result = $data !== null ? field_exec($data, 'read') : null;
+        $cells[] = $result !== null ? (string) ($result['value'] ?? '') : '';
+    }
+    return ['id' => (int) ($row['id'] ?? 0), 'cells' => $cells];
+}
+
+/**
+ * Сборка представления «список» (view-слой, STATE.md п.8): из строк
+ * таблицы — готовая заготовка для рендера, БЕЗ HTML. Ядро собирает,
+ * render раскладывает по клеткам — шов между сборкой и укладкой
+ * (инвариант трёх слоёв, журнал 07-10).
+ *
+ * Возврат:
+ *   ['kind'=>'table', 'table'=>..., 'columns'=>[['field'=>..,'label'=>..]],
+ *    'rows'=>[['id'=>N, 'cells'=>['<готовое значение>', ...]]]]
+ */
+function record_table_view(mysqli $db_connection, array $snapshot, string $table, int $limit = 50): array
+{
+    $columns = record_view_columns($snapshot, $table);
+    $rows    = [];
+    foreach (record_list($db_connection, $snapshot, $table, $limit) as $row) {
+        $rows[] = record_view_row($db_connection, $snapshot, $table, $row, $columns);
+    }
+    return ['kind' => 'table', 'table' => $table, 'columns' => $columns, 'rows' => $rows];
 }

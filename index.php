@@ -16,7 +16,7 @@ error_reporting(E_ALL);
  * сырой request не проходит.
  */
 
-// sync: 2026-07-11, view-слой п.8а — карта объекта вынесена в render.php (render_object_tree)
+// sync: 2026-07-11, view-слой п.8б — список и карта через record_table_view + render_record_table
 
 // --- 1. boot -----------------------------------------------------------------
 
@@ -184,63 +184,30 @@ echo "<h2>$table_title</h2>";
 // --- 6. конвейер + рендер ---------------------------------------------------------
 
 if ($mode === 'read' && $request_id === 0) {
-    // Список: строка за строкой, поле за полем — та самая одна строчка
-    // field_exec() на каждую ячейку. SQL живёт в record_list.
-    $rows = record_list($db_connection, $snapshot, $task_table);
-
-    echo '<table border="1" cellpadding="4"><tr>';
-    foreach ($task_fields as $field_name => $field_schema) {
-        if ($field_schema['kind'] !== 'entity_field') {
-            continue;
-        }
-        $short = $snapshot['presentation']['labels']['field'][$task_table][$field_name] ?? [];
-        echo '<th>' . render_escape((string) ($short['data_short'] ?? $field_name)) . '</th>';
-    }
-    echo '<th></th></tr>';
-
-    foreach ($rows as $row) {
-        $row_id    = (int) $row['id'];
-        $card_href = "?_table=$task_table&_action=view&_id=$row_id";
-        $is_first  = true;
-
-        echo '<tr>';
-        foreach ($task_fields as $field_name => $field_schema) {
-            if ($field_schema['kind'] !== 'entity_field') {
-                continue;
-            }
-            $data   = field_data($snapshot, $db_connection, $task_table, $field_name, $row[$field_name], $row);
-            $result = field_exec($data, 'read');
-            $value  = $result !== null ? render_value($result) : '';
-            // Первая ячейка — крупная область клика на карточку объекта
-            // (не форму редактирования — read-карта, ссылки на edit/delete
-            // внутри неё явные), не только маленький значок ~ в конце
-            // строки — так навигация естественна и на телефоне.
-            echo $is_first
-                ? "<td><a href=\"$card_href\">$value</a></td>"
-                : "<td>$value</td>";
-            $is_first = false;
-        }
-        echo "<td><a class=\"act\" href=\"?_table=$task_table&_action=edit&_id=$row_id\" title=\"править\">~</a>"
-           . "<a class=\"act act-danger\" href=\"?_table=$task_table&_action=delete&_id=$row_id\" title=\"удалить\">×</a></td>";
-        echo '</tr>';
-    }
-    echo '</table>';
+    // Список через view-слой (п.8б): ядро собирает заготовку, render
+    // укладывает. Кустарный цикл здесь убран — одна пара функций на
+    // все экраны-списки, один стиль таблицы.
+    $view = record_table_view($db_connection, $snapshot, $task_table);
+    echo render_record_table($view, [
+        'card_href'   => "?_table=$task_table&_action=view&_id={id}",
+        'edit_href'   => "?_table=$task_table&_action=edit&_id={id}",
+        'delete_href' => "?_table=$task_table&_action=delete&_id={id}",
+    ]);
     echo "<p><a href=\"?_table=$task_table&_action=new\">Добавить запись</a></p>";
 }
 
 if ($mode === 'read' && $request_id > 0) {
     // Карта объекта: вся глубина дерева сразу (STATE.md п.3, решение
     // Влада 07-09 «карта есть карта, без ограничений»). record_tree
-    // обходит граф в структуру, render_object_tree разворачивает её
-    // рекурсивно — обход и вывод раздельны (в отличие от легаси db_tree,
-    // мешавшего обход, SQL и HTML в одной функции). render_object_tree
-    // живёт в render.php (view-слой, п.8а).
+    // record_tree обходит граф в структуру и прикрепляет к каждому узлу
+    // готовую заготовку (view-слой, п.8б); render_object_tree только
+    // укладывает — разбор полей и доступ к БД остаются в ядре.
     $tree = record_tree($db_connection, $snapshot, $task_table, $request_id);
     if ($tree === null) {
         http_response_code(404);
         exit('Запись не найдена');
     }
-    render_object_tree($tree, $snapshot, $db_connection);
+    render_object_tree($tree);
 }
 
 if ($mode === 'new' || $mode === 'edit') {

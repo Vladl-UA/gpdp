@@ -15,7 +15,7 @@ declare(strict_types=1);
  * маппинга в label.
  */
 
-// sync: 2026-07-11, общий каркас админ-страниц + render_object_tree (view-слой п.8а)
+// sync: 2026-07-11, view-слой п.8б — render_record_table (укладчик списка/карты), render не трогает БД
 
 /**
  * Общий вид админ-интерфейсов (index.php, configurator.php) — один
@@ -47,6 +47,8 @@ function render_admin_styles(): string
     .act:hover{background:#eef}
     .act-danger{color:#a22}
     .act-danger:hover{background:#fee}
+    .data-list th{background:#f6f6f4;font-weight:500}
+    .data-list td:first-child a{font-weight:500}
     </style>
     CSS;
 }
@@ -170,34 +172,18 @@ function render_choice(array $result): string
  * представления живёт в render.php, входная точка его только вызывает.
  * Поведение идентично прежнему render_object_map — чистый перенос.
  */
-function render_object_tree(
-    array $node, array $snapshot, mysqli $db_connection, int $depth = 0
-): void {
+function render_object_tree(array $node, int $depth = 0): void
+{
     $task_table = $node['table'];
+    $id         = $node['id'];
     $indent     = $depth * 24;
 
-    $task_fields = $snapshot['structure']['tables'][$task_table]['fields'] ?? [];
     echo '<div style="margin-left:' . $indent . 'px;border-left:2px solid #dde;padding-left:12px;margin-bottom:8px">';
-    echo '<table border="1" cellpadding="4"><tr>';
-    foreach ($task_fields as $field_name => $field_schema) {
-        if ($field_schema['kind'] !== 'entity_field') {
-            continue;
-        }
-        $short = $snapshot['presentation']['labels']['field'][$task_table][$field_name] ?? [];
-        echo '<th>' . render_escape((string) ($short['data_short'] ?? $field_name)) . '</th>';
-    }
-    echo '</tr><tr>';
-    foreach ($task_fields as $field_name => $field_schema) {
-        if ($field_schema['kind'] !== 'entity_field') {
-            continue;
-        }
-        $data   = field_data($snapshot, $db_connection, $task_table, $field_name, $node['row'][$field_name], $node['row']);
-        $result = field_exec($data, 'read');
-        echo '<td>' . ($result !== null ? render_value($result) : '') . '</td>';
-    }
-    echo '</tr></table>';
 
-    $id = $node['id'];
+    // Поля узла — готовая заготовка от record_tree (ядро), рендер только
+    // укладывает. Без действий: карта read-режим, ~/× явной строкой ниже.
+    echo render_record_table($node['view']);
+
     echo "<p><a class=\"act\" href=\"?_table=$task_table&_action=edit&_id=$id\" title=\"править\">~</a>"
        . "<a class=\"act act-danger\" href=\"?_table=$task_table&_action=delete&_id=$id\" title=\"удалить\">×</a></p>";
 
@@ -205,7 +191,7 @@ function render_object_tree(
         echo '<div style="margin-left:' . ($indent + 24) . 'px">';
         echo '<h4>' . render_escape($block['label']) . '</h4>';
         foreach ($block['nodes'] as $child_node) {
-            render_object_tree($child_node, $snapshot, $db_connection, $depth + 1);
+            render_object_tree($child_node, $depth + 1);
         }
         echo '<p><a href="?_table=' . rawurlencode($block['table'])
             . '&_action=new&_parent_table=' . rawurlencode($task_table)
@@ -213,4 +199,57 @@ function render_object_tree(
         echo '</div>';
     }
     echo '</div>';
+}
+
+/**
+ * Укладчик представления «список» (view-слой): готовая заготовка
+ * record_table_view() → HTML-таблица. Ничего не вычисляет — значения
+ * ячеек уже готовы (voc разрешён в подпись сборщиком). Рендер только
+ * раскладывает по клеткам + оборачивает управляющими ссылками.
+ *
+ * $opts: 'first_link' => шаблон href для первой ячейки (крупная область
+ * клика на карточку); 'actions' => шаблон href-пары ~/× (править/удалить).
+ * Плейсхолдер {id} подставляется. Пусто → без ссылок (нейтральная
+ * таблица, напр. внутри карты объекта).
+ */
+function render_record_table(array $view, array $opts = []): string
+{
+    $columns = $view['columns'] ?? [];
+    $rows    = $view['rows'] ?? [];
+
+    $has_actions = isset($opts['edit_href'], $opts['delete_href']);
+
+    $html = '<table class="data-list"><tr>';
+    foreach ($columns as $column) {
+        $html .= '<th>' . render_escape((string) $column['label']) . '</th>';
+    }
+    if ($has_actions) {
+        $html .= '<th></th>';
+    }
+    $html .= '</tr>';
+
+    foreach ($rows as $row) {
+        $id    = (int) $row['id'];
+        $cells = $row['cells'] ?? [];
+        $html .= '<tr>';
+        foreach ($cells as $i => $value) {
+            $escaped = render_escape((string) $value);
+            if ($i === 0 && isset($opts['card_href'])) {
+                $href = render_escape(str_replace('{id}', (string) $id, $opts['card_href']));
+                $html .= '<td><a href="' . $href . '">' . $escaped . '</a></td>';
+            } else {
+                $html .= '<td>' . $escaped . '</td>';
+            }
+        }
+        if ($has_actions) {
+            $edit   = render_escape(str_replace('{id}', (string) $id, $opts['edit_href']));
+            $delete = render_escape(str_replace('{id}', (string) $id, $opts['delete_href']));
+            $html .= '<td><a class="act" href="' . $edit . '" title="править">~</a>'
+                   . '<a class="act act-danger" href="' . $delete . '" title="удалить">×</a></td>';
+        }
+        $html .= '</tr>';
+    }
+
+    $html .= '</table>';
+    return $html;
 }
