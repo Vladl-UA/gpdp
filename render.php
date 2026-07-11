@@ -433,3 +433,110 @@ function render_table_directory(array $snapshot, array $actions, array $opts = [
         }
     }
 }
+
+/**
+ * Укладчик диагностики структуры (view-слой): результат model_diagnose()
+ * → HTML раздела «Состояние модели». На языке модели, не SQL (журнал
+ * 07-11): человек, забывший SQL, чинит структуру, не вспоминая SQL.
+ * Кнопки починки — формы POST в конфигуратор (действие + адрес); сам
+ * обработчик в configurator.php. $action_url — куда слать (обычно '').
+ *
+ * У каждого расхождения — обе кнопки, где уместно (взять под управление /
+ * удалить): система показывает, судит человек (Мир А, журнал 07-11).
+ */
+function render_model_diagnosis(array $diag): string
+{
+    if ($diag['clean'] ?? false) {
+        return '<div class="flash flash-ok">Структура и реестр согласованы. Расхождений нет.</div>';
+    }
+
+    $h = static fn (string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+    $html = '';
+
+    // Кнопка починки: скрытая форма POST с действием и адресом.
+    $btn = static function (string $action, array $fields, string $label, string $cls = 'act') use ($h): string {
+        $inputs = '<input type="hidden" name="_action" value="' . $h($action) . '">';
+        foreach ($fields as $k => $v) {
+            $inputs .= '<input type="hidden" name="' . $h((string) $k) . '" value="' . $h((string) $v) . '">';
+        }
+        return '<form method="post" style="display:inline;margin:0">' . $inputs
+             . '<button type="submit" class="' . $h($cls) . '">' . $h($label) . '</button></form> ';
+    };
+
+    // --- поля-сироты: в БД есть, реестр не знает ------------------------
+    if (($diag['orphan_fields'] ?? []) !== []) {
+        $html .= '<h3>Поля вне управления</h3>';
+        $html .= '<p><em>Поле есть в таблице, но система про него не знает — '
+               . 'подпись и поведение к нему не привязать, пока не взято под управление.</em></p>';
+        $html .= '<table class="data-list"><tr><th>таблица</th><th>поле</th><th>тип</th><th>действие</th></tr>';
+        foreach ($diag['orphan_fields'] as $of) {
+            $addr = ['table' => $of['table'], 'field' => $of['field'], 'entity' => $of['entity']];
+            $html .= '<tr><td>' . $h($of['table']) . '</td>'
+                   . '<td><code>' . $h($of['field']) . '</code></td>'
+                   . '<td>' . $h($of['entity']) . '</td><td>'
+                   . $btn('reg_adopt_field', $addr, 'взять под управление')
+                   . $btn('reg_drop_column', $addr, 'удалить поле из БД', 'act act-danger')
+                   . '</td></tr>';
+        }
+        $html .= '</table>';
+    }
+
+    // --- таблицы-сироты -------------------------------------------------
+    if (($diag['orphan_tables'] ?? []) !== []) {
+        $html .= '<h3>Таблицы вне управления</h3>';
+        $html .= '<p><em>Таблица есть в базе, но система про неё не знает.</em></p>';
+        $html .= '<table class="data-list"><tr><th>таблица</th><th>действие</th></tr>';
+        foreach ($diag['orphan_tables'] as $t) {
+            $html .= '<tr><td>' . $h($t) . '</td><td>'
+                   . $btn('reg_adopt_table', ['table' => $t], 'взять под управление')
+                   . '</td></tr>';
+        }
+        $html .= '</table>';
+    }
+
+    // --- записи-призраки: реестр помнит исчезнувшее ---------------------
+    if (($diag['ghost_registry'] ?? []) !== []) {
+        $html .= '<h3>Записи о несуществующем</h3>';
+        $html .= '<p><em>Реестр помнит элемент, которого в базе уже нет — '
+               . 'осталась от удаления в обход системы.</em></p>';
+        $html .= '<table class="data-list"><tr><th>что</th><th>адрес</th><th>действие</th></tr>';
+        foreach ($diag['ghost_registry'] as $g) {
+            $addr = $g['kind'] === 'field'
+                ? $h((string) $g['owner']) . '.' . $h($g['element'])
+                : $h($g['element']);
+            $kind = $g['kind'] === 'field' ? 'поле' : 'таблица';
+            $html .= '<tr><td>' . $kind . '</td><td><code>' . $addr . '</code></td><td>'
+                   . $btn('reg_drop_ghost', ['id' => $g['id']], 'убрать из реестра', 'act act-danger')
+                   . '</td></tr>';
+        }
+        $html .= '</table>';
+    }
+
+    // --- дубли: один адрес зарегистрирован дважды ----------------------
+    if (($diag['duplicates'] ?? []) !== []) {
+        $html .= '<h3>Двойная регистрация</h3>';
+        $html .= '<p><em>Один элемент записан в реестре несколько раз. '
+               . 'Оставить нужно одну запись, лишние убрать.</em></p>';
+        $html .= '<table class="data-list"><tr><th>что</th><th>адрес</th><th>записи (id)</th><th>действие</th></tr>';
+        foreach ($diag['duplicates'] as $d) {
+            $addr = $d['kind'] === 'field'
+                ? $h((string) $d['owner']) . '.' . $h($d['element'])
+                : $h($d['element']);
+            $kind = $d['kind'] === 'field' ? 'поле' : 'таблица';
+            // Оставляем наименьший id, лишние (остальные) — на удаление.
+            $ids  = $d['ids'];
+            sort($ids);
+            $keep = array_shift($ids);
+            $drop_buttons = '';
+            foreach ($ids as $drop_id) {
+                $drop_buttons .= $btn('reg_drop_dup', ['id' => $drop_id], "убрать #$drop_id", 'act act-danger');
+            }
+            $html .= '<tr><td>' . $kind . '</td><td><code>' . $addr . '</code></td>'
+                   . '<td>оставить #' . (int) $keep . ', лишние: ' . $h(implode(', ', $ids)) . '</td>'
+                   . '<td>' . $drop_buttons . '</td></tr>';
+        }
+        $html .= '</table>';
+    }
+
+    return $html;
+}

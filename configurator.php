@@ -437,7 +437,24 @@ echo render_admin_page_open(
 echo '<h1>Конфигуратор БД (v0)</h1>';
 echo render_admin_flash($flash, $flash_ok);
 
-if ($caction === 'new_table') {
+// Диагностика структуры (журнал 07-11): при заходе считаем расхождения
+// БД↔реестр. Плашка-уведомление, если есть — не молча. Раздел «Состояние
+// модели» показывает подробно и чинит.
+$diag = model_diagnose($db_connection);
+if (!($diag['clean'] ?? false) && $caction !== 'diagnose') {
+    $n = count($diag['orphan_fields']) + count($diag['orphan_tables'])
+       + count($diag['ghost_registry']) + count($diag['duplicates']);
+    echo '<div class="flash flash-err">В структуре модели расхождений: ' . $n
+       . '. <a href="?_action=diagnose">Состояние модели →</a></div>';
+}
+
+if ($caction === 'diagnose') {
+
+    echo '<h2>Состояние модели</h2>';
+    echo '<p><a href="?_action=list">← К таблицам</a></p>';
+    echo render_model_diagnosis($diag);
+
+} elseif ($caction === 'new_table') {
 
     $type_options = '';
     foreach (entities() as $entity_id => $passport) {
