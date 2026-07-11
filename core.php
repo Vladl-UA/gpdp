@@ -1634,3 +1634,117 @@ function schema_view(array $snapshot, string $table): array
         'fields' => $fields,
     ];
 }
+
+/**
+ * Диагностика структуры: сравнить реальную БД с реестром модели, найти
+ * расхождения (инструмент ремонта, журнал 2026-07-11). Отдельно от
+ * snapshot_build_registry (тот в горячем пути компиляции и молча
+ * проглатывает дубли — перезаписью ключа); здесь — по запросу, честно
+ * пересчитывая сырые строки реестра.
+ *
+ * Возврат — три вида, каждый список готов к показу и починке:
+ *   'orphan_fields'  — поле есть в БД, в реестре нет: [[table,field,entity]]
+ *   'orphan_tables'  — таблица есть в БД, в реестре нет: [table]
+ *   'ghost_registry' — реестр ссылается на исчезнувшее: [[id,kind,owner,element]]
+ *   'duplicates'     — один адрес зарегистрирован >1 раза: [[kind,owner,element,ids]]
+ * Пусто везде — структура и реестр согласованы.
+ *
+ * Системные таблицы (model_) и структурные поля (id/dep_/rel_main) не
+ * участвуют: они не адресуются реестром по построению, их «отсутствие»
+ * в реестре — норма, не расхождение.
+ */
+function model_diagnose(mysqli $db_connection): array
+{
+    $structure = snapshot_build_structure($db_connection);
+    $sys       = defined('SYSTEM_TABLE_PREFIX') ? SYSTEM_TABLE_PREFIX : 'model_';
+
+    // Сырые строки реестра (все active), без свёртки в map — чтобы
+    // увидеть дубли, которые map затирает.
+    $reg_rows = [];
+    $sql = 'SELECT id, data_kind, data_owner, data_element FROM `'
+         . MODEL_REGISTRY_TABLE . '` WHERE active = 1';
+    $res = @mysqli_query($db_connection, $sql);
+    if ($res !== false) {
+        while ($row = mysqli_fetch_assoc($res)) {
+            $reg_rows[] = $row;
+        }
+    }
+
+    // Индекс адресов реестра: адрес → список id (список, а не одно —
+    // чтобы поймать дубли).
+    $reg_addr = [];
+    foreach ($reg_rows as $row) {
+        $kind  = (string) $row['data_kind'];
+        $owner = $row['data_owner'] === null ? '' : (string) $row['data_owner'];
+        $elem  = (string) $row['data_element'];
+        $reg_addr["$kind|$owner|$elem"][] = (int) $row['id'];
+    }
+
+    // --- дубли: один адрес с >1 id --------------------------------------
+    $duplicates = [];
+    foreach ($reg_addr as $addr => $ids) {
+        if (count($ids) > 1) {
+            [$kind, $owner, $elem] = explode('|', $addr, 3);
+            $duplicates[] = [
+                'kind'    => $kind,
+                'owner'   => $owner === '' ? null : $owner,
+                'element' => $elem,
+                'ids'     => $ids,
+            ];
+        }
+    }
+
+    // --- призраки: реестр ссылается на исчезнувший элемент ---------------
+    $ghost_registry = [];
+    foreach ($reg_rows as $row) {
+        $kind  = (string) $row['data_kind'];
+        $owner = $row['data_owner'];
+        $elem  = (string) $row['data_element'];
+        $gone = match ($kind) {
+            'table' => !isset($structure['tables'][$elem]),
+            'field' => !isset($structure['tables'][(string) $owner]['fields'][$elem]),
+            default => false,
+        };
+        if ($gone) {
+            $ghost_registry[] = [
+                'id'      => (int) $row['id'],
+                'kind'    => $kind,
+                'owner'   => $owner,
+                'element' => $elem,
+            ];
+        }
+    }
+
+    // --- сироты: в БД есть, в реестре нет --------------------------------
+    $orphan_tables = [];
+    $orphan_fields = [];
+    foreach ($structure['tables'] as $t_name => $t_schema) {
+        if (str_starts_with($t_name, $sys)) {
+            continue; // системные таблицы реестром не адресуются
+        }
+        if (!isset($reg_addr["table||$t_name"])) {
+            $orphan_tables[] = $t_name;
+        }
+        foreach ($t_schema['fields'] as $f_name => $f_schema) {
+            if (($f_schema['kind'] ?? '') !== 'entity_field') {
+                continue; // id/dep_/rel_main — структурные, не адресуются
+            }
+            if (!isset($reg_addr["field|$t_name|$f_name"])) {
+                $orphan_fields[] = [
+                    'table'  => $t_name,
+                    'field'  => $f_name,
+                    'entity' => (string) ($f_schema['entity'] ?? ''),
+                ];
+            }
+        }
+    }
+
+    return [
+        'orphan_fields'  => $orphan_fields,
+        'orphan_tables'  => $orphan_tables,
+        'ghost_registry' => $ghost_registry,
+        'duplicates'     => $duplicates,
+        'clean'          => $orphan_fields === [] && $orphan_tables === []
+                          && $ghost_registry === [] && $duplicates === [],
+    ];
+}
