@@ -626,7 +626,18 @@ if ($caction === 'new_table') {
 
 } else {
     // --- список: живой слепок, без кэша ------------------------------------
-    $structure = snapshot_build_structure($db_connection);
+    // Снапшот-для-показа собирается из готовых кусков (не snapshot_build:
+    // тот fail-fast падает на кривой схеме, а список должен показываться
+    // именно чтобы схему чинить). Нужны: структура (поля), презентация
+    // (человеческие подписи для schema_view), связи (дерево зависимых).
+    $structure    = snapshot_build_structure($db_connection);
+    $presentation = snapshot_build_presentation($db_connection);
+    $relations    = snapshot_build_relations(['tables' => $structure['tables']]);
+    $snapshot = [
+        'structure'    => $structure,
+        'presentation' => $presentation,
+        'model'        => ['relations' => $relations['map']],
+    ];
     // Бейдж «используется как словарь» (уровень 0, §16): множество имён
     // полей вида voc_* среди ВСЕХ таблиц — по конвенции это и есть имена
     // таблиц-словарей, на которые кто-то ссылается.
