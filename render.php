@@ -15,7 +15,7 @@ declare(strict_types=1);
  * маппинга в label.
  */
 
-// sync: 2026-07-11, view-слой п.8бвг — укладчики: record_table/form + schema_card, render не трогает БД
+// sync: 2026-07-11, view-слой п.8бвг + карточка схемы: залитая шапка, ширина 70%
 
 /**
  * Общий вид админ-интерфейсов (index.php, configurator.php) — один
@@ -51,6 +51,13 @@ function render_admin_styles(): string
     .data-list td:first-child a{font-weight:500}
     .schema-fields{width:auto;margin:4px 0 0 20px}
     .schema-fields td{border:none;padding:1px 24px 1px 0;color:#444}
+    .schema-card{width:70%;max-width:calc(100% - 24px);margin-bottom:12px;
+                 border:1px solid #e2e2e0;border-radius:4px;overflow:hidden}
+    .schema-head{display:flex;align-items:center;justify-content:space-between;
+                 gap:8px;background:#f6f6f4;padding:6px 10px;border-bottom:1px solid #eee}
+    .schema-title{min-width:0}
+    .schema-acts{flex-shrink:0;white-space:nowrap}
+    .schema-fields{margin:6px 0 8px 20px}
     </style>
     CSS;
 }
@@ -295,17 +302,18 @@ function render_schema_card(array $view, array $actions = [], string $badge = ''
     $table  = $view['table'];
     $indent = $depth * 24;
 
-    $html = '<div style="margin-left:' . $indent . 'px;margin-bottom:12px">';
+    $html = '<div class="schema-card" style="margin-left:' . $indent . 'px">';
 
-    // Шапка: подпись таблицы + значок + действия.
+    // Шапка: подпись таблицы + значок + действия — залитая полоса.
     $links = '';
     foreach ($actions as $label => $href_tpl) {
         $href = render_escape(str_replace('{t}', rawurlencode($table), $href_tpl));
         $links .= ' <a class="act" href="' . $href . '">' . render_escape((string) $label) . '</a>';
     }
-    $html .= '<div><strong>' . render_escape((string) $view['label']) . '</strong> '
-           . '<span class="badge">' . render_escape($table) . '</span>' . $badge
-           . '<span style="float:right">' . $links . '</span></div>';
+    $html .= '<div class="schema-head"><span class="schema-title"><strong>'
+           . render_escape((string) $view['label']) . '</strong> '
+           . '<span class="badge">' . render_escape($table) . '</span>' . $badge . '</span>'
+           . '<span class="schema-acts">' . $links . '</span></div>';
 
     // Поля в столбик по $per_col — таблица-раскладка (не данные).
     $fields  = $view['fields'] ?? [];
