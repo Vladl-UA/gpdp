@@ -15,7 +15,7 @@ declare(strict_types=1);
  * маппинга в label.
  */
 
-// sync: 2026-07-11, view-слой п.8бвг + карточка схемы: залитая шапка, ширина 70%
+// sync: 2026-07-11, view-слой п.8бвг + карточка схемы: семейный блок (главная+зависимые в одной рамке 70%)
 
 /**
  * Общий вид админ-интерфейсов (index.php, configurator.php) — один
@@ -53,6 +53,10 @@ function render_admin_styles(): string
     .schema-fields td{border:none;padding:1px 24px 1px 0;color:#444}
     .schema-card{width:70%;max-width:calc(100% - 24px);margin-bottom:12px;
                  border:1px solid #e2e2e0;border-radius:4px;overflow:hidden}
+    .schema-family{width:70%;max-width:calc(100% - 24px);margin-bottom:16px;
+                   border:1px solid #d8d8d5;border-radius:4px;overflow:hidden;padding-bottom:4px}
+    .schema-card-bare{width:auto;max-width:none;margin-bottom:0;border:none;border-radius:0}
+    .schema-card-bare .schema-head{border-radius:0}
     .schema-head{display:flex;align-items:center;justify-content:space-between;
                  gap:8px;background:#f6f6f4;padding:6px 10px;border-bottom:1px solid #eee}
     .schema-title{min-width:0}
@@ -297,12 +301,15 @@ function render_record_form(array $view, string $submit = 'Сохранить'):
  * Поля раскладываются колонками по $per_col строк (по умолчанию 5):
  * заполнили колонку — следующая рядом. Пустая таблица — без блока полей.
  */
-function render_schema_card(array $view, array $actions = [], string $badge = '', int $depth = 0): string
+function render_schema_card(array $view, array $actions = [], string $badge = '', int $depth = 0, bool $bare = false): string
 {
     $table  = $view['table'];
     $indent = $depth * 24;
 
-    $html = '<div class="schema-card" style="margin-left:' . $indent . 'px">';
+    // $bare — карточка внутри семейного блока (.schema-family): своей
+    // рамки/ширины не рисует, их даёт блок; иначе одиночная карточка 70%.
+    $cls   = $bare ? 'schema-card schema-card-bare' : 'schema-card';
+    $html  = '<div class="' . $cls . '" style="margin-left:' . $indent . 'px">';
 
     // Шапка: подпись таблицы + значок + действия — залитая полоса.
     $links = '';

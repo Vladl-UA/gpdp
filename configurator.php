@@ -674,13 +674,14 @@ if ($caction === 'new_table') {
     }
     unset($names);
 
-    // Рекурсивный вывод главной таблицы с её зависимыми (дерево по графу
-    // связей). Дети берутся из скомпилированного model.relations.
+    // Рекурсивный вывод главной таблицы с её зависимыми внутри семейного
+    // блока: карточки идут bare (без своей рамки), рамку и правый край
+    // для выравнивания даёт блок-обёртка .schema-family.
     $render_table_tree = function (string $t_name, int $depth) use (
-        &$render_table_tree, $snapshot, $structure, $card_actions, $referenced_as_dict
+        &$render_table_tree, $snapshot, $card_actions, $referenced_as_dict
     ): void {
         $badge = isset($referenced_as_dict[$t_name]) ? '<span class="badge">словарь</span>' : '';
-        echo render_schema_card(schema_view($snapshot, $t_name), $card_actions, $badge, $depth);
+        echo render_schema_card(schema_view($snapshot, $t_name), $card_actions, $badge, $depth, true);
         foreach ($snapshot['model']['relations'][$t_name] ?? [] as $relation) {
             $render_table_tree($relation['child'], $depth + 1);
         }
@@ -691,7 +692,9 @@ if ($caction === 'new_table') {
         echo '<p><em>нет</em></p>';
     } else {
         foreach ($by_group['main'] as $t_name) {
+            echo '<div class="schema-family">';
             $render_table_tree($t_name, 0);
+            echo '</div>';
         }
     }
 
