@@ -1548,8 +1548,9 @@ function record_table_view(mysqli $db_connection, array $snapshot, string $table
  */
 function record_form_view(
     mysqli $db_connection, array $snapshot, string $table, string $mode,
-    array $row = [], array $hidden = []
+    ?array $row = null, array $hidden = []
 ): array {
+    $row      = $row ?? []; // new: записи ещё нет — пустой набор значений
     $fields   = $snapshot['structure']['tables'][$table]['fields'] ?? [];
     $elements = [];
     foreach ($fields as $field_name => $field_schema) {
