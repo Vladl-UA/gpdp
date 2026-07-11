@@ -15,7 +15,7 @@ declare(strict_types=1);
  * маппинга в label.
  */
 
-// sync: 2026-07-10, общий каркас админ-страниц: render_admin_page_open/render_admin_flash + полноширинный дизайн
+// sync: 2026-07-11, общий каркас админ-страниц + render_object_tree (view-слой п.8а)
 
 /**
  * Общий вид админ-интерфейсов (index.php, configurator.php) — один
@@ -159,3 +159,58 @@ function render_choice(array $result): string
     return "<select name=\"$name\">$options</select>";
 }
 
+
+/**
+ * Рендер карты объекта: узел (поля записи read-строкой) + все его дети,
+ * рекурсивно вглубь до листьев. Обход дерева уже сделан record_tree()
+ * (core.php) — здесь ТОЛЬКО вывод готовой структуры в HTML, ни обхода,
+ * ни SQL (в отличие от легаси db_tree, мешавшего всё в одной функции).
+ *
+ * Перенесено из index.php 2026-07-11 (view-слой, STATE.md п.8а): рендер
+ * представления живёт в render.php, входная точка его только вызывает.
+ * Поведение идентично прежнему render_object_map — чистый перенос.
+ */
+function render_object_tree(
+    array $node, array $snapshot, mysqli $db_connection, int $depth = 0
+): void {
+    $task_table = $node['table'];
+    $indent     = $depth * 24;
+
+    $task_fields = $snapshot['structure']['tables'][$task_table]['fields'] ?? [];
+    echo '<div style="margin-left:' . $indent . 'px;border-left:2px solid #dde;padding-left:12px;margin-bottom:8px">';
+    echo '<table border="1" cellpadding="4"><tr>';
+    foreach ($task_fields as $field_name => $field_schema) {
+        if ($field_schema['kind'] !== 'entity_field') {
+            continue;
+        }
+        $short = $snapshot['presentation']['labels']['field'][$task_table][$field_name] ?? [];
+        echo '<th>' . render_escape((string) ($short['data_short'] ?? $field_name)) . '</th>';
+    }
+    echo '</tr><tr>';
+    foreach ($task_fields as $field_name => $field_schema) {
+        if ($field_schema['kind'] !== 'entity_field') {
+            continue;
+        }
+        $data   = field_data($snapshot, $db_connection, $task_table, $field_name, $node['row'][$field_name], $node['row']);
+        $result = field_exec($data, 'read');
+        echo '<td>' . ($result !== null ? render_value($result) : '') . '</td>';
+    }
+    echo '</tr></table>';
+
+    $id = $node['id'];
+    echo "<p><a class=\"act\" href=\"?_table=$task_table&_action=edit&_id=$id\" title=\"править\">~</a>"
+       . "<a class=\"act act-danger\" href=\"?_table=$task_table&_action=delete&_id=$id\" title=\"удалить\">×</a></p>";
+
+    foreach ($node['children'] as $block) {
+        echo '<div style="margin-left:' . ($indent + 24) . 'px">';
+        echo '<h4>' . render_escape($block['label']) . '</h4>';
+        foreach ($block['nodes'] as $child_node) {
+            render_object_tree($child_node, $snapshot, $db_connection, $depth + 1);
+        }
+        echo '<p><a href="?_table=' . rawurlencode($block['table'])
+            . '&_action=new&_parent_table=' . rawurlencode($task_table)
+            . "&_parent_id=$id\">+ добавить в «" . render_escape($block['label']) . '»</a></p>';
+        echo '</div>';
+    }
+    echo '</div>';
+}

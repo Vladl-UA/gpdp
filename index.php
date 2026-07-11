@@ -16,7 +16,7 @@ error_reporting(E_ALL);
  * сырой request не проходит.
  */
 
-// sync: 2026-07-10, STATE.md п.7 + меню админ-страниц (конфигуратор, подписи и словари) на домашней
+// sync: 2026-07-11, view-слой п.8а — карта объекта вынесена в render.php (render_object_tree)
 
 // --- 1. boot -----------------------------------------------------------------
 
@@ -183,57 +183,6 @@ echo "<h2>$table_title</h2>";
 
 // --- 6. конвейер + рендер ---------------------------------------------------------
 
-// Рекурсивный рендер карты объекта: узел (поля записи) + все его дети,
-// развёрнутые вглубь до листьев. Обход уже сделан record_tree() —
-// здесь только вывод готовой структуры. Отступ по глубине даёт
-// визуальную вложенность дерева.
-function render_object_map(
-    array $node, array $snapshot, mysqli $db_connection, int $depth = 0
-): void {
-    $task_table = $node['table'];
-    $indent     = $depth * 24;
-
-    // Поля самой записи — read-строкой (значения через конвейер).
-    $task_fields = $snapshot['structure']['tables'][$task_table]['fields'] ?? [];
-    echo '<div style="margin-left:' . $indent . 'px;border-left:2px solid #dde;padding-left:12px;margin-bottom:8px">';
-    echo '<table border="1" cellpadding="4"><tr>';
-    foreach ($task_fields as $field_name => $field_schema) {
-        if ($field_schema['kind'] !== 'entity_field') {
-            continue;
-        }
-        $short = $snapshot['presentation']['labels']['field'][$task_table][$field_name] ?? [];
-        echo '<th>' . render_escape((string) ($short['data_short'] ?? $field_name)) . '</th>';
-    }
-    echo '</tr><tr>';
-    foreach ($task_fields as $field_name => $field_schema) {
-        if ($field_schema['kind'] !== 'entity_field') {
-            continue;
-        }
-        $data   = field_data($snapshot, $db_connection, $task_table, $field_name, $node['row'][$field_name], $node['row']);
-        $result = field_exec($data, 'read');
-        echo '<td>' . ($result !== null ? render_value($result) : '') . '</td>';
-    }
-    echo '</tr></table>';
-
-    $id = $node['id'];
-    echo "<p><a class=\"act\" href=\"?_table=$task_table&_action=edit&_id=$id\" title=\"править\">~</a>"
-       . "<a class=\"act act-danger\" href=\"?_table=$task_table&_action=delete&_id=$id\" title=\"удалить\">×</a></p>";
-
-    // Дети — каждый блок с заголовком таблицы, рекурсивно вглубь.
-    foreach ($node['children'] as $block) {
-        echo '<div style="margin-left:' . ($indent + 24) . 'px">';
-        echo '<h4>' . render_escape($block['label']) . '</h4>';
-        foreach ($block['nodes'] as $child_node) {
-            render_object_map($child_node, $snapshot, $db_connection, $depth + 1);
-        }
-        echo '<p><a href="?_table=' . rawurlencode($block['table'])
-            . '&_action=new&_parent_table=' . rawurlencode($task_table)
-            . "&_parent_id=$id\">+ добавить в «" . render_escape($block['label']) . '»</a></p>';
-        echo '</div>';
-    }
-    echo '</div>';
-}
-
 if ($mode === 'read' && $request_id === 0) {
     // Список: строка за строкой, поле за полем — та самая одна строчка
     // field_exec() на каждую ячейку. SQL живёт в record_list.
@@ -282,15 +231,16 @@ if ($mode === 'read' && $request_id === 0) {
 if ($mode === 'read' && $request_id > 0) {
     // Карта объекта: вся глубина дерева сразу (STATE.md п.3, решение
     // Влада 07-09 «карта есть карта, без ограничений»). record_tree
-    // обходит граф в структуру, render_object_map разворачивает её
+    // обходит граф в структуру, render_object_tree разворачивает её
     // рекурсивно — обход и вывод раздельны (в отличие от легаси db_tree,
-    // мешавшего обход, SQL и HTML в одной функции).
+    // мешавшего обход, SQL и HTML в одной функции). render_object_tree
+    // живёт в render.php (view-слой, п.8а).
     $tree = record_tree($db_connection, $snapshot, $task_table, $request_id);
     if ($tree === null) {
         http_response_code(404);
         exit('Запись не найдена');
     }
-    render_object_map($tree, $snapshot, $db_connection);
+    render_object_tree($tree, $snapshot, $db_connection);
 }
 
 if ($mode === 'new' || $mode === 'edit') {
