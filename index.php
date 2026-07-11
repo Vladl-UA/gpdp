@@ -146,11 +146,17 @@ if (in_array($request_action, ['save_new', 'save_edit', 'delete'], true)) {
     };
 
     if ($outcome['ok']) {
-        // Ребёнок создан из карточки родителя → вернуться в неё,
-        // а не в плоский список дочерней таблицы.
-        $back = $task_structural !== []
-            ? '?_table=' . rawurlencode($parent_table) . '&_action=edit&_id=' . $parent_id
-            : '?_table=' . rawurlencode($task_table) . '&_action=view';
+        // Возврат «откуда позвали» (несён формой). Если его нет —
+        // прежняя логика: ребёнок из карточки родителя → в родителя,
+        // иначе → в список таблицы.
+        $return = (string) ($_POST['_return'] ?? '');
+        if ($return !== '' && str_starts_with($return, '/')) {
+            $back = $return;
+        } else {
+            $back = $task_structural !== []
+                ? '?_table=' . rawurlencode($parent_table) . '&_action=edit&_id=' . $parent_id
+                : '?_table=' . rawurlencode($task_table) . '&_action=view';
+        }
         header('Location: ' . $back);
         exit;
     }
@@ -252,6 +258,15 @@ if ($mode === 'new' || $mode === 'edit') {
     if ($parent_ok) {
         $hidden['_parent_table'] = $parent_table;
         $hidden['_parent_id']    = $parent_id;
+    }
+    // Возврат «откуда позвали»: адрес страницы, с которой открыли форму
+    // (Referer при показе), несём через форму — после сохранения вернёмся
+    // ровно туда. Только локальные пути (ведущий /), чужой Referer не берём.
+    $ref = (string) ($_SERVER['HTTP_REFERER'] ?? '');
+    $ref_path = $ref !== '' ? (parse_url($ref, PHP_URL_PATH) ?? '') : '';
+    if ($ref_path !== '') {
+        $ref_q = parse_url($ref, PHP_URL_QUERY);
+        $hidden['_return'] = $ref_path . ($ref_q ? '?' . $ref_q : '');
     }
 
     // Форма через view-слой (п.8в): ядро собирает заготовку (виджеты
