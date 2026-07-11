@@ -16,7 +16,7 @@ error_reporting(E_ALL);
  * сырой request не проходит.
  */
 
-// sync: 2026-07-11, view-слой п.8б — список и карта через record_table_view + render_record_table
+// sync: 2026-07-11, view-слой п.8бв — список, карта и форма через сборщики core + укладчики render
 
 // --- 1. boot -----------------------------------------------------------------
 
@@ -242,29 +242,22 @@ if ($mode === 'new' || $mode === 'edit') {
             . '</b></p>';
     }
 
-    echo '<form method="post">';
-    echo "<input type=\"hidden\" name=\"_action\" value=\"$save_action\">";
-    echo '<input type="hidden" name="_table" value="' . render_escape($task_table) . '">';
+    // Технические скрытые поля формы (PRG): действие, таблица, id для
+    // edit, родитель для new-ребёнка. Собираются здесь, в дирижёре, из
+    // разобранного запроса — идут в заготовку формы как есть.
+    $hidden = ['_action' => $save_action, '_table' => $task_table];
     if ($mode === 'edit') {
-        echo '<input type="hidden" name="_id" value="' . $request_id . '">';
+        $hidden['_id'] = $request_id;
     }
     if ($parent_ok) {
-        echo '<input type="hidden" name="_parent_table" value="' . render_escape($parent_table) . '">';
-        echo '<input type="hidden" name="_parent_id" value="' . $parent_id . '">';
+        $hidden['_parent_table'] = $parent_table;
+        $hidden['_parent_id']    = $parent_id;
     }
 
-    foreach ($task_fields as $field_name => $field_schema) {
-        if ($field_schema['kind'] !== 'entity_field') {
-            continue; // структурные поля в форму не попадают вовсе
-        }
-        $data   = field_data($snapshot, $db_connection, $task_table, $field_name, $row[$field_name] ?? null, $row);
-        $result = field_exec($data, $mode);
-        if ($result !== null) {
-            echo render_form_element($result);
-        }
-    }
-
-    echo '<p><input type="submit" value="Сохранить"></p></form>';
+    // Форма через view-слой (п.8в): ядро собирает заготовку (виджеты
+    // полей в режиме new/edit), render укладывает. Кустарный цикл убран.
+    $view = record_form_view($db_connection, $snapshot, $task_table, $mode, $row, $hidden);
+    echo render_record_form($view);
 
     // Отмена — назад туда, где логически "живёт" запись: у edit — на её
     // же карточку; у new-ребёнка — на карточку родителя; у new без

@@ -15,7 +15,7 @@ declare(strict_types=1);
  * маппинга в label.
  */
 
-// sync: 2026-07-11, view-слой п.8б — render_record_table (укладчик списка/карты), render не трогает БД
+// sync: 2026-07-11, view-слой п.8бв — render_record_table/render_record_form (укладчики), render не трогает БД
 
 /**
  * Общий вид админ-интерфейсов (index.php, configurator.php) — один
@@ -251,5 +251,29 @@ function render_record_table(array $view, array $opts = []): string
     }
 
     $html .= '</table>';
+    return $html;
+}
+
+/**
+ * Укладчик представления «форма» (view-слой): заготовка record_form_view()
+ * → HTML-форма. Ничего не вычисляет — элементы уже готовы (виджеты
+ * input/choice собраны сборщиком в ядре). Рендер оборачивает в <form>,
+ * раскладывает скрытые технические поля и элементы, добавляет кнопку.
+ *
+ * $submit — подпись кнопки. Скрытые поля из $view['hidden'] — как есть
+ * (ключ→значение), это технические имена (_action/_table/_id/_parent_*),
+ * не подписи.
+ */
+function render_record_form(array $view, string $submit = 'Сохранить'): string
+{
+    $html = '<form method="post">';
+    foreach ($view['hidden'] ?? [] as $name => $value) {
+        $html .= '<input type="hidden" name="' . render_escape((string) $name)
+               . '" value="' . render_escape((string) $value) . '">';
+    }
+    foreach ($view['elements'] ?? [] as $element) {
+        $html .= render_form_element($element);
+    }
+    $html .= '<p><input type="submit" value="' . render_escape($submit) . '"></p></form>';
     return $html;
 }

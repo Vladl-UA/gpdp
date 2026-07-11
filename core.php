@@ -1529,3 +1529,44 @@ function record_table_view(mysqli $db_connection, array $snapshot, string $table
     }
     return ['kind' => 'table', 'table' => $table, 'columns' => $columns, 'rows' => $rows];
 }
+
+/**
+ * Сборка представления «форма» (view-слой, STATE.md п.8в): поля записи
+ * в режиме new/edit — готовая заготовка для рендера, БЕЗ HTML. Ядро
+ * собирает (зовёт field_exec в нужном режиме — получаются виджеты
+ * input/choice с текущими значениями), render раскладывает.
+ *
+ * $row — прочитанная строка для edit (пусто/[] для new).
+ * $mode — 'new' | 'edit'.
+ *
+ * Возврат:
+ *   ['kind'=>'form', 'table'=>..., 'mode'=>..., 'elements'=>[<результаты
+ *     field_exec>], 'hidden'=>['_action'=>.., '_table'=>.., ...]]
+ * elements — уже готовые структурированные результаты полей (input/
+ * choice/value), render превращает их в виджеты. hidden — технические
+ * поля формы (действие, таблица, id, родитель), которые нужны PRG.
+ */
+function record_form_view(
+    mysqli $db_connection, array $snapshot, string $table, string $mode,
+    array $row = [], array $hidden = []
+): array {
+    $fields   = $snapshot['structure']['tables'][$table]['fields'] ?? [];
+    $elements = [];
+    foreach ($fields as $field_name => $field_schema) {
+        if (($field_schema['kind'] ?? '') !== 'entity_field') {
+            continue; // структурные поля в форму не попадают
+        }
+        $data   = field_data($snapshot, $db_connection, $table, $field_name, $row[$field_name] ?? null, $row);
+        $result = $data !== null ? field_exec($data, $mode) : null;
+        if ($result !== null) {
+            $elements[] = $result;
+        }
+    }
+    return [
+        'kind'     => 'form',
+        'table'    => $table,
+        'mode'     => $mode,
+        'elements' => $elements,
+        'hidden'   => $hidden,
+    ];
+}
