@@ -176,81 +176,23 @@ function configurator_validate_spec(array $input, array $live_structure): array
     }
 
     foreach ($raw_fields as $i => $raw_field) {
-        $entity_choice = (string) ($raw_field['entity'] ?? '');
-        $f_short       = trim((string) ($raw_field['short'] ?? ''));
-        $f_full        = trim((string) ($raw_field['full'] ?? ''));
-
-        // 'id' — структурный синтетический выбор, не сущность: не проверяем
-        // имя/подписи, не создаёт запись в реестре (см. §17: id не описан
-        // подписью, он идентичность, а не модельный элемент со смыслом).
-        if ($entity_choice === 'id') {
-            if ($has_id) {
-                $errors[] = 'Поле "id" можно указать только один раз.';
+        if (($raw_field['entity'] ?? '') === 'id') {
+            continue; // id гарантирован сервером; повтор игнорируем
+        }
+        $parsed = configurator_parse_field($raw_field, $known_entities, $live_structure);
+        if (!$parsed['ok']) {
+            foreach ($parsed['errors'] as $e) {
+                $errors[] = "Поле #" . ($i + 1) . ": " . $e;
             }
-            $has_id = true;
             continue;
         }
-
-        if (!isset($known_entities[$entity_choice])) {
-            $errors[] = "Поле #" . ($i + 1) . ": неизвестный тип \"$entity_choice\".";
-            continue;
-        }
-
-        // Для voc именная часть приходит из выпадающего списка существующих
-        // словарей (voc_pick), не из свободного текстового поля name —
-        // предотвращает опечатку там, где правильный ответ всегда один
-        // из уже известных системе вариантов.
-        $name_part = $entity_choice === 'voc'
-            ? trim((string) ($raw_field['voc_pick'] ?? ''))
-            : trim((string) ($raw_field['name'] ?? ''));
-
-        if (!configurator_identifier_valid($name_part)) {
-            $errors[] = "Поле #" . ($i + 1) . ($entity_choice === 'voc'
-                ? ": словарь не выбран."
-                : ": именная часть — латиница/цифры/\"_\", с буквы.");
-            continue;
-        }
-
-        $column = $entity_choice . '_' . $name_part;
-
-        if (strlen($column) > 64) {
-            $errors[] = "Поле #" . ($i + 1) . ": имя колонки \"$column\" длиннее 64 символов (лимит MySQL).";
-        }
-        if (in_array($column, STRUCTURAL_FIELD_NAMES, true)
-            || str_starts_with($column, 'dep_')) {
-            $errors[] = "Поле #" . ($i + 1) . ": \"$column\" — зарезервированное структурное имя.";
-        }
+        $column = $parsed['field']['column'];
         if (isset($seen_columns[$column])) {
             $errors[] = "Поле #" . ($i + 1) . ": колонка \"$column\" повторяется в спецификации.";
+            continue;
         }
         $seen_columns[$column] = true;
-
-        if ($f_short === '' || $f_full === '') {
-            $errors[] = "Поле #" . ($i + 1) . ": короткая и полная подпись обязательны.";
-        }
-
-        // Уровень 0 (§16): для voc-поля таблица-склад должна существовать
-        // УЖЕ СЕЙЧАС и иметь data_name. Она создаётся режимом 'voc_simple'
-        // выше — эта ветка только проверяет, что путь был пройден честно.
-        if ($entity_choice === 'voc') {
-            $dict_table = $column; // конвенция уровня 0: имя поля = имя таблицы-словаря
-            $dict_fields = $live_structure['tables'][$dict_table]['fields'] ?? null;
-            if ($dict_fields === null) {
-                $errors[] = "Поле #" . ($i + 1) . ": словаря \"$dict_table\" не существует. "
-                          . "Создайте его первым через режим \"Словарь\".";
-            } elseif (!isset($dict_fields['data_name'])) {
-                $errors[] = "Поле #" . ($i + 1) . ": таблица \"$dict_table\" существует, но без поля data_name — "
-                          . "не может быть словарём уровня 0.";
-            }
-        }
-
-        $fields[] = [
-            'column'  => $column,
-            'entity'  => $entity_choice,
-            'db_type' => $known_entities[$entity_choice]['db']['default_type'],
-            'short'   => $f_short,
-            'full'    => $f_full,
-        ];
+        $fields[] = $parsed['field'];
     }
 
     return [
@@ -263,6 +205,70 @@ function configurator_validate_spec(array $input, array $live_structure): array
         'has_id'             => $has_id,
         'structural_columns' => $structural_columns,
     ];
+}
+
+/**
+ * Разбор и проверка ОДНОГО поля из формы (общий для создания таблицы и
+ * добавления поля через ALTER). Возвращает ['ok', 'errors', 'field'].
+ * field при ok: ['column','entity','db_type','short','full'].
+ * 'id' — синтетический структурный выбор: ok=true, field=null (в реестр
+ * не пишется).
+ */
+function configurator_parse_field(array $raw_field, array $known_entities, array $live_structure): array
+{
+    $errors        = [];
+    $entity_choice = (string) ($raw_field['entity'] ?? '');
+    $f_short       = trim((string) ($raw_field['short'] ?? ''));
+    $f_full        = trim((string) ($raw_field['full'] ?? ''));
+
+    if ($entity_choice === 'id') {
+        return ['ok' => true, 'errors' => [], 'field' => null]; // структурный, без записи
+    }
+    if (!isset($known_entities[$entity_choice])) {
+        return ['ok' => false, 'errors' => ["неизвестный тип \"$entity_choice\"."], 'field' => null];
+    }
+
+    $name_part = $entity_choice === 'voc'
+        ? trim((string) ($raw_field['voc_pick'] ?? ''))
+        : trim((string) ($raw_field['name'] ?? ''));
+
+    if (!configurator_identifier_valid($name_part)) {
+        return ['ok' => false, 'errors' => [$entity_choice === 'voc'
+            ? 'словарь не выбран.'
+            : 'именная часть — латиница/цифры/"_", с буквы.'], 'field' => null];
+    }
+
+    $column = $entity_choice . '_' . $name_part;
+
+    if (strlen($column) > 64) {
+        $errors[] = "имя колонки \"$column\" длиннее 64 символов (лимит MySQL).";
+    }
+    if (in_array($column, STRUCTURAL_FIELD_NAMES, true) || str_starts_with($column, 'dep_')) {
+        $errors[] = "\"$column\" — зарезервированное структурное имя.";
+    }
+    if ($f_short === '' || $f_full === '') {
+        $errors[] = "короткая и полная подпись обязательны.";
+    }
+    if ($entity_choice === 'voc') {
+        $dict_table  = $column;
+        $dict_fields = $live_structure['tables'][$dict_table]['fields'] ?? null;
+        if ($dict_fields === null) {
+            $errors[] = "словаря \"$dict_table\" не существует. Создайте его первым через режим \"Словарь\".";
+        } elseif (!isset($dict_fields['data_name'])) {
+            $errors[] = "таблица \"$dict_table\" существует, но без поля data_name — не может быть словарём уровня 0.";
+        }
+    }
+
+    if ($errors !== []) {
+        return ['ok' => false, 'errors' => $errors, 'field' => null];
+    }
+    return ['ok' => true, 'errors' => [], 'field' => [
+        'column'  => $column,
+        'entity'  => $entity_choice,
+        'db_type' => $known_entities[$entity_choice]['db']['default_type'],
+        'short'   => $f_short,
+        'full'    => $f_full,
+    ]];
 }
 
 // ============================================================================
@@ -525,6 +531,120 @@ function configurator_drop_column(mysqli $db_connection, string $table, string $
         if (!mysqli_query($db_connection, 'ALTER TABLE `' . $table . '` DROP COLUMN `' . $field . '`')) {
             return ['ok' => false, 'errors' => ['DDL: ' . mysqli_error($db_connection)]];
         }
+        return configurator_refresh($db_connection, $application);
+    } finally {
+        snapshot_lock_release('configurator');
+    }
+}
+
+// ============================================================================
+// Правка полей таблицы (ALTER, Волна 2, 2026-07-11). Добавление и
+// удаление колонки живой таблицы. Под локом схемы, регистрация в реестре
+// разом с DDL (иначе — сирота, которую ловит диагностика). Смена типа —
+// сознательно вне охвата (журнал: только внутри группы, только усложнение
+// без потери данных — позже).
+// ============================================================================
+
+/**
+ * Добавить поле в существующую таблицу: ALTER ADD COLUMN + регистрация +
+ * подпись. Тип/имя разбираются тем же валидатором, что при создании
+ * (configurator_validate_spec на спеке из одного поля) — те же проверки
+ * (префикс, длина, резерв, для voc — существование словаря).
+ * $field_input — как одно поле формы создания: entity, name/voc_pick,
+ * short, full.
+ */
+function configurator_add_field(mysqli $db_connection, string $table, array $field_input, array $application): array
+{
+    if (!snapshot_lock_acquire('configurator', "Добавление поля в $table")) {
+        return ['ok' => false, 'errors' => ['Схема заблокирована другой операцией.']];
+    }
+    try {
+        $live = snapshot_build_structure($db_connection);
+        if (!isset($live['tables'][$table])) {
+            return ['ok' => false, 'errors' => ["Таблица $table не существует."]];
+        }
+
+        // Разбор поля тем же кирпичом, что валидатор создания (общая
+        // configurator_parse_field — не копия проверок).
+        $parsed = configurator_parse_field($field_input, entities(), $live);
+        if (!$parsed['ok']) {
+            return ['ok' => false, 'errors' => $parsed['errors']];
+        }
+        $field = $parsed['field'];
+        if ($field === null) {
+            return ['ok' => false, 'errors' => ['Поле не распозналось (id нельзя добавить как поле).']];
+        }
+
+        if (isset($live['tables'][$table]['fields'][$field['column']])) {
+            return ['ok' => false, 'errors' => ["Поле {$field['column']} в таблице $table уже есть."]];
+        }
+
+        $sql = 'ALTER TABLE `' . $table . '` ADD COLUMN `' . $field['column'] . '` '
+             . $field['db_type'] . ' NULL';
+        if (!mysqli_query($db_connection, $sql)) {
+            return ['ok' => false, 'errors' => ['DDL: ' . mysqli_error($db_connection)]];
+        }
+
+        $stmt = mysqli_prepare($db_connection, 'INSERT INTO `' . MODEL_REGISTRY_TABLE
+            . "` (data_kind, data_owner, data_element, active) VALUES ('field', ?, ?, 1)");
+        mysqli_stmt_bind_param($stmt, 'ss', $table, $field['column']);
+        mysqli_stmt_execute($stmt);
+        $rid = mysqli_insert_id($db_connection);
+
+        $stmt = mysqli_prepare($db_connection, 'INSERT INTO `' . MODEL_LABELS_TABLE
+            . '` (dep_model_registry, data_short, data_full) VALUES (?, ?, ?)');
+        mysqli_stmt_bind_param($stmt, 'iss', $rid, $field['short'], $field['full']);
+        mysqli_stmt_execute($stmt);
+
+        return configurator_refresh($db_connection, $application);
+    } finally {
+        snapshot_lock_release('configurator');
+    }
+}
+
+/**
+ * Удалить поле из таблицы ФИЗИЧЕСКИ (DROP COLUMN) + снять регистрацию.
+ * Защита данных: если в колонке есть непустые значения, требуется явный
+ * флаг $force (подтверждение инженера «удаляю с данными»). Пустая
+ * колонка удаляется без флага. Структурные поля (id/dep_/rel_main) не
+ * удаляются. Подпись уходит каскадом FK (§17).
+ */
+function configurator_drop_field(mysqli $db_connection, string $table, string $field, bool $force, array $application): array
+{
+    if (!snapshot_lock_acquire('configurator', "Удаление поля $table.$field")) {
+        return ['ok' => false, 'errors' => ['Схема заблокирована другой операцией.']];
+    }
+    try {
+        $live = snapshot_build_structure($db_connection);
+        $fschema = $live['tables'][$table]['fields'][$field] ?? null;
+        if ($fschema === null) {
+            return ['ok' => false, 'errors' => ["Поля $table.$field нет."]];
+        }
+        if (($fschema['kind'] ?? '') !== 'entity_field') {
+            return ['ok' => false, 'errors' => ["$table.$field — структурное поле, не удаляется."]];
+        }
+
+        // Проверка данных: есть ли непустые значения в колонке.
+        $cnt_sql = 'SELECT COUNT(*) AS c FROM `' . $table . '` WHERE `' . $field . '` IS NOT NULL';
+        $res = @mysqli_query($db_connection, $cnt_sql);
+        $with_data = $res ? (int) (mysqli_fetch_assoc($res)['c'] ?? 0) : 0;
+        if ($with_data > 0 && !$force) {
+            return ['ok' => false, 'errors' => [
+                "В поле $table.$field есть данные ($with_data значений). "
+                . "Удаление сотрёт их — подтвердите удаление с данными."
+            ]];
+        }
+
+        if (!mysqli_query($db_connection, 'ALTER TABLE `' . $table . '` DROP COLUMN `' . $field . '`')) {
+            return ['ok' => false, 'errors' => ['DDL: ' . mysqli_error($db_connection)]];
+        }
+
+        // Снять регистрацию (подпись — каскадом FK).
+        $stmt = mysqli_prepare($db_connection, 'DELETE FROM `' . MODEL_REGISTRY_TABLE
+            . "` WHERE data_kind='field' AND data_owner=? AND data_element=?");
+        mysqli_stmt_bind_param($stmt, 'ss', $table, $field);
+        mysqli_stmt_execute($stmt);
+
         return configurator_refresh($db_connection, $application);
     } finally {
         snapshot_lock_release('configurator');
