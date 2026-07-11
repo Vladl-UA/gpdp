@@ -3,7 +3,7 @@ declare(strict_types=1);
 ini_set('display_errors', '1');
 error_reporting(E_ALL);
 
-// sync: 2026-07-11, view-слой п.8г — конфигуратор: 4 группы таблиц + схема через schema_view/render_schema_card
+// sync: 2026-07-11, view-слой п.8г — конфигуратор на общий render_table_directory
 
 /**
  * GPDP / RNA — конфигуратор БД (v0).
@@ -652,72 +652,13 @@ if ($caction === 'new_table') {
 
     echo '<h2>Таблицы</h2><p><a href="?_action=new_table">+ новая таблица</a></p>';
 
-    // Действия карточки (навигация конфигуратора), {t} → имя таблицы.
-    $card_actions = [
-        'содержимое'   => 'index.php?_table={t}&_action=view',
+    // Каталог таблиц — общая раскладка (та же, что на labels; render.php).
+    // Под капотом различаются только действия карточек.
+    render_table_directory($snapshot, [
+        'содержимое'    => 'index.php?_table={t}&_action=view',
         'редактировать' => '?_action=edit&table={t}',
         'удалить'       => '?_action=delete_confirm&table={t}',
-    ];
-
-    // Раскладка по группам (классификатор в ядре, один на все страницы).
-    $by_group = ['main' => [], 'dict' => [], 'system' => []];
-    foreach ($structure['tables'] as $t_name => $t_schema) {
-        $g = table_group($t_name, $t_schema);
-        // dependent не верхнего уровня — покажется под своей главной деревом.
-        if ($g === 'dependent') {
-            continue;
-        }
-        $by_group[$g][] = $t_name;
-    }
-    foreach ($by_group as $g => &$names) {
-        sort($names, SORT_NATURAL | SORT_FLAG_CASE);
-    }
-    unset($names);
-
-    // Рекурсивный вывод главной таблицы с её зависимыми внутри семейного
-    // блока: карточки идут bare (без своей рамки), рамку и правый край
-    // для выравнивания даёт блок-обёртка .schema-family.
-    $render_table_tree = function (string $t_name, int $depth) use (
-        &$render_table_tree, $snapshot, $card_actions, $referenced_as_dict
-    ): void {
-        $badge = isset($referenced_as_dict[$t_name]) ? '<span class="badge">словарь</span>' : '';
-        echo render_schema_card(schema_view($snapshot, $t_name), $card_actions, $badge, $depth, true);
-        foreach ($snapshot['model']['relations'][$t_name] ?? [] as $relation) {
-            $render_table_tree($relation['child'], $depth + 1);
-        }
-    };
-
-    echo '<h3>Главные таблицы</h3>';
-    if ($by_group['main'] === []) {
-        echo '<p><em>нет</em></p>';
-    } else {
-        foreach ($by_group['main'] as $t_name) {
-            echo '<div class="schema-family">';
-            $render_table_tree($t_name, 0);
-            echo '</div>';
-        }
-    }
-
-    echo '<h3>Отчёты</h3><p><em>Отчёты не созданы.</em></p>';
-
-    echo '<h3>Служебные таблицы</h3>';
-    if ($by_group['dict'] === []) {
-        echo '<p><em>нет</em></p>';
-    } else {
-        foreach ($by_group['dict'] as $t_name) {
-            $badge = isset($referenced_as_dict[$t_name]) ? '<span class="badge">словарь</span>' : '';
-            echo render_schema_card(schema_view($snapshot, $t_name), $card_actions, $badge, 0);
-        }
-    }
-
-    echo '<h3>Системные таблицы</h3>';
-    if ($by_group['system'] === []) {
-        echo '<p><em>нет</em></p>';
-    } else {
-        foreach ($by_group['system'] as $t_name) {
-            echo render_schema_card(schema_view($snapshot, $t_name), $card_actions, '', 0);
-        }
-    }
+    ], ['referenced' => $referenced_as_dict]);
 }
 
 echo '</body></html>';

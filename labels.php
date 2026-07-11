@@ -158,6 +158,12 @@ if (isset($_GET['flash'])) {
 
 $structure    = snapshot_build_structure($db_connection);
 $presentation = snapshot_build_presentation($db_connection);
+$relations    = snapshot_build_relations(['tables' => $structure['tables']]);
+$snapshot_view = [
+    'structure'    => $structure,
+    'presentation' => $presentation,
+    'model'        => ['relations' => $relations['map']],
+];
 
 $SYS_PREFIX = defined('SYSTEM_TABLE_PREFIX') ? SYSTEM_TABLE_PREFIX : 'model_';
 
@@ -182,43 +188,15 @@ echo render_admin_flash($flash !== null ? h($flash[1]) : null, ($flash[0] ?? '')
 // ---------------------------------------------------------------------------
 if (!$valid_selected) {
     echo '<h1>Подписи и словари</h1>';
+    echo '<p><em>Выберите таблицу — правка подписей её полей; у словарей '
+       . 'также значения.</em></p>';
 
-    $mains = $deps = $vocs = [];
-    foreach ($structure['tables'] as $t_name => $t_schema) {
-        if (str_starts_with($t_name, $SYS_PREFIX)) {
-            continue;
-        }
-        $full = (string) ($presentation['labels']['table'][$t_name]['data_full'] ?? $t_name);
-        if (str_starts_with($t_name, 'voc_')) {
-            $vocs[$t_name] = $full;
-            continue;
-        }
-        $has_sub = false;
-        foreach ($t_schema['fields'] as $f_name => $_) {
-            if ($f_name === 'rel_main' || str_starts_with($f_name, 'dep_')) {
-                $has_sub = true;
-                break;
-            }
-        }
-        $has_sub ? $deps[$t_name] = $full : $mains[$t_name] = $full;
-    }
-    asort($mains, SORT_NATURAL | SORT_FLAG_CASE);
-    asort($deps, SORT_NATURAL | SORT_FLAG_CASE);
-    asort($vocs, SORT_NATURAL | SORT_FLAG_CASE);
-
-    foreach (['Главные' => $mains, 'Зависимые' => $deps, 'Словари' => $vocs] as $title => $items) {
-        echo '<h3>' . h($title) . '</h3>';
-        if ($items === []) {
-            echo '<p><em>нет</em></p>';
-            continue;
-        }
-        echo '<ul>';
-        foreach ($items as $t_name => $full) {
-            echo '<li><a href="?table=' . rawurlencode($t_name) . '">' . h($full) . '</a>'
-               . ' <span class="badge">' . h($t_name) . '</span></li>';
-        }
-        echo '</ul>';
-    }
+    // Тот же каталог таблиц, что в конфигураторе (render.php) — «сверху
+    // одно и то же». Под капотом действие одно: выбрать таблицу для
+    // правки подписей. Системные (model_) не правятся здесь.
+    render_table_directory($snapshot_view, [
+        'править' => '?table={t}',
+    ], ['show_system' => false, 'reports_note' => 'Отчёты не созданы.']);
 
     echo '</body></html>';
     mysqli_close($db_connection);

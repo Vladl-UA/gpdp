@@ -15,7 +15,7 @@ declare(strict_types=1);
  * маппинга в label.
  */
 
-// sync: 2026-07-11, view-слой п.8бвг + карточка схемы: семейный блок (главная+зависимые в одной рамке 70%)
+// sync: 2026-07-11, view-слой п.8г + render_table_directory (общий каталог таблиц: конфигуратор и labels)
 
 /**
  * Общий вид админ-интерфейсов (index.php, configurator.php) — один
@@ -346,4 +346,90 @@ function render_schema_card(array $view, array $actions = [], string $badge = ''
 
     $html .= '</div>';
     return $html;
+}
+
+/**
+ * Общий каталог таблиц по группам (view-слой): четыре раздела —
+ * Главные (каждая с деревом зависимых в семейном блоке), Отчёты,
+ * Служебные, Системные. Одна раскладка на конфигуратор и labels
+ * («сверху одно и то же»); под капотом расходятся действия карточек.
+ *
+ * $snapshot — снапшот-для-показа (structure + presentation + relations).
+ * $actions  — ссылки карточки [подпись => href-шаблон], {t} → имя
+ *             таблицы; у конфигуратора одни, у labels другие.
+ * $opts:
+ *   'dict_badge'    => bool — рисовать значок «словарь» (множество имён
+ *                      voc-полей передаётся как 'referenced');
+ *   'referenced'    => массив имён таблиц-словарей (для значка);
+ *   'show_system'   => bool — показывать раздел системных (labels может
+ *                      не показывать; по умолчанию true);
+ *   'reports_note'  => текст пустой полки отчётов.
+ */
+function render_table_directory(array $snapshot, array $actions, array $opts = []): void
+{
+    $referenced   = $opts['referenced'] ?? [];
+    $show_system  = $opts['show_system'] ?? true;
+    $reports_note = $opts['reports_note'] ?? 'Отчёты не созданы.';
+
+    $tables = $snapshot['structure']['tables'] ?? [];
+
+    $by_group = ['main' => [], 'dict' => [], 'system' => []];
+    foreach ($tables as $t_name => $t_schema) {
+        $g = table_group($t_name, $t_schema);
+        if ($g === 'dependent') {
+            continue; // покажется под своей главной деревом
+        }
+        $by_group[$g][] = $t_name;
+    }
+    foreach ($by_group as &$names) {
+        sort($names, SORT_NATURAL | SORT_FLAG_CASE);
+    }
+    unset($names);
+
+    $badge_of = static function (string $t) use ($referenced): string {
+        return isset($referenced[$t]) ? '<span class="badge">словарь</span>' : '';
+    };
+
+    // Рекурсивный вывод главной с зависимыми внутри семейного блока.
+    $tree = static function (string $t_name, int $depth) use (
+        &$tree, $snapshot, $actions, $badge_of
+    ): void {
+        echo render_schema_card(schema_view($snapshot, $t_name), $actions, $badge_of($t_name), $depth, true);
+        foreach ($snapshot['model']['relations'][$t_name] ?? [] as $relation) {
+            $tree($relation['child'], $depth + 1);
+        }
+    };
+
+    echo '<h3>Главные таблицы</h3>';
+    if ($by_group['main'] === []) {
+        echo '<p><em>нет</em></p>';
+    } else {
+        foreach ($by_group['main'] as $t_name) {
+            echo '<div class="schema-family">';
+            $tree($t_name, 0);
+            echo '</div>';
+        }
+    }
+
+    echo '<h3>Отчёты</h3><p><em>' . render_escape($reports_note) . '</em></p>';
+
+    echo '<h3>Служебные таблицы</h3>';
+    if ($by_group['dict'] === []) {
+        echo '<p><em>нет</em></p>';
+    } else {
+        foreach ($by_group['dict'] as $t_name) {
+            echo render_schema_card(schema_view($snapshot, $t_name), $actions, $badge_of($t_name), 0);
+        }
+    }
+
+    if ($show_system) {
+        echo '<h3>Системные таблицы</h3>';
+        if ($by_group['system'] === []) {
+            echo '<p><em>нет</em></p>';
+        } else {
+            foreach ($by_group['system'] as $t_name) {
+                echo render_schema_card(schema_view($snapshot, $t_name), $actions, '', 0);
+            }
+        }
+    }
 }
