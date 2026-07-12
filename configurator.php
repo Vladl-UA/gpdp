@@ -238,6 +238,18 @@ function configurator_parse_field(array $raw_field, array $known_entities, array
             : 'именная часть — латиница/цифры/"_", с буквы.'], 'field' => null];
     }
 
+    // link_: имя поля свободное (как обычное), а не выбор из списка —
+    // в отличие от voc_, где имя = имя целевой таблицы. Цель для link_
+    // указывается ОТДЕЛЬНО (журнал 2026-07-12: имя поля и адрес цели —
+    // разные вещи, ровно затем и вводили link_).
+    $link_target = null;
+    if ($entity_choice === 'link') {
+        $link_target = trim((string) ($raw_field['link_target'] ?? ''));
+        if ($link_target === '' || !isset($live_structure['tables'][$link_target])) {
+            return ['ok' => false, 'errors' => ['цель ссылки не выбрана или не существует.'], 'field' => null];
+        }
+    }
+
     $column = $entity_choice . '_' . $name_part;
 
     if (strlen($column) > 64) {
@@ -263,12 +275,30 @@ function configurator_parse_field(array $raw_field, array $known_entities, array
         return ['ok' => false, 'errors' => $errors, 'field' => null];
     }
     return ['ok' => true, 'errors' => [], 'field' => [
-        'column'  => $column,
-        'entity'  => $entity_choice,
-        'db_type' => $known_entities[$entity_choice]['db']['default_type'],
-        'short'   => $f_short,
-        'full'    => $f_full,
+        'column'      => $column,
+        'entity'      => $entity_choice,
+        'db_type'     => $known_entities[$entity_choice]['db']['default_type'],
+        'short'       => $f_short,
+        'full'        => $f_full,
+        'link_target' => $link_target, // null для всех, кроме link_
     ]];
+}
+
+/**
+ * Записать адрес link_-поля в model_links (журнал 2026-07-12). Глобально
+ * по имени поля (§16.1, «одно имя = один смысл») — простой INSERT, не
+ * ON DUPLICATE KEY: повторная регистрация того же имени с ДРУГОЙ целью
+ * обязана упасть громко (первичный ключ = data_element), а не молча
+ * переписать адрес — «не переопределяется после создания» из решения.
+ */
+function configurator_register_link(mysqli $db_connection, string $column, string $target): bool
+{
+    $stmt = mysqli_prepare(
+        $db_connection,
+        'INSERT INTO `model_links` (data_element, data_target_table) VALUES (?, ?)'
+    );
+    mysqli_stmt_bind_param($stmt, 'ss', $column, $target);
+    return mysqli_stmt_execute($stmt);
 }
 
 // ============================================================================
@@ -342,6 +372,15 @@ function configurator_create_table(mysqli $db_connection, array $spec, array $ap
             );
             mysqli_stmt_bind_param($stmt, 'iss', $field_registry_id, $field['short'], $field['full']);
             mysqli_stmt_execute($stmt);
+
+            if (($field['link_target'] ?? null) !== null) {
+                if (!configurator_register_link($db_connection, $field['column'], $field['link_target'])) {
+                    return ['ok' => false, 'errors' => [
+                        "Поле {$field['column']} создано, но адрес link_ не записан: "
+                        . mysqli_error($db_connection),
+                    ]];
+                }
+            }
         }
 
         // Пересборка тем же примитивом, что использует холодный старт,
@@ -596,6 +635,15 @@ function configurator_add_field(mysqli $db_connection, string $table, array $fie
         mysqli_stmt_bind_param($stmt, 'iss', $rid, $field['short'], $field['full']);
         mysqli_stmt_execute($stmt);
 
+        if (($field['link_target'] ?? null) !== null) {
+            if (!configurator_register_link($db_connection, $field['column'], $field['link_target'])) {
+                return ['ok' => false, 'errors' => [
+                    "Поле {$field['column']} добавлено, но адрес link_ не записан: "
+                    . mysqli_error($db_connection),
+                ]];
+            }
+        }
+
         return configurator_refresh($db_connection, $application);
     } finally {
         snapshot_lock_release('configurator');
@@ -799,6 +847,23 @@ if ($caction === 'diagnose') {
     }
     $dict_labels_json = json_encode($available_dicts, JSON_UNESCAPED_UNICODE);
 
+    // Цели для link_ (журнал 2026-07-12): ЛЮБАЯ таблица с data_name —
+    // не только voc_*, в этом и смысл link_ (Идея А). Системные (model_)
+    // уже исключены структурным сканером. Более широкие цели (только с
+    // шаблоном подписи, без data_name) движок понимает, но этот список —
+    // сознательно суженный v0-фильтр для удобного выбора, не полный
+    // охват движка.
+    $link_target_options = '<option value="">— выберите цель —</option>';
+    foreach ($live_structure['tables'] as $t_name => $t_schema) {
+        if (!isset($t_schema['fields']['data_name'])) {
+            continue;
+        }
+        $t_labels = $live_presentation['labels']['table'][$t_name] ?? [];
+        $t_full   = (string) ($t_labels['data_full'] ?? $t_name);
+        $link_target_options .= '<option value="' . render_escape($t_name) . '">'
+                              . render_escape($t_full) . ' (' . render_escape($t_name) . ')</option>';
+    }
+
     // Родители для режима "Зависимая таблица" — ВСЕ живые таблицы
     // (включая словари: контекстные таблицы могут подчиняться и им).
     // model_-таблицы структурный сканер уже исключил.
@@ -864,6 +929,7 @@ if ($caction === 'diagnose') {
 
         <input type="text" class="f-name" name="fields[__I__][name]" placeholder="именная часть (без префикса)">
         <select class="f-voc-pick" name="fields[__I__][voc_pick]" style="display:none" onchange="onVocPick(this)">$dict_options</select>
+        <select class="f-link-target" name="fields[__I__][link_target]" style="display:none">$link_target_options</select>
 
         <input type="text" class="f-full"  name="fields[__I__][full]"  placeholder="полная подпись">
         <input type="text" class="f-short" name="fields[__I__][short]" placeholder="короткая подпись">
@@ -891,20 +957,20 @@ if ($caction === 'diagnose') {
       const row  = select.closest('.field-row');
       const name = row.querySelector('.f-name');
       const voc  = row.querySelector('.f-voc-pick');
+      const link = row.querySelector('.f-link-target');
       const short = row.querySelector('.f-short');
       const full  = row.querySelector('.f-full');
 
-      if (select.value === 'voc') {
-        // именная часть выбирается из уже существующих словарей,
-        // не печатается свободным текстом (§16, уровень 0)
-        name.style.display = 'none';
-        voc.style.display = '';
-        short.style.display = full.style.display = '';
-      } else {
-        name.style.display = '';
-        voc.style.display = 'none';
-        short.style.display = full.style.display = '';
-      }
+      // voc_: имя выбирается из существующих словарей, не печатается
+      // (§16, уровень 0). link_: имя СВОБОДНОЕ (как обычное поле) — а
+      // цель выбирается отдельно (журнал 07-12: имя и адрес — разные
+      // вещи, обе видны сразу, никакого авто-заполнения подписи от
+      // цели — семантика поля («любимый цвет») не совпадает с
+      // подписью цели («Цвет»)).
+      voc.style.display  = select.value === 'voc'  ? '' : 'none';
+      link.style.display = select.value === 'link' ? '' : 'none';
+      name.style.display = select.value === 'voc'  ? 'none' : '';
+      short.style.display = full.style.display = '';
     }
 
     function onVocPick(select) {
@@ -1029,6 +1095,19 @@ if ($caction === 'diagnose') {
         }
         $dict_labels_json = json_encode($available_dicts, JSON_UNESCAPED_UNICODE);
 
+        // Цели для link_ — тот же критерий, что при создании таблицы
+        // (любая таблица с data_name, не только voc_*).
+        $link_target_options = '<option value="">— выберите цель —</option>';
+        foreach ($live_structure['tables'] as $t_name => $ts) {
+            if (!isset($ts['fields']['data_name'])) {
+                continue;
+            }
+            $tl = $live_presentation['labels']['table'][$t_name] ?? [];
+            $link_target_options .= '<option value="' . render_escape($t_name) . '">'
+                                   . render_escape((string) ($tl['data_full'] ?? $t_name))
+                                   . ' (' . render_escape($t_name) . ')</option>';
+        }
+
         echo <<<HTML
         <h3>Добавить поле</h3>
         <form method="post" action="?_action=alter_add_field">
@@ -1038,6 +1117,7 @@ if ($caction === 'diagnose') {
               <option value="" selected disabled>— тип поля —</option>$type_options</select>
             <input type="text" class="f-name" name="field[name]" placeholder="именная часть (без префикса)">
             <select class="f-voc-pick" name="field[voc_pick]" style="display:none" onchange="onVocPick(this)">$dict_options</select>
+            <select class="f-link-target" name="field[link_target]" style="display:none">$link_target_options</select>
             <input type="text" class="f-full"  name="field[full]"  placeholder="полная подпись">
             <input type="text" class="f-short" name="field[short]" placeholder="короткая подпись">
             <button type="submit">+ добавить</button>
@@ -1049,8 +1129,10 @@ if ($caction === 'diagnose') {
           const row  = select.closest('.field-row');
           const name = row.querySelector('.f-name');
           const voc  = row.querySelector('.f-voc-pick');
-          if (select.value === 'voc') { name.style.display = 'none'; voc.style.display = ''; }
-          else { name.style.display = ''; voc.style.display = 'none'; }
+          const link = row.querySelector('.f-link-target');
+          voc.style.display  = select.value === 'voc'  ? '' : 'none';
+          link.style.display = select.value === 'link' ? '' : 'none';
+          name.style.display = select.value === 'voc'  ? 'none' : '';
         }
         function onVocPick(select) {
           const row = select.closest('.field-row');
