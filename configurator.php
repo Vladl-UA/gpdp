@@ -3,7 +3,7 @@ declare(strict_types=1);
 ini_set('display_errors', '1');
 error_reporting(E_ALL);
 
-// sync: 2026-07-11, конфигуратор + инструмент ремонта структуры (диагностика/показ/починка)
+// sync: 2026-07-12, конфигуратор: инструмент ремонта + ALTER полей (добавление/удаление с защитой данных)
 
 /**
  * GPDP / RNA — конфигуратор БД (v0).
@@ -711,6 +711,31 @@ if (in_array($caction, $repair_actions, true) && $_SERVER['REQUEST_METHOD'] === 
     exit;
 }
 
+// Правка полей таблицы (ALTER, Волна 2). PRG назад в форму правки той же
+// таблицы — человек сразу видит обновлённый состав полей.
+if ($caction === 'alter_add_field' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $table   = (string) ($_POST['table'] ?? '');
+    $outcome = configurator_add_field($db_connection, $table, (array) ($_POST['field'] ?? []), $application);
+    $msg = $outcome['ok']
+        ? 'Поле добавлено и взято под управление.'
+        : implode(' | ', $outcome['errors']);
+    header('Location: ?_action=edit&table=' . rawurlencode($table)
+         . '&_msg=' . rawurlencode($msg) . '&_ok=' . ($outcome['ok'] ? '1' : '0'));
+    exit;
+}
+if ($caction === 'alter_drop_field' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $table   = (string) ($_POST['table'] ?? '');
+    $field   = (string) ($_POST['field'] ?? '');
+    $force   = ($_POST['force'] ?? '') === '1';
+    $outcome = configurator_drop_field($db_connection, $table, $field, $force, $application);
+    $msg = $outcome['ok']
+        ? "Поле $field удалено из таблицы."
+        : implode(' | ', $outcome['errors']);
+    header('Location: ?_action=edit&table=' . rawurlencode($table)
+         . '&_msg=' . rawurlencode($msg) . '&_ok=' . ($outcome['ok'] ? '1' : '0'));
+    exit;
+}
+
 // --- отрисовка -----------------------------------------------------------
 
 $flash    = isset($_GET['_msg']) ? render_escape((string) $_GET['_msg']) : null;
@@ -904,6 +929,140 @@ if ($caction === 'diagnose') {
     addField(); // первое поле сразу видно (для режима "обычная таблица")
     </script>
     HTML;
+
+} elseif ($caction === 'edit') {
+
+    // --- правка полей существующей таблицы (ALTER, Волна 2) ---------------
+    $table = (string) ($_GET['table'] ?? '');
+    $live_structure    = snapshot_build_structure($db_connection);
+    $live_presentation = snapshot_build_presentation($db_connection);
+    $t_schema = $live_structure['tables'][$table] ?? null;
+
+    if ($t_schema === null || str_starts_with($table, SYSTEM_TABLE_PREFIX)) {
+        echo '<p>Таблица не найдена или системная.</p><p><a href="?_action=list">← К таблицам</a></p>';
+    } else {
+        $t_labels = $live_presentation['labels']['table'][$table] ?? [];
+        $t_full   = (string) ($t_labels['data_full'] ?? $table);
+
+        // Число непустых значений по каждому entity-полю — одним запросом
+        // (COUNT(col) считает не-NULL). Инженер видит цену удаления ДО клика.
+        $entity_fields = [];
+        foreach ($t_schema['fields'] as $f_name => $f_schema) {
+            if (($f_schema['kind'] ?? '') === 'entity_field') {
+                $entity_fields[] = $f_name;
+            }
+        }
+        $data_counts = [];
+        if ($entity_fields !== []) {
+            $parts = [];
+            foreach ($entity_fields as $f) {
+                $parts[] = 'COUNT(`' . $f . '`) AS `' . $f . '`';
+            }
+            $res = @mysqli_query($db_connection, 'SELECT ' . implode(', ', $parts) . ' FROM `' . $table . '`');
+            if ($res !== false) {
+                $data_counts = mysqli_fetch_assoc($res) ?: [];
+            }
+        }
+
+        $tbl_esc = render_escape($table);
+        echo '<h2>Поля таблицы: ' . render_escape($t_full)
+           . ' <span class="badge">' . $tbl_esc . '</span></h2>';
+        echo '<p><a href="?_action=list">← К таблицам</a></p>';
+
+        // Текущие поля: структурные — серым без действий, entity — с удалением.
+        echo '<table class="data-list"><tr><th>поле</th><th>тип</th><th>подпись</th><th>данных</th><th></th></tr>';
+        foreach ($t_schema['fields'] as $f_name => $f_schema) {
+            $f_esc = render_escape($f_name);
+            if (($f_schema['kind'] ?? '') !== 'entity_field') {
+                echo '<tr><td><code style="color:#999">' . $f_esc . '</code></td>'
+                   . '<td colspan="4" style="color:#999">структурное — не редактируется</td></tr>';
+                continue;
+            }
+            $f_labels = $live_presentation['labels']['field'][$table][$f_name] ?? [];
+            $f_full   = render_escape((string) ($f_labels['data_full'] ?? ''));
+            $entity   = render_escape((string) ($f_schema['entity'] ?? ''));
+            $cnt      = (int) ($data_counts[$f_name] ?? 0);
+
+            // Подтверждение зависит от данных: пустое поле — простое,
+            // с данными — предупреждение + force. Сервер перепроверит.
+            if ($cnt > 0) {
+                $confirm = "В поле $f_name данные: $cnt знач. Удалить ВМЕСТЕ С ДАННЫМИ? Это необратимо.";
+                $force   = '<input type="hidden" name="force" value="1">';
+            } else {
+                $confirm = "Удалить пустое поле $f_name?";
+                $force   = '';
+            }
+            echo '<tr><td><code>' . $f_esc . '</code></td>'
+               . '<td>' . $entity . '</td><td>' . $f_full . '</td>'
+               . '<td>' . ($cnt > 0 ? $cnt : '—') . '</td>'
+               . '<td><form method="post" action="?_action=alter_drop_field" style="margin:0" '
+               . 'onsubmit="return confirm(\'' . render_escape($confirm) . '\')">'
+               . '<input type="hidden" name="table" value="' . $tbl_esc . '">'
+               . '<input type="hidden" name="field" value="' . $f_esc . '">' . $force
+               . '<button type="submit" class="act act-danger" title="удалить поле">×</button>'
+               . '</form></td></tr>';
+        }
+        echo '</table>';
+
+        // --- добавить поле: одна строка, та же механика, что при создании ---
+        $type_options = '';
+        foreach (entities() as $entity_id => $passport) {
+            $label = render_escape((string) ($passport['label'] ?? $entity_id));
+            $type_options .= '<option value="' . render_escape($entity_id) . '">'
+                           . render_escape($entity_id) . ' — ' . $label . '</option>';
+        }
+        $available_dicts = [];
+        $dict_options    = '<option value="">— выберите словарь —</option>';
+        foreach ($live_structure['tables'] as $t_name => $ts) {
+            if (!str_starts_with($t_name, 'voc_') || !isset($ts['fields']['data_name'])) {
+                continue;
+            }
+            $name_part = substr($t_name, strlen('voc_'));
+            $tl = $live_presentation['labels']['table'][$t_name] ?? [];
+            $available_dicts[$name_part] = [
+                'short' => (string) ($tl['data_short'] ?? $t_name),
+                'full'  => (string) ($tl['data_full'] ?? $t_name),
+            ];
+            $dict_options .= '<option value="' . render_escape($name_part) . '">'
+                           . render_escape($available_dicts[$name_part]['full'])
+                           . ' (' . render_escape($t_name) . ')</option>';
+        }
+        $dict_labels_json = json_encode($available_dicts, JSON_UNESCAPED_UNICODE);
+
+        echo <<<HTML
+        <h3>Добавить поле</h3>
+        <form method="post" action="?_action=alter_add_field">
+          <input type="hidden" name="table" value="$tbl_esc">
+          <div class="field-row">
+            <select name="field[entity]" onchange="onFieldTypeChange(this)">
+              <option value="" selected disabled>— тип поля —</option>$type_options</select>
+            <input type="text" class="f-name" name="field[name]" placeholder="именная часть (без префикса)">
+            <select class="f-voc-pick" name="field[voc_pick]" style="display:none" onchange="onVocPick(this)">$dict_options</select>
+            <input type="text" class="f-full"  name="field[full]"  placeholder="полная подпись">
+            <input type="text" class="f-short" name="field[short]" placeholder="короткая подпись">
+            <button type="submit">+ добавить</button>
+          </div>
+        </form>
+        <script>
+        const dictLabels = $dict_labels_json;
+        function onFieldTypeChange(select) {
+          const row  = select.closest('.field-row');
+          const name = row.querySelector('.f-name');
+          const voc  = row.querySelector('.f-voc-pick');
+          if (select.value === 'voc') { name.style.display = 'none'; voc.style.display = ''; }
+          else { name.style.display = ''; voc.style.display = 'none'; }
+        }
+        function onVocPick(select) {
+          const row = select.closest('.field-row');
+          const info = dictLabels[select.value];
+          if (info) {
+            row.querySelector('.f-short').value = info.short;
+            row.querySelector('.f-full').value  = info.full;
+          }
+        }
+        </script>
+        HTML;
+    }
 
 } elseif ($caction === 'delete_confirm') {
 
