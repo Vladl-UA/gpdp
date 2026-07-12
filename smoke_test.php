@@ -404,14 +404,17 @@ $index_source = (string) file_get_contents(__DIR__ . '/index.php');
 check('в index.php нет SQL и mysqli_query/prepare',
     preg_match('/mysqli_query|mysqli_prepare|SELECT |INSERT |UPDATE |DELETE /', $index_source) === 0);
 
-// Встроенный сервер PHP; проходим цикл: view → new → save (PRG) → view
+// Встроенный сервер PHP; проходим цикл: view → new → save (PRG) → view.
+// _table=main — обязателен явно: без него index.php показывает домашнюю
+// страницу «Главные таблицы» (условие !$table_requested в дирижёре),
+// не список записей — родилось позже, чем эта секция теста, разошлись.
 $pid = (int) shell_exec('php -S localhost:8088 -t ' . escapeshellarg(__DIR__) . ' >/dev/null 2>&1 & echo $!');
 usleep(600000);
 
-$view = (string) file_get_contents('http://localhost:8088/index.php?_action=view');
+$view = (string) file_get_contents('http://localhost:8088/index.php?_table=main&_action=view');
 check('view отрисован с подписями', str_contains($view, 'Куст') && str_contains($view, 'Смоук'));
 
-$form = (string) file_get_contents('http://localhost:8088/index.php?_action=new');
+$form = (string) file_get_contents('http://localhost:8088/index.php?_table=main&_action=new');
 check('форма new собрана конвейером', str_contains($form, 'name="data_nkust"')
     && str_contains($form, '<select name="voc_smoke"'));
 check('структурные поля в форму не попали', !str_contains($form, 'name="rel_main"'));
@@ -431,7 +434,7 @@ $prg = implode(' ', $http_response_header ?? []);
 check('PRG: после записи redirect, не отрисовка',
     str_contains($prg, '302') && str_contains($prg, '_action=view'));
 
-$view2 = (string) file_get_contents('http://localhost:8088/index.php?_action=view');
+$view2 = (string) file_get_contents('http://localhost:8088/index.php?_table=main&_action=view');
 check('запись видна после redirect: словарь отрендерен именем',
     str_contains($view2, 'Куст-HTTP') && str_contains($view2, 'Самотлор'));
 
