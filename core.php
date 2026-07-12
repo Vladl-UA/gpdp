@@ -414,12 +414,46 @@ function template_parse(string $template): array
     return ['items' => $items, 'error' => null];
 }
 
-function snapshot_build_dictionaries(array $structure, array $templates = []): array
+function snapshot_build_dictionaries(array $structure, array $templates = [], array $links = []): array
 {
     $map        = [];
     $unresolved = [];
 
-    // ---- Проход 1: разрешение источника по лестнице §16.1 ----
+    // Общая часть резолвера (журнал 2026-07-12, вынесена ради link_):
+    // источник уже определён — по лестнице §16.1 для voc_, по явной
+    // записи model_links для link_ — дальше путь один: маяк шаблона
+    // (проекция) сильнее конвенции data_name (склад/адрес/link).
+    $resolve = function (string $field_name, string $source, string $subtype) use (
+        &$map, &$unresolved, $templates, $structure
+    ): void {
+        // Маяк (§16.1 п.2): непустой шаблон на источнике — проекция.
+        // Явный маяк СИЛЬНЕЕ конвенции data_name: проставленный
+        // человеком шаблон не может молча игнорироваться. План
+        // компилируется проходом 2 (там же циклодетект).
+        if (isset($templates[$source])) {
+            $map[$field_name] = [
+                'source_table' => $source,
+                'label_column' => null,
+                'subtype'      => 'projection',
+                'template'     => $templates[$source],
+            ];
+            return;
+        }
+
+        // Без маяка — конвенция data_name, как в (а1).
+        if (!isset($structure['tables'][$source]['fields']['data_name'])) {
+            $unresolved[] = $subtype === 'warehouse'
+                ? "$field_name: таблица-склад `$source` повреждена (нет data_name, нет шаблона)"
+                : "$field_name: таблице `$source` нужен паспорт словаря (нет data_name, нет шаблона)";
+            return;
+        }
+
+        $map[$field_name] = $subtype === 'warehouse'
+            ? ['source_table' => $source, 'label_column' => 'data_name', 'subtype' => 'warehouse']
+            : ['source_table' => $source, 'label_column' => 'data_name', 'subtype' => $subtype, 'label_from' => $source];
+    };
+
+    // ---- Проход 1: voc_ — источник по лестнице §16.1 ----
     foreach ($structure['tables'] as $table) {
         foreach ($table['fields'] as $field_name => $field) {
             if (($field['kind'] ?? '') !== 'entity_field' || ($field['entity'] ?? '') !== 'voc') {
@@ -433,44 +467,45 @@ function snapshot_build_dictionaries(array $structure, array $templates = []): a
 
             // Кандидат-источник: склад (voc_x) прежде адреса (x) —
             // порядок ступеней (а1) не меняется.
-            $source = null;
-            $family = null;
             if (isset($structure['tables'][$field_name])) {
-                $source = $field_name;
-                $family = 'warehouse';
+                $resolve($field_name, $field_name, 'warehouse');
             } elseif (isset($structure['tables'][$bare])) {
-                $source = $bare;
-                $family = 'address';
+                $resolve($field_name, $bare, 'address');
             } else {
                 $unresolved[] = "$field_name: неизвестный адрес словаря (нет ни `$field_name`, ни `$bare`)";
+            }
+        }
+    }
+
+    // ---- Проход 1б: link_ — источник ЯВНО из model_links (журнал 07-12) ----
+    // Тот же резолвер (маяк/data_name) — другой способ узнать $source:
+    // не вычисляется из имени поля, читается из явной записи. Нужно,
+    // потому что двум полям на одной таблице требуется один и тот же
+    // адрес под разными именами и ролями (Идея А — «любимый цвет» /
+    // «нелюбимый цвет» → оба voc_color); имя может адресовать только
+    // одно место, значит адрес для link_ не в имени, а в записи.
+    // Глобально по имени поля — та же конвенция «одно имя = один
+    // смысл» (§16.1), что у словарей.
+    foreach ($structure['tables'] as $table) {
+        foreach ($table['fields'] as $field_name => $field) {
+            if (($field['kind'] ?? '') !== 'entity_field' || ($field['entity'] ?? '') !== 'link') {
+                continue;
+            }
+            if (isset($map[$field_name])) {
                 continue;
             }
 
-            // Маяк (§16.1 п.2): непустой шаблон на источнике — проекция.
-            // Явный маяк СИЛЬНЕЕ конвенции data_name: проставленный
-            // человеком шаблон не может молча игнорироваться. План
-            // компилируется проходом 2 (там же циклодетект).
-            if (isset($templates[$source])) {
-                $map[$field_name] = [
-                    'source_table' => $source,
-                    'label_column' => null,
-                    'subtype'      => 'projection',
-                    'template'     => $templates[$source],
-                ];
+            $source = $links[$field_name] ?? null;
+            if ($source === null) {
+                $unresolved[] = "$field_name: адрес не задан (нет записи в model_links)";
+                continue;
+            }
+            if (!isset($structure['tables'][$source])) {
+                $unresolved[] = "$field_name: целевая таблица `$source` не существует";
                 continue;
             }
 
-            // Без маяка — конвенция data_name, как в (а1).
-            if (!isset($structure['tables'][$source]['fields']['data_name'])) {
-                $unresolved[] = $family === 'warehouse'
-                    ? "$field_name: таблица-склад `$source` повреждена (нет data_name, нет шаблона)"
-                    : "$field_name: таблице `$source` нужен паспорт словаря (нет data_name, нет шаблона)";
-                continue;
-            }
-
-            $map[$field_name] = $family === 'warehouse'
-                ? ['source_table' => $source, 'label_column' => 'data_name', 'subtype' => 'warehouse']
-                : ['source_table' => $source, 'label_column' => 'data_name', 'subtype' => 'address', 'label_from' => $source];
+            $resolve($field_name, $source, 'link');
         }
     }
 
@@ -784,6 +819,29 @@ function snapshot_templates(array $presentation): array
 }
 
 /**
+ * Явные адреса link_-полей (журнал 2026-07-12): имя поля → целевая
+ * таблица. Глобально по имени — та же конвенция, что у словарей
+ * (§16.1, «одно имя = один смысл»): не по строке реестра, не по
+ * владеющей таблице. Источник — model_links, системная таблица вне
+ * обычного цикла конфигуратора (как model_registry/model_labels).
+ * Отсутствие таблицы (старая установка до этого решения) — не падаем,
+ * просто link_-полей в структуре не будет, снапшот соберётся без них.
+ */
+function snapshot_build_links(mysqli $db_connection): array
+{
+    $links  = [];
+    $result = @mysqli_query($db_connection, 'SELECT data_element, data_target_table FROM `model_links`');
+    if ($result === false) {
+        return $links;
+    }
+    while ($row = mysqli_fetch_assoc($result)) {
+        $links[(string) $row['data_element']] = (string) $row['data_target_table'];
+    }
+
+    return $links;
+}
+
+/**
  * Полная сборка. $application — параметры приложения (root_table и т.п.):
  * принадлежат модели, приходят снаружи, здесь не зашиты.
  * null при unknown-полях — fail-fast, причина в snapshot_last_error().
@@ -811,7 +869,8 @@ function snapshot_build(mysqli $db_connection, array $application = []): ?array
     // элемента модели → локальная деградация, не 503 (журнал 07-07).
     $dictionaries = snapshot_build_dictionaries(
         ['tables' => $structure['tables']],
-        snapshot_templates($presentation)
+        snapshot_templates($presentation),
+        snapshot_build_links($db_connection)
     );
 
     if ($dictionaries['unresolved'] !== []) {
@@ -1037,7 +1096,8 @@ function snapshot_refresh_presentation(mysqli $db_connection): bool
     // старый снапшот цел — fail-safe вместо частичного применения.
     $dictionaries = snapshot_build_dictionaries(
         $snapshot['structure'],
-        snapshot_templates($presentation)
+        snapshot_templates($presentation),
+        snapshot_build_links($db_connection)
     );
     if ($dictionaries['unresolved'] !== []) {
         snapshot_last_error('Refresh отклонён, словари не разрешены: '
@@ -1077,7 +1137,8 @@ function snapshot_refresh_model(mysqli $db_connection): bool
     $presentation = snapshot_build_presentation($db_connection);
     $dictionaries = snapshot_build_dictionaries(
         $snapshot['structure'],
-        snapshot_templates($presentation)
+        snapshot_templates($presentation),
+        snapshot_build_links($db_connection)
     );
     if ($dictionaries['unresolved'] !== []) {
         snapshot_last_error('Refresh отклонён, словари не разрешены: '
