@@ -29,8 +29,12 @@ mysqli_set_charset($db_connection, 'utf8mb4');
 // переполняется на каждом прогоне, боевых данных не касается вовсе; id не
 // хардкодятся — вычисляются по имени сразу после вставки.
 mysqli_query($db_connection, "DELETE FROM `voc_smoke`");
-mysqli_query($db_connection, "INSERT INTO `voc_smoke` (data_name) VALUES "
-    . "('Самотлор'), ('Приобское'), ('Ромашкинское'), ('Ванкорское')");
+$smoke_dict_names = ['Самотлор', 'Приобское', 'Ромашкинское', 'Ванкорское'];
+$values_sql = implode(', ', array_map(
+    static fn (string $n): string => "('" . mysqli_real_escape_string($db_connection, $n) . "')",
+    $smoke_dict_names
+));
+mysqli_query($db_connection, "INSERT INTO `voc_smoke` (data_name) VALUES $values_sql");
 $smoke_dict_id = static function (string $name) use ($db_connection): string {
     $esc = mysqli_real_escape_string($db_connection, $name);
     $row = mysqli_fetch_assoc(mysqli_query($db_connection, "SELECT id FROM `voc_smoke` WHERE data_name = '$esc'"));
@@ -313,7 +317,13 @@ $read = field_exec($data, 'read');
 check('voc read → человекочитаемое значение', $read['value'] === 'Приобское');
 
 $edit = field_exec($data, 'edit');
-check('voc edit → структура choice', $edit['type'] === 'choice' && count($edit['options']) === 4);
+// +1 — voc_handler в режиме edit всегда добавляет пустой вариант выбора
+// впереди списка (entities.php: ['value'=>0,'label'=>'']), сверх реальных
+// значений словаря. Считаем от того же списка, что сеяли — не магическим
+// числом (моя ошибка при первой правке 07-12: посадила 4 значения, забыв
+// про этот пустой вариант, получилось 5 вместо ожидаемых 4).
+check('voc edit → структура choice',
+    $edit['type'] === 'choice' && count($edit['options']) === count($smoke_dict_names) + 1);
 
 // Живое исполнение проекции — без изменений схемы: синтетическая
 // скомпилированная запись над РЕАЛЬНОЙ main (у записи $new_id:
