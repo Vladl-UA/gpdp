@@ -20,6 +20,26 @@ if ($db_connection === false) {
 }
 mysqli_set_charset($db_connection, 'utf8mb4');
 
+// --- Изолированный словарь-манекен смоука (журнал 2026-07-12) --------------
+// Раньше фикстура main.voc_mr указывала на БОЕВОЙ словарь месторождений
+// (well пользуется им по-настоящему) — имя поля жёстко адресует таблицу
+// (§1, наименование определяет поведение), развязать частично нельзя.
+// Смоук хардкодил id=1/2 и рассчитывал на content живого словаря — правки
+// в проде рвали тест. Теперь у фикстуры СВОЙ словарь: пересоздаётся и
+// переполняется на каждом прогоне, боевых данных не касается вовсе; id не
+// хардкодятся — вычисляются по имени сразу после вставки.
+mysqli_query($db_connection, "DELETE FROM `voc_smoke`");
+mysqli_query($db_connection, "INSERT INTO `voc_smoke` (data_name) VALUES "
+    . "('Самотлор'), ('Приобское'), ('Ромашкинское'), ('Ванкорское')");
+$smoke_dict_id = static function (string $name) use ($db_connection): string {
+    $esc = mysqli_real_escape_string($db_connection, $name);
+    $row = mysqli_fetch_assoc(mysqli_query($db_connection, "SELECT id FROM `voc_smoke` WHERE data_name = '$esc'"));
+    return (string) ($row['id'] ?? '0');
+};
+$id_samotlor  = $smoke_dict_id('Самотлор');
+$id_priobskoe = $smoke_dict_id('Приобское');
+mysqli_query($db_connection, "DELETE FROM `main`"); // фикстура: чистый лист на каждый прогон
+
 function check(string $name, bool $ok, string $details = ''): void
 {
     echo ($ok ? '  OK  ' : ' FAIL ') . $name . ($details !== '' ? "  [$details]" : '') . "\n";
@@ -33,21 +53,24 @@ $snapshot = snapshot_init($db_connection, config()['application']);
 check('snapshot построен', $snapshot !== null, (string) snapshot_last_error());
 check('файл лежит в state/', str_contains(config()['paths']['snapshot'], '/state/')
     && is_file(config()['paths']['snapshot']));
-check('поле voc_mr — сущность voc',
-    $snapshot['structure']['tables']['main']['fields']['voc_mr']['entity'] === 'voc');
+check('поле voc_smoke — сущность voc',
+    $snapshot['structure']['tables']['main']['fields']['voc_smoke']['entity'] === 'voc');
 check('поле id — структурное',
     $snapshot['structure']['tables']['main']['fields']['id']['kind'] === 'structural');
-check('presentation: подпись voc_mr скомпилирована из model_labels',
-    ($snapshot['presentation']['labels']['field']['main']['voc_mr'] ?? []) !== []);
+check('presentation: подпись voc_smoke скомпилирована из model_labels',
+    ($snapshot['presentation']['labels']['field']['main']['voc_smoke'] ?? []) !== []);
 check('root_table из config, не из ядра',
     ($snapshot['application']['root_table'] ?? '') === 'main');
 
 echo "\n=== 1а. Словари: адрес разрешён сборкой, не рантаймом (§16.1) ===\n";
+// voc_mr здесь — БОЕВОЙ словарь (месторождения well), не фикстура main.
+// Проверка структурная (склад разрешается верно) и не зависит от того,
+// какие конкретно значения в нём лежат — content-независима, оставлена.
 check('voc_mr разрешён как склад в model.dictionaries',
     ($snapshot['model']['dictionaries']['voc_mr']['subtype'] ?? '') === 'warehouse'
     && $snapshot['model']['dictionaries']['voc_mr']['source_table'] === 'voc_mr');
-$probe = field_data($snapshot, $db_connection, 'main', 'voc_mr', 1);
-check('пакет несёт скомпилированный source', $probe['field']['source'] === 'voc_mr');
+$probe = field_data($snapshot, $db_connection, 'main', 'voc_smoke', 1);
+check('пакет несёт скомпилированный source', $probe['field']['source'] === 'voc_smoke');
 $probe = field_data($snapshot, $db_connection, 'main', 'data_nkust', 'x');
 check('несловарное поле: source = null', $probe['field']['source'] === null);
 
@@ -216,9 +239,9 @@ check('dep_ в никуда → fail-fast с именем таблицы',
 check('живой снапшот несёт model.relations',
     isset($snapshot['model']['relations']) && is_array($snapshot['model']['relations']));
 check('у словаря нет детей → record_children пуст, ноль запросов',
-    record_children($db_connection, $snapshot, 'voc_mr', 1) === []);
+    record_children($db_connection, $snapshot, 'voc_smoke', (int) $id_samotlor) === []);
 check('record_label: подпись объекта по data_name-ветке',
-    record_label($db_connection, $snapshot, 'voc_mr', 1) !== '#1');
+    record_label($db_connection, $snapshot, 'voc_smoke', (int) $id_samotlor) !== '#' . $id_samotlor);
 
 echo "\n=== 2. Пространство имён ===\n";
 check('в системе не осталось функций gpdp_*',
@@ -249,7 +272,7 @@ $r = field_exec($data, 'read');
 check('exec: одна строчка, без охраны несуществующих дверей', $r['value'] === 'проверка');
 
 echo "\n=== 5. Запись: validate → универсальный save ===\n";
-$input  = ['data_nkust' => '  Куст-101  ', 'voc_mr' => '2',
+$input  = ['data_nkust' => '  Куст-101  ', 'voc_smoke' => $id_priobskoe,
            'id' => '999', 'rel_main' => '777', 'handler' => 'evil_function'];
 $result = record_save($db_connection, $snapshot, 'main', $input);
 check('insert ok', $result['ok'] === true, implode('; ', $result['errors']));
@@ -261,7 +284,7 @@ $row = mysqli_fetch_assoc(mysqli_query($db_connection, "SELECT * FROM `main` WHE
 check('data нормализовано (trim)', $row['data_nkust'] === 'Куст-101');
 check('структурные/чужие ключи input проигнорированы', (int) $row['id'] === $new_id);
 
-$bad = record_save($db_connection, $snapshot, 'main', ['voc_mr' => '999']);
+$bad = record_save($db_connection, $snapshot, 'main', ['voc_smoke' => '999999']);
 check('validate ловит несуществующее значение словаря',
     $bad['ok'] === false && str_contains($bad['errors'][0] ?? '', 'словаре'));
 
@@ -285,7 +308,7 @@ check('record_list: лимит соблюдается',
 check('record_list: неизвестная таблица → пустой массив',
     record_list($db_connection, $snapshot, 'evil') === []);
 
-$data = field_data($snapshot, $db_connection, 'main', 'voc_mr', $row['voc_mr'], $row);
+$data = field_data($snapshot, $db_connection, 'main', 'voc_smoke', $row['voc_smoke'], $row);
 $read = field_exec($data, 'read');
 check('voc read → человекочитаемое значение', $read['value'] === 'Приобское');
 
@@ -294,8 +317,8 @@ check('voc edit → структура choice', $edit['type'] === 'choice' && co
 
 // Живое исполнение проекции — без изменений схемы: синтетическая
 // скомпилированная запись над РЕАЛЬНОЙ main (у записи $new_id:
-// data_nkust='Куст-102', voc_mr=2), вложенный словарь — настоящий
-// voc_mr из снапшота. lookup_labels собирает подпись в PHP по плану.
+// data_nkust='Куст-102', voc_smoke=id «Приобское»), вложенный словарь —
+// изолированная фикстура voc_smoke из снапшота, не боевой voc_mr.
 $live_projection = [
     'source_table' => 'main',
     'label_column' => null,
@@ -303,13 +326,13 @@ $live_projection = [
     'plan'         => [
         ['kind' => 'field',   'field' => 'data_nkust'],
         ['kind' => 'literal', 'value' => ' / '],
-        ['kind' => 'dict',    'field' => 'voc_mr',
-         'dict' => $snapshot['model']['dictionaries']['voc_mr']],
+        ['kind' => 'dict',    'field' => 'voc_smoke',
+         'dict' => $snapshot['model']['dictionaries']['voc_smoke']],
     ],
 ];
 $live_labels = lookup_labels($db_connection, $live_projection);
-$mr_label    = lookup_options($db_connection, 'voc_mr')[2] ?? '';
-check('проекция живьём: {data_nkust} / {voc_mr} собрано по плану',
+$mr_label    = lookup_options($db_connection, 'voc_smoke')[(int) $id_priobskoe] ?? '';
+check('проекция живьём: {data_nkust} / {voc_smoke} собрано по плану',
     $mr_label !== ''
     && ($live_labels[$new_id] ?? '') === 'Куст-102 / ' . $mr_label);
 
@@ -317,7 +340,7 @@ $html = render_form_element($edit);
 // Подпись сверяется с самим снапшотом (model_labels), не с зашитым
 // словом: смоук не знает, short или full рисует renderer — знает,
 // что рисуется ОДНА ИЗ скомпилированных.
-$label_row  = $snapshot['presentation']['labels']['field']['main']['voc_mr'] ?? [];
+$label_row  = $snapshot['presentation']['labels']['field']['main']['voc_smoke'] ?? [];
 $label_seen = false;
 foreach ([$label_row['data_full'] ?? '', $label_row['data_short'] ?? ''] as $label_candidate) {
     if ($label_candidate !== '' && str_contains($html, $label_candidate)) {
@@ -331,7 +354,7 @@ check('renderer собрал select с подписью из model_labels',
 echo "\n=== 7. Lookup-кэш (N+1, теперь в helpers) ===\n";
 $q_before = (int) mysqli_fetch_row(mysqli_query($db_connection, "SHOW SESSION STATUS LIKE 'Questions'"))[1];
 for ($i = 0; $i < 30; $i++) {
-    lookup_options($db_connection, 'voc_mr');
+    lookup_options($db_connection, 'voc_smoke');
 }
 $q_after = (int) mysqli_fetch_row(mysqli_query($db_connection, "SHOW SESSION STATUS LIKE 'Questions'"))[1];
 check('30 обращений → не 30 SELECT', ($q_after - $q_before) <= 2,
@@ -341,17 +364,17 @@ echo "\n=== 8. Два пути обновления snapshot ===\n";
 // Подпись живёт в model_labels (§17). Таблица subscr физически ещё
 // существует (страховка миграции), но ядро её НЕ читает — обновлять
 // её в этом тесте бессмысленно: подпись бы «не обновилась» вечно.
-$label_before = $snapshot['presentation']['labels']['field']['main']['voc_mr']['data_full'] ?? '';
+$label_before = $snapshot['presentation']['labels']['field']['main']['voc_smoke']['data_full'] ?? '';
 $label_update = "UPDATE `model_labels` l
                  JOIN `model_registry` r ON r.id = l.dep_model_registry
                  SET l.data_full = %s
                  WHERE r.data_kind = 'field' AND r.data_owner = 'main'
-                   AND r.data_element = 'voc_mr'";
+                   AND r.data_element = 'voc_smoke'";
 mysqli_query($db_connection, sprintf($label_update, "'Родовище'"));
 check('refresh presentation без lock', snapshot_refresh_presentation($db_connection));
 $fresh = snapshot_load();
 check('подпись обновилась из model_labels',
-    ($fresh['presentation']['labels']['field']['main']['voc_mr']['data_full'] ?? '') === 'Родовище');
+    ($fresh['presentation']['labels']['field']['main']['voc_smoke']['data_full'] ?? '') === 'Родовище');
 check('lock не создавался', snapshot_lock_read() === null);
 $label_restore = $label_before === ''
     ? 'NULL'
@@ -376,11 +399,11 @@ $pid = (int) shell_exec('php -S localhost:8088 -t ' . escapeshellarg(__DIR__) . 
 usleep(600000);
 
 $view = (string) file_get_contents('http://localhost:8088/index.php?_action=view');
-check('view отрисован с подписями', str_contains($view, 'Куст') && str_contains($view, 'МР'));
+check('view отрисован с подписями', str_contains($view, 'Куст') && str_contains($view, 'Смоук'));
 
 $form = (string) file_get_contents('http://localhost:8088/index.php?_action=new');
 check('форма new собрана конвейером', str_contains($form, 'name="data_nkust"')
-    && str_contains($form, '<select name="voc_mr"'));
+    && str_contains($form, '<select name="voc_smoke"'));
 check('структурные поля в форму не попали', !str_contains($form, 'name="rel_main"'));
 
 $context = stream_context_create(['http' => [
@@ -388,7 +411,7 @@ $context = stream_context_create(['http' => [
     'header'          => 'Content-Type: application/x-www-form-urlencoded',
     'content'         => http_build_query([
         '_action' => 'save_new', '_table' => 'main',
-        'data_nkust' => 'Куст-HTTP', 'voc_mr' => '1',
+        'data_nkust' => 'Куст-HTTP', 'voc_smoke' => $id_samotlor,
     ]),
     'follow_location' => 0,
     'ignore_errors'   => true,
