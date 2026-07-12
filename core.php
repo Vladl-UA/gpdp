@@ -882,13 +882,32 @@ function snapshot_save(array $snapshot): bool
         return false;
     }
 
+    // .tmp — тоже фиксированное имя, переиспользуется при каждом save;
+    // та же причина, что и для $file ниже.
+    if (function_exists('opcache_invalidate')) {
+        opcache_invalidate($tmp_file, true);
+    }
+
     $check = @include $tmp_file;
     if (!is_array($check) || !snapshot_validate($check)) {
         @unlink($tmp_file);
         return false;
     }
 
-    return rename($tmp_file, $file);
+    $renamed = rename($tmp_file, $file);
+
+    // OPcache кеширует скомпилированный код по ИМЕНИ файла (§8: PHP
+    // return[...] выбран ради его скорости, журнал 2026-07). rename()
+    // подменяет содержимое под тем же именем — OPcache об этом не узнаёт
+    // сам, следующий include может отдать старый снапшот из кеша, даже
+    // в том же запросе (revalidate_freq по умолчанию — не мгновенно).
+    // Без явной инвалидации refresh «срабатывает», но следующее чтение
+    // видит старое — тихая рассинхронизация, не ошибка, что хуже.
+    if ($renamed && function_exists('opcache_invalidate')) {
+        opcache_invalidate($file, true);
+    }
+
+    return $renamed;
 }
 
 /** Чтение из файла; null = «рабочего снапшота сейчас нет». */
