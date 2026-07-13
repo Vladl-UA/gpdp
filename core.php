@@ -356,32 +356,6 @@ function snapshot_build_structure(mysqli $db_connection): array
 }
 
 /**
- * Model-слой: разрешение словарных адресов (ARCHITECTURE.md §16.1).
- *
- * Чистая функция над УЖЕ собранной структурой: живой БД не касается,
- * ни одного SHOW — всё, что нужно лестнице («существует ли таблица»,
- * «есть ли data_name»), уже лежит в $structure. Разрешение происходит
- * один раз на границе сборки; рантайм (voc_handler) читает готовый
- * source из пакета и НЕ выводит его из имени поля.
- *
- * Лестница по каждому имени voc_x:
- *   1. таблица voc_x существует        → склад   (уровень 0)
- *   2. её нет, таблица x с data_name   → адрес   (уровень 1),
- *      label_from = x — хук наследования подписи (§16.1; показ
- *      унаследованной подписи в presentation — отложен, журнал 07-07)
- *   3. x есть, data_name нет           → «нужен паспорт словаря»
- *   4. ни voc_x, ни x                  → «неизвестный адрес словаря»
- *
- * Границы (журнал 2026-07-07, согласованы до кода):
- *   — резолвер КОНВЕНЦИОННЫЙ и временный: первая ступень, не паспортная
- *     доктрина словарей; проекции/дескрипторы описываются явно на (а2);
- *   — ключ карты — имя поля: одно имя voc_x = один смысл на всю модель;
- *     контекстно-разные словари → переход к [owner][field], когда
- *     реально понадобятся, не раньше;
- *   — пока таблиц-описателей не существует, существующая voc_x — склад;
- *     различение склад/дескриптор — строгая граница (а2).
- */
-/**
  * Разбор строки-шаблона (§16.3): '{voc_area} №{data_number}' →
  * последовательность literal|token. Чистая функция СИНТАКСИСА:
  * что означает токен — решает потребитель. Сегодня потребитель один —
@@ -423,34 +397,41 @@ function snapshot_build_dictionaries(array $structure, array $templates = [], ar
     // источник уже определён — по лестнице §16.1 для voc_, по явной
     // записи model_links для link_ — дальше путь один: маяк шаблона
     // (проекция) сильнее конвенции data_name (склад/адрес/link).
+    //
+    // Унификация (решение 2026-07-11, исполнено 2026-07-13): data_name —
+    // частный случай шаблона из ОДНОГО куска, не особое правило. Нет
+    // явного маяка, но есть data_name → синтезируем шаблон-по-умолчанию
+    // `{data_name}` и идём ТЕМ ЖЕ путём проекции, что и составные подписи.
+    // Была вторая машинка (`subtype`='warehouse'/'address'/'link' без
+    // плана, читал `lookup_options` жёстким SELECT) — убрана: одна
+    // форма записи в карте на все словари, `$subtype` больше не влияет
+    // на форму, только на текст диагностики при отказе.
     $resolve = function (string $field_name, string $source, string $subtype) use (
-        &$map, &$unresolved, $templates, $structure
+        &$map, &$unresolved, &$templates, $structure
     ): void {
         // Маяк (§16.1 п.2): непустой шаблон на источнике — проекция.
         // Явный маяк СИЛЬНЕЕ конвенции data_name: проставленный
-        // человеком шаблон не может молча игнорироваться. План
-        // компилируется проходом 2 (там же циклодетект).
-        if (isset($templates[$source])) {
-            $map[$field_name] = [
-                'source_table' => $source,
-                'label_column' => null,
-                'subtype'      => 'projection',
-                'template'     => $templates[$source],
-            ];
-            return;
+        // человеком шаблон не может молча игнорироваться.
+        if (!isset($templates[$source])) {
+            if (!isset($structure['tables'][$source]['fields']['data_name'])) {
+                $unresolved[] = $subtype === 'warehouse'
+                    ? "$field_name: таблица-склад `$source` повреждена (нет data_name, нет шаблона)"
+                    : "$field_name: таблице `$source` нужен паспорт словаря (нет data_name, нет шаблона)";
+                return;
+            }
+            // Синтетический маяк — не читается ниоткуда, не сохраняется;
+            // только на время этой сборки снапшота. Кладём в общий
+            // $templates (по ссылке) — проход 2 (компиляция плана)
+            // подхватит его как обычный, не отличая от настоящего.
+            $templates[$source] = '{data_name}';
         }
 
-        // Без маяка — конвенция data_name, как в (а1).
-        if (!isset($structure['tables'][$source]['fields']['data_name'])) {
-            $unresolved[] = $subtype === 'warehouse'
-                ? "$field_name: таблица-склад `$source` повреждена (нет data_name, нет шаблона)"
-                : "$field_name: таблице `$source` нужен паспорт словаря (нет data_name, нет шаблона)";
-            return;
-        }
-
-        $map[$field_name] = $subtype === 'warehouse'
-            ? ['source_table' => $source, 'label_column' => 'data_name', 'subtype' => 'warehouse']
-            : ['source_table' => $source, 'label_column' => 'data_name', 'subtype' => $subtype, 'label_from' => $source];
+        $map[$field_name] = [
+            'source_table' => $source,
+            'label_column' => null,
+            'subtype'      => 'projection',
+            'template'     => $templates[$source],
+        ];
     };
 
     // ---- Проход 1: voc_ — источник по лестнице §16.1 ----
@@ -523,7 +504,7 @@ function snapshot_build_dictionaries(array $structure, array $templates = [], ar
                       // '@table' повторно вызывает compile() на уже
                       // проваленном источнике и дублирует ошибку
 
-    $compile = function (string $source) use (&$compile, &$plans, &$visiting, &$attempted, &$unresolved, $templates, $structure, $map): bool {
+    $compile = function (string $source) use (&$compile, &$plans, &$visiting, &$attempted, &$unresolved, &$templates, $structure, $map): bool {
         if (isset($plans[$source])) {
             return true;
         }
@@ -605,17 +586,32 @@ function snapshot_build_dictionaries(array $structure, array $templates = [], ar
     // от наличия входящих ссылок. Дособираем их под ключом '@table' —
     // '@' невозможен в имени поля, коллизии с voc-ключами исключены;
     // record_label адресует подпись объекта именно по '@'.($table).
-    foreach ($templates as $table_name => $_) {
+    //
+    // Унификация 07-13 распространяется и сюда: раньше только таблицы
+    // с ЯВНЫМ шаблоном получали self-label здесь, а простые (только
+    // data_name) — обходились отдельным путём в record_label() через
+    // lookup_options напрямую (та же вторая машинка, что и у полей).
+    // Теперь — тем же способом, что $resolve: нет шаблона, но есть
+    // data_name → синтезируем `{data_name}`. record_label() больше не
+    // нуждается в собственном обходном пути.
+    foreach ($structure['tables'] as $table_name => $table_schema) {
         $self_key = '@' . $table_name;
-        if (isset($map[$self_key]) || !isset($structure['tables'][$table_name])) {
+        if (isset($map[$self_key])) {
             continue;
+        }
+        $tpl = $templates[$table_name] ?? null;
+        if ($tpl === null) {
+            if (!isset($table_schema['fields']['data_name'])) {
+                continue; // подписаться нечем — record_label() падает на "#id", законно
+            }
+            $tpl = $templates[$table_name] = '{data_name}';
         }
         if ($compile($table_name)) {
             $map[$self_key] = [
                 'source_table' => $table_name,
                 'label_column' => null,
                 'subtype'      => 'projection',
-                'template'     => $templates[$table_name],
+                'template'     => $tpl,
             ];
         }
     }
@@ -1382,20 +1378,18 @@ function record_delete(mysqli $db_connection, array $snapshot, string $table, in
  */
 function record_label(mysqli $db_connection, array $snapshot, string $table, int $id): string
 {
-    // Подпись собственного объекта лежит под ключом '@table' —
-    // резолвер компилирует её для ЛЮБОЙ таблицы с шаблоном, независимо
-    // от входящих ссылок (см. snapshot_build_dictionaries).
+    // Подпись собственного объекта лежит под ключом '@table' — резолвер
+    // компилирует её для ЛЮБОЙ таблицы, у которой есть чем подписаться
+    // (явный шаблон ИЛИ data_name — унификация 07-13), независимо от
+    // входящих ссылок (см. snapshot_build_dictionaries). Отдельного
+    // пути для простых словарей больше нет — lookup_options удалён,
+    // это и был весь смысл унификации.
     $dict = $snapshot['model']['dictionaries']['@' . $table] ?? null;
-
-    if ($dict !== null) {
-        return lookup_labels($db_connection, $dict)[$id] ?? "#$id";
+    if ($dict === null) {
+        return "#$id";
     }
 
-    if (isset($snapshot['structure']['tables'][$table]['fields']['data_name'])) {
-        return lookup_options($db_connection, $table)[$id] ?? "#$id";
-    }
-
-    return "#$id";
+    return lookup_labels($db_connection, $dict)[$id] ?? "#$id";
 }
 
 /**

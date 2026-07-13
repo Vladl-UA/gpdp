@@ -40,29 +40,15 @@ function admin_db_connect(): mysqli
     return $db;
 }
 
-function lookup_options(mysqli $db_connection, string $source): array
-{
-    static $cache = [];
-
-    if (isset($cache[$source])) {
-        return $cache[$source];
-    }
-
-    $options = [];
-    $result  = mysqli_query($db_connection, "SELECT `id`, `data_name` FROM `$source` ORDER BY `data_name`");
-    while ($row = mysqli_fetch_assoc($result)) {
-        $options[(int) $row['id']] = (string) $row['data_name'];
-    }
-
-    return $cache[$source] = $options;
-}
-
 /**
  * Подписи по скомпилированной словарной записи: map id → label.
  *
- * Единый вход для всех подтипов словаря (§16.1). Склад/адрес —
- * делегирование в lookup_options (плоский id + data_name). Проекция —
- * сборка подписи в PHP по плану, скомпилированному сборкой снапшота:
+ * Единый вход для ВСЕХ словарей без исключения (§16.1, унификация
+ * 2026-07-13): и простой словарь (data_name), и составная подпись
+ * («Мамуринская №31») идут одним и тем же путём — сборкой снапшота
+ * data_name синтезирован как шаблон из одного куска, отдельной формы
+ * записи для «простого» словаря больше нет (была lookup_options,
+ * жёсткий SELECT id, data_name — убрана вместе со второй машинкой).
  * literal → как есть; field → сырое значение колонки той же строки;
  * dict → рекурсивно подпись вложенного словаря (его запись ВЛОЖЕНА
  * в план при компиляции — исполнителю не нужна карта словарей,
@@ -70,18 +56,14 @@ function lookup_options(mysqli $db_connection, string $source): array
  *
  * SQL JOIN не собирается принципиально (§16.3: «текст SQL в данных
  * не хранится и не исполняется») — один плоский SELECT источника,
- * склейка в PHP; вложенные словари идут через lookup_options /
- * lookup_labels с их request-кэшами, N+1 не возникает.
+ * склейка в PHP; вложенные словари идут через ту же функцию рекурсивно,
+ * со своим request-кэшем — N+1 не возникает.
  *
  * $dict ОБЯЗАН быть доверенным: скомпилированная запись из пакета
  * field_data (снапшот), не из request.
  */
 function lookup_labels(mysqli $db_connection, array $dict): array
 {
-    if (($dict['subtype'] ?? '') !== 'projection') {
-        return lookup_options($db_connection, $dict['source_table']);
-    }
-
     static $cache = [];
     $source = $dict['source_table'];
 
