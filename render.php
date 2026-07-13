@@ -149,7 +149,15 @@ function render_input(array $result): string
 
     return match ($result['widget'] ?? 'text') {
         'textarea' => "<textarea name=\"$name\"$attrs rows=\"5\" cols=\"40\">$value</textarea>",
-        'checkbox' => '<input type="checkbox" name="' . $name . '" value="1"'
+        // Скрытое поле ПЕРЕД чекбоксом (тот же трюк, что везде в вебе):
+        // непроверенный чекбокс браузер вообще не отправляет — без этой
+        // страховки record_save() увидел бы отсутствие ключа как «поле
+        // не трогали» (частичное обновление законно), а не как «снято».
+        // Порядок важен: если чекбокс отмечен, браузер шлёт оба значения
+        // одним именем, и «1» от чекбокса в теле запроса идёт ПОСЛЕ
+        // скрытого «0» — выигрывает он.
+        'checkbox' => '<input type="hidden" name="' . $name . '" value="0">'
+        . '<input type="checkbox" name="' . $name . '" value="1"'
         . (($result['value'] ?? 0) ? ' checked' : '') . '>',
         'hidden'   => "<input type=\"hidden\" name=\"$name\" value=\"$value\">",
         'date'     => "<input type=\"date\" name=\"$name\" value=\"$value\"$attrs>",
