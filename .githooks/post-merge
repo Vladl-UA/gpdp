@@ -1,0 +1,18 @@
+#!/bin/sh
+# После каждого git pull/merge: если лежит флаг SNAPSHOT_REBUILD_REQUIRED —
+# пересобрать снапшот и убрать флаг. Претензия Влада 07-13: снапшот на
+# диске не знает о правках КОДА резолвера сам по себе, обновляется только
+# как побочный эффект структурных действий конфигуратора. Флаг кладёт
+# тот, кто коммитит системную правку (core.php/helpers.php/entities.php —
+# всё, что меняет field_parse/snapshot_build_*/lookup_*), не каждая
+# правка подряд (render.php/документация — не требуют).
+if [ -f SNAPSHOT_REBUILD_REQUIRED ]; then
+    echo "SNAPSHOT_REBUILD_REQUIRED найден — пересобираю снапшот..."
+    php tools_rebuild_snapshot.php
+    if [ $? -eq 0 ]; then
+        rm -f SNAPSHOT_REBUILD_REQUIRED
+        echo "Снапшот пересобран, флаг убран."
+    else
+        echo "ПРОВАЛ пересборки — флаг ОСТАВЛЕН, разберитесь и запустите php tools_rebuild_snapshot.php вручную."
+    fi
+fi
