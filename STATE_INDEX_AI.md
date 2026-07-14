@@ -1,6 +1,8 @@
 # STATE_INDEX_AI.md
 
-generated_at_commit: ddcdebe
+generated_at_commit: 5ef443b
+source_state_commit: 5ef443b
+source_scope: STATE.md; freshness must be checked by file history, not this self-reported field
 format: date | tags | decision | ref
 
 07-01 | configurator, model | Data-model changes must go through native configurator; direct DB editing is outside normal design path | STATE.md:architectural rule
@@ -23,3 +25,9 @@ format: date | tags | decision | ref
 07-14 | db.php | db.php introduced; record/core/configurator migration started and advanced through configurator create_table | commits 40e40a0..a1c8144
 07-14 | AI context | Compact context protocol accepted: passports + architecture snapshot + state index + HANDOFF | AI_CONTEXT_PROTOCOL.md:1-238
 07-14 | delegation | Chat maintains compact docs/mechanical tasks; Claude+Vlad own architecture decisions; Gemini may do bulk templates | AI_CONTEXT_PROTOCOL.md:179-237
+07-14 | trust, freshness | AI-document freshness is scoped to each document's source files, not commit..HEAD across the whole repository | STATE.md:journal 2026-07-14; commit 46dc044
+07-14 | trust, git | Freshness baseline comes from real file history (`git log -1 -- <AI-document>`), not from its self-reported generated_at_commit field | STATE.md:journal 2026-07-14; commits f9dcd36, 3f0f535
+07-14 | handoff | HANDOFF became an operational protocol artifact; filenames use `HANDOFF_YYYY-MM-DDTHH-MM.md` so several handoffs per day remain distinct | AI_CONTEXT_PROTOCOL.md:§4; commits fc01ed7, b080e57, b1d1114
+07-14 | db, delegation | DB call-wrapper migration completed across core, configurator, helpers and labels; first delegated Chat task accepted after commit/diff/smoke verification | STATE.md:journal 2026-07-14; commit 9726521
+07-14 | db, boundary | Low-level db_select/db_execute execution and future semantic record_select plans are separate layers; do not mix or predesign unused query forms | STATE.md:journal 2026-07-14; commit 51b9848
+07-14 | Sheet2, acceptance | Sheet2 data entry closed completely after the final two buffers; full live well card matches the reconstructed source without discrepancies | STATE.md:current item 7; commit 5ef443b
