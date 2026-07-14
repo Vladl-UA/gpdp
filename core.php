@@ -1336,6 +1336,64 @@ function record_delete(mysqli $db_connection, array $snapshot, string $table, in
     return $result;
 }
 
+/**
+ * Смена непосредственного родителя (dep_<parent>) уже существующей
+ * записи — reparent как ОТДЕЛЬНОЕ защищённое действие (STATE.md
+ * «Сейчас» п.5), не задний ход record_save: её структурный канал
+ * закрыт на UPDATE сознательно (см. докблок record_save выше).
+ * Меняется ровно одна колонка; каскада нет по построению — потомки
+ * ссылаются на id самой записи, не на корень, перенос ветки их
+ * не касается (проверено доктриной §16, не только этим кодом).
+ *
+ * Имя FK-поля не приходит из request — резолвится record_parent_relation()
+ * из собственных структурных полей таблицы. Из request попадает только
+ * значение $new_parent_id, и оно проверяется на существование в той
+ * родительской таблице, к которой фактически ведёт связь (record_fetch,
+ * тот же паттерн проверки, что и everywhere в этом файле).
+ */
+function record_reparent(
+    mysqli $db_connection,
+    array $snapshot,
+    string $table,
+    int $id,
+    int $new_parent_id
+): array {
+    $result = record_result('reparent', $table);
+
+    $relation = record_parent_relation($snapshot, $table);
+    if ($relation === null) {
+        $result['errors'][] = "Таблица '$table' не имеет однозначной dep_-связи";
+        return $result;
+    }
+
+    if (record_fetch($db_connection, $snapshot, $table, $id) === null) {
+        $result['errors'][] = "Запись '$table'#$id не найдена";
+        return $result;
+    }
+
+    if (record_fetch($db_connection, $snapshot, $relation['parent_table'], $new_parent_id) === null) {
+        $result['errors'][] = "Новый родитель '{$relation['parent_table']}'#$new_parent_id не найден";
+        return $result;
+    }
+
+    $outcome = db_execute(
+        $db_connection,
+        "UPDATE `$table` SET `{$relation['fk']}` = ? WHERE `id` = ?",
+        'ii',
+        [$new_parent_id, $id]
+    );
+    if (!$outcome['ok']) {
+        $result['errors'][] = 'Ошибка записи: ' . $outcome['error'];
+        return $result;
+    }
+
+    $result['ok']            = true;
+    $result['affected_rows'] = $outcome['affected_rows'];
+    $result['id']            = $id;
+
+    return $result;
+}
+
 // --- чтение: единственные SELECT'ы рабочего конвейера --------------------------
 // Дирижёр и render SQL не пишут; всё чтение записей — через эти две функции.
 // Возврат — данные, не результат-контракт §3: он принадлежит операциям записи.
@@ -1376,6 +1434,37 @@ function record_label(mysqli $db_connection, array $snapshot, string $table, int
  * перебора таблиц — граф уже собран сборкой снапшота. Нет связей →
  * пустой массив, ноль запросов.
  */
+/**
+ * Резолв единственной dep_-связи таблицы: имя FK-поля и имя
+ * родительской таблицы, читается напрямую из СОБСТВЕННЫХ структурных
+ * полей таблицы (§1: имя поля — явный адрес, префикс dep_ снимается
+ * так же, как в snapshot_build_relations). Не эвристика по графу —
+ * прямой разбор имени. null — связи нет вовсе, либо больше одной
+ * (сегодня в модели такого нигде нет; появится — fail-fast здесь,
+ * не угадывание, §16 «эвристического выбора не существует»). Основа
+ * для record_reparent/record_reparent_view (STATE.md «Сейчас» п.5).
+ */
+function record_parent_relation(array $snapshot, string $table): ?array
+{
+    $table_schema = $snapshot['structure']['tables'][$table] ?? null;
+    if ($table_schema === null) {
+        return null;
+    }
+
+    $fk_candidates = [];
+    foreach ($table_schema['fields'] as $field_name => $field_schema) {
+        if (($field_schema['kind'] ?? '') === 'structural' && str_starts_with($field_name, 'dep_')) {
+            $fk_candidates[] = $field_name;
+        }
+    }
+
+    if (count($fk_candidates) !== 1) {
+        return null;
+    }
+
+    return ['fk' => $fk_candidates[0], 'parent_table' => substr($fk_candidates[0], 4)];
+}
+
 function record_children(mysqli $db_connection, array $snapshot, string $table, int $id): array
 {
     $blocks = [];
@@ -1454,6 +1543,12 @@ function record_tree(mysqli $db_connection, array $snapshot, string $table, int 
         'table'    => $table,
         'id'       => $id,
         'label'    => record_label($db_connection, $snapshot, $table, $id),
+        // Признак «есть однозначная dep_-связь» — не сам родитель,
+        // только флаг для рендера (STATE.md «Сейчас» п.5): показывать
+        // ли ссылку «сменить родителя» у узла. Вычисление уже готово
+        // (record_parent_relation), второй раз в render его звать
+        // незачем — render не лезет в снапшот вообще.
+        'reparentable' => record_parent_relation($snapshot, $table) !== null,
         'row'      => $row,
         // Готовая заготовка узла (view-слой, п.8б): столбцы + одна строка
         // с разрешёнными значениями. Рендер её только укладывает, разбор
@@ -1484,6 +1579,27 @@ function record_fetch(mysqli $db_connection, array $snapshot, string $table, int
  * (возможно пустой) — вызывающий не знает про mysqli_result.
  * Пагинация/сортировка по полю — слой «Позже» (batch-режимы).
  */
+/**
+ * Список id→подпись всех записей таблицы-родителя — источник опций
+ * для формы reparent (STATE.md «Сейчас» п.5). Список id — единственный
+ * собственный SELECT; подпись каждой строки — через record_label (её
+ * request-level кэш lookup_labels уже решает N+1, второй кэш не заводим).
+ */
+function record_parent_candidates(mysqli $db_connection, array $snapshot, string $parent_table): array
+{
+    $ids = array_map(
+        static fn(array $row): int => (int) $row['id'],
+        db_select($db_connection, "SELECT `id` FROM `$parent_table` ORDER BY `id` DESC")
+    );
+
+    $candidates = [];
+    foreach ($ids as $parent_id) {
+        $candidates[$parent_id] = record_label($db_connection, $snapshot, $parent_table, $parent_id);
+    }
+
+    return $candidates;
+}
+
 function record_list(mysqli $db_connection, array $snapshot, string $table, int $limit = 50): array
 {
     if (!isset($snapshot['structure']['tables'][$table])) {
@@ -1544,6 +1660,47 @@ function record_view_row(
  *   ['kind'=>'table', 'table'=>..., 'columns'=>[['field'=>..,'label'=>..]],
  *    'rows'=>[['id'=>N, 'cells'=>['<готовое значение>', ...]]]]
  */
+/**
+ * Заготовка формы reparent (view-слой, п.8 — тот же инвариант, что у
+ * списка/карты/формы): подпись записи, подпись текущего родителя,
+ * список кандидатов. Render только укладывает в HTML, доступ к БД
+ * остаётся здесь. null — связи нет или запись не найдена; вызывающий
+ * (index.php) превращает в 422/404, HTML тут не строится.
+ *
+ * $hidden — технические скрытые поля формы (_action/_table/_id/_return),
+ * собираются дирижёром так же, как для record_form_view — как есть,
+ * без интерпретации.
+ */
+function record_reparent_view(
+    mysqli $db_connection,
+    array $snapshot,
+    string $table,
+    int $id,
+    array $hidden = []
+): ?array {
+    $relation = record_parent_relation($snapshot, $table);
+    if ($relation === null) {
+        return null;
+    }
+
+    $row = record_fetch($db_connection, $snapshot, $table, $id);
+    if ($row === null) {
+        return null;
+    }
+
+    $current_parent_id = (int) ($row[$relation['fk']] ?? 0);
+
+    return [
+        'label'                => record_label($db_connection, $snapshot, $table, $id),
+        'current_parent_id'    => $current_parent_id,
+        'current_parent_label' => $current_parent_id > 0
+            ? record_label($db_connection, $snapshot, $relation['parent_table'], $current_parent_id)
+            : '(нет)',
+        'candidates'           => record_parent_candidates($db_connection, $snapshot, $relation['parent_table']),
+        'hidden'               => $hidden,
+    ];
+}
+
 function record_table_view(mysqli $db_connection, array $snapshot, string $table, int $limit = 50): array
 {
     $columns = record_view_columns($snapshot, $table);

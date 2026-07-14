@@ -113,7 +113,7 @@ $task_fields = $snapshot['structure']['tables'][$task_table]['fields'];
 // PRG: после успешной записи — redirect на просмотр, не отрисовка
 // (страхует от повторной отправки формы и возвращает к исходной точке).
 
-if (in_array($request_action, ['save_new', 'save_edit', 'delete'], true)) {
+if (in_array($request_action, ['save_new', 'save_edit', 'delete', 'save_reparent'], true)) {
 
     // Родитель из request — подсказка (§9): становится доверенным
     // структурным фактом только после сверки с model.relations
@@ -140,23 +140,31 @@ if (in_array($request_action, ['save_new', 'save_edit', 'delete'], true)) {
         $task_structural = [$parent_fk => $parent_id];
     }
 
+    // Смена родителя (STATE.md «Сейчас» п.5) — значение, не имя поля:
+    // само имя FK резолвит record_reparent() из модели, не отсюда.
+    $new_parent_id = (int) ($_POST['_new_parent_id'] ?? 0);
+
     $outcome = match ($request_action) {
-        'save_new'  => record_save($db_connection, $snapshot, $task_table, $_POST, null, $task_structural),
-        'save_edit' => record_save($db_connection, $snapshot, $task_table, $_POST, $request_id),
-        'delete'    => record_delete($db_connection, $snapshot, $task_table, $request_id),
+        'save_new'      => record_save($db_connection, $snapshot, $task_table, $_POST, null, $task_structural),
+        'save_edit'     => record_save($db_connection, $snapshot, $task_table, $_POST, $request_id),
+        'delete'        => record_delete($db_connection, $snapshot, $task_table, $request_id),
+        'save_reparent' => record_reparent($db_connection, $snapshot, $task_table, $request_id, $new_parent_id),
     };
 
     if ($outcome['ok']) {
         // Возврат «откуда позвали» (несён формой). Если его нет —
         // прежняя логика: ребёнок из карточки родителя → в родителя,
+        // reparent без _return → на собственную карточку записи,
         // иначе → в список таблицы.
         $return = (string) ($_POST['_return'] ?? '');
         if ($return !== '' && str_starts_with($return, '/')) {
             $back = $return;
+        } elseif ($task_structural !== []) {
+            $back = '?_table=' . rawurlencode($parent_table) . '&_action=edit&_id=' . $parent_id;
+        } elseif ($request_action === 'save_reparent') {
+            $back = '?_table=' . rawurlencode($task_table) . '&_action=view&_id=' . $request_id;
         } else {
-            $back = $task_structural !== []
-                ? '?_table=' . rawurlencode($parent_table) . '&_action=edit&_id=' . $parent_id
-                : '?_table=' . rawurlencode($task_table) . '&_action=view';
+            $back = '?_table=' . rawurlencode($task_table) . '&_action=view';
         }
         header('Location: ' . $back);
         exit;
@@ -168,6 +176,36 @@ if (in_array($request_action, ['save_new', 'save_edit', 'delete'], true)) {
         echo '<li>' . render_escape($error) . '</li>';
     }
     echo '</ul><p><a href="javascript:history.back()">Назад к форме</a></p>';
+    exit;
+}
+
+// --- 4а. форма смены родителя — отдельное защищённое действие (STATE.md ---------
+// «Сейчас» п.5): не режим сущности, не идёт через action_mode/field_exec,
+// работает со структурным полем dep_ напрямую поверх record_reparent_view.
+if ($request_action === 'reparent') {
+    $ref      = (string) ($_SERVER['HTTP_REFERER'] ?? '');
+    $ref_path = $ref !== '' ? (parse_url($ref, PHP_URL_PATH) ?? '') : '';
+    $hidden   = ['_action' => 'save_reparent', '_table' => $task_table, '_id' => $request_id];
+    if ($ref_path !== '') {
+        $ref_q = parse_url($ref, PHP_URL_QUERY);
+        $hidden['_return'] = $ref_path . ($ref_q ? '?' . $ref_q : '');
+    }
+
+    $view = record_reparent_view($db_connection, $snapshot, $task_table, $request_id, $hidden);
+    if ($view === null) {
+        http_response_code(422);
+        exit("Смена родителя недоступна для '$task_table'#$request_id");
+    }
+
+    $table_title = render_escape(
+        (string) ($snapshot['presentation']['labels']['table'][$task_table]['data_full'] ?? $task_table)
+    );
+    echo render_admin_page_open($table_title, '<a class="home-link" href="?_action=home">← Домой</a>');
+    echo "<h2>Смена родителя: $table_title</h2>";
+    echo render_reparent_form($view);
+    echo "<p><a href=\"?_table=$task_table&_action=view&_id=$request_id\">Отмена</a></p>";
+    echo '</body></html>';
+    mysqli_close($db_connection);
     exit;
 }
 

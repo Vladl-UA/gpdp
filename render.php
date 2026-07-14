@@ -205,7 +205,16 @@ function render_object_tree(array $node, int $depth = 0): void
     // укладывает. Без действий: карта read-режим, ~/× явной строкой ниже.
     echo render_record_table($node['view']);
 
+    // Ссылка «сменить родителя» — только у записей с однозначной dep_
+    // связью (флаг уже вычислен в core.php, render его не пересчитывает,
+    // STATE.md «Сейчас» п.5). Корень дерева (well) её не имеет — родителя
+    // менять нечему, флаг у него false, ссылка не появляется сама.
+    $reparent_link = ($node['reparentable'] ?? false)
+        ? "<a class=\"act\" href=\"?_table=$task_table&_action=reparent&_id=$id\" title=\"сменить родителя\">⇄</a>"
+        : '';
+
     echo "<p><a class=\"act\" href=\"?_table=$task_table&_action=edit&_id=$id\" title=\"править\">~</a>"
+       . $reparent_link
        . "<a class=\"act act-danger\" href=\"?_table=$task_table&_action=delete&_id=$id\" title=\"удалить\">×</a></p>";
 
     foreach ($node['children'] as $block) {
@@ -220,6 +229,33 @@ function render_object_tree(array $node, int $depth = 0): void
         echo '</div>';
     }
     echo '</div>';
+}
+
+/**
+ * Укладчик формы reparent (view-слой): заготовка record_reparent_view()
+ * → HTML. Ничего не вычисляет — подписи и список кандидатов уже готовы.
+ * Один select с текущим родителем, выбранным по умолчанию.
+ */
+function render_reparent_form(array $view): string
+{
+    $html = '<p>Запись: <b>' . render_escape($view['label']) . '</b></p>'
+          . '<p>Текущий родитель: <b>' . render_escape($view['current_parent_label']) . '</b></p>';
+
+    $html .= '<form method="post">';
+    foreach ($view['hidden'] as $name => $value) {
+        $html .= '<input type="hidden" name="' . render_escape((string) $name)
+               . '" value="' . render_escape((string) $value) . '">';
+    }
+    $html .= '<p><label>Новый родитель: <select name="_new_parent_id">';
+    foreach ($view['candidates'] as $parent_id => $label) {
+        $selected = $parent_id === $view['current_parent_id'] ? ' selected' : '';
+        $html .= '<option value="' . (int) $parent_id . '"' . $selected . '>'
+               . render_escape($label) . '</option>';
+    }
+    $html .= '</select></label></p>';
+    $html .= '<p><input type="submit" value="Сменить родителя"></p></form>';
+
+    return $html;
 }
 
 /**
