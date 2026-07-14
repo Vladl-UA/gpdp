@@ -294,12 +294,12 @@ function configurator_parse_field(array $raw_field, array $known_entities, array
  */
 function configurator_register_link(mysqli $db_connection, string $column, string $target): bool
 {
-    $stmt = mysqli_prepare(
+    return db_execute(
         $db_connection,
-        'INSERT INTO `model_links` (data_element, data_target_table) VALUES (?, ?)'
-    );
-    mysqli_stmt_bind_param($stmt, 'ss', $column, $target);
-    return mysqli_stmt_execute($stmt);
+        'INSERT INTO `model_links` (data_element, data_target_table) VALUES (?, ?)',
+        'ss',
+        [$column, $target]
+    )['ok'];
 }
 
 // ============================================================================
@@ -412,16 +412,19 @@ function configurator_delete_table(mysqli $db_connection, string $table, array $
 
     try {
         // model_labels чистится каскадом FK (ON DELETE CASCADE, §17).
-        $stmt = mysqli_prepare(
+        db_execute(
             $db_connection,
             'DELETE FROM `' . MODEL_REGISTRY_TABLE . "` WHERE (data_kind='table' AND data_element=?) "
-            . "OR (data_kind='field' AND data_owner=?)"
+            . "OR (data_kind='field' AND data_owner=?)",
+            'ss',
+            [$table, $table]
         );
-        mysqli_stmt_bind_param($stmt, 'ss', $table, $table);
-        mysqli_stmt_execute($stmt);
 
-        if (!mysqli_query($db_connection, 'DROP TABLE `' . $table . '`')) {
-            return ['ok' => false, 'errors' => ['DDL: ' . mysqli_error($db_connection)]];
+        // DDL — имя таблицы не параметризуется (ограничение SQL, не
+        // db_execute): $types='' — прямой запрос без подготовки.
+        $drop = db_execute($db_connection, 'DROP TABLE `' . $table . '`');
+        if (!$drop['ok']) {
+            return ['ok' => false, 'errors' => ['DDL: ' . $drop['error']]];
         }
 
         $snapshot = snapshot_build($db_connection, $application);
@@ -509,16 +512,11 @@ function configurator_adopt_table(mysqli $db_connection, string $table, array $a
         if (!isset($live['tables'][$table])) {
             return ['ok' => false, 'errors' => ["Таблица $table не существует."]];
         }
-        $stmt = mysqli_prepare($db_connection, 'INSERT INTO `' . MODEL_REGISTRY_TABLE
-            . "` (data_kind, data_owner, data_element, active) VALUES ('table', NULL, ?, 1)");
-        mysqli_stmt_bind_param($stmt, 's', $table);
-        mysqli_stmt_execute($stmt);
-        $rid = mysqli_insert_id($db_connection);
+        $reg = db_execute($db_connection, 'INSERT INTO `' . MODEL_REGISTRY_TABLE
+            . "` (data_kind, data_owner, data_element, active) VALUES ('table', NULL, ?, 1)", 's', [$table]);
 
-        $stmt = mysqli_prepare($db_connection, 'INSERT INTO `' . MODEL_LABELS_TABLE
-            . '` (dep_model_registry, data_short, data_full) VALUES (?, ?, ?)');
-        mysqli_stmt_bind_param($stmt, 'iss', $rid, $table, $table);
-        mysqli_stmt_execute($stmt);
+        db_execute($db_connection, 'INSERT INTO `' . MODEL_LABELS_TABLE
+            . '` (dep_model_registry, data_short, data_full) VALUES (?, ?, ?)', 'iss', [$reg['id'], $table, $table]);
 
         return configurator_refresh($db_connection, $application);
     } finally {
@@ -534,10 +532,8 @@ function configurator_drop_registry_row(mysqli $db_connection, int $id, array $a
         return ['ok' => false, 'errors' => ['Схема заблокирована другой операцией.']];
     }
     try {
-        $stmt = mysqli_prepare($db_connection, 'DELETE FROM `' . MODEL_REGISTRY_TABLE . '` WHERE id = ?');
-        mysqli_stmt_bind_param($stmt, 'i', $id);
-        mysqli_stmt_execute($stmt);
-        if (mysqli_affected_rows($db_connection) === 0) {
+        $outcome = db_execute($db_connection, 'DELETE FROM `' . MODEL_REGISTRY_TABLE . '` WHERE id = ?', 'i', [$id]);
+        if ($outcome['affected_rows'] === 0) {
             return ['ok' => false, 'errors' => ["Записи реестра #$id нет (уже убрана?)."]];
         }
         return configurator_refresh($db_connection, $application);
@@ -561,15 +557,14 @@ function configurator_drop_column(mysqli $db_connection, string $table, string $
             return ['ok' => false, 'errors' => ["Поле $table.$field не существует или структурное — не удаляю."]];
         }
         // Защита: удаляем только сироту. Под управлением — не наш случай.
-        $chk = mysqli_prepare($db_connection, 'SELECT id FROM `' . MODEL_REGISTRY_TABLE
-            . "` WHERE data_kind='field' AND data_owner=? AND data_element=? AND active=1");
-        mysqli_stmt_bind_param($chk, 'ss', $table, $field);
-        mysqli_stmt_execute($chk);
-        if (mysqli_fetch_assoc(mysqli_stmt_get_result($chk))) {
+        $chk = db_select($db_connection, 'SELECT id FROM `' . MODEL_REGISTRY_TABLE
+            . "` WHERE data_kind='field' AND data_owner=? AND data_element=? AND active=1", 'ss', [$table, $field]);
+        if ($chk !== []) {
             return ['ok' => false, 'errors' => ["Поле $table.$field под управлением — удаление колонки под управлением здесь не делается."]];
         }
-        if (!mysqli_query($db_connection, 'ALTER TABLE `' . $table . '` DROP COLUMN `' . $field . '`')) {
-            return ['ok' => false, 'errors' => ['DDL: ' . mysqli_error($db_connection)]];
+        $drop = db_execute($db_connection, 'ALTER TABLE `' . $table . '` DROP COLUMN `' . $field . '`');
+        if (!$drop['ok']) {
+            return ['ok' => false, 'errors' => ['DDL: ' . $drop['error']]];
         }
         return configurator_refresh($db_connection, $application);
     } finally {
