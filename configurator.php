@@ -340,44 +340,29 @@ function configurator_create_table(mysqli $db_connection, array $spec, array $ap
         $sql   = "CREATE TABLE `$table` (" . implode(', ', $columns_sql) . ") "
                . "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci";
 
-        if (!mysqli_query($db_connection, $sql)) {
-            return ['ok' => false, 'errors' => ['DDL: ' . mysqli_error($db_connection)]];
+        $create = db_execute($db_connection, $sql);
+        if (!$create['ok']) {
+            return ['ok' => false, 'errors' => ['DDL: ' . $create['error']]];
         }
 
         // Регистрация таблицы в реестре + подпись.
-        $stmt = mysqli_prepare(
-            $db_connection,
+        $table_reg = db_execute($db_connection,
             'INSERT INTO `' . MODEL_REGISTRY_TABLE . '` (data_kind, data_owner, data_element, active) '
-            . "VALUES ('table', NULL, ?, 1)"
-        );
-        mysqli_stmt_bind_param($stmt, 's', $table);
-        mysqli_stmt_execute($stmt);
-        $table_registry_id = mysqli_insert_id($db_connection);
+            . "VALUES ('table', NULL, ?, 1)", 's', [$table]);
 
-        $stmt = mysqli_prepare(
-            $db_connection,
-            'INSERT INTO `' . MODEL_LABELS_TABLE . '` (dep_model_registry, data_short, data_full) VALUES (?, ?, ?)'
-        );
-        mysqli_stmt_bind_param($stmt, 'iss', $table_registry_id, $spec['table_short'], $spec['table_full']);
-        mysqli_stmt_execute($stmt);
+        db_execute($db_connection,
+            'INSERT INTO `' . MODEL_LABELS_TABLE . '` (dep_model_registry, data_short, data_full) VALUES (?, ?, ?)',
+            'iss', [$table_reg['id'], $spec['table_short'], $spec['table_full']]);
 
         // Регистрация каждого предметного поля (id — структурный, без записи).
         foreach ($spec['fields'] as $field) {
-            $stmt = mysqli_prepare(
-                $db_connection,
+            $field_reg = db_execute($db_connection,
                 'INSERT INTO `' . MODEL_REGISTRY_TABLE . '` (data_kind, data_owner, data_element, active) '
-                . "VALUES ('field', ?, ?, 1)"
-            );
-            mysqli_stmt_bind_param($stmt, 'ss', $table, $field['column']);
-            mysqli_stmt_execute($stmt);
-            $field_registry_id = mysqli_insert_id($db_connection);
+                . "VALUES ('field', ?, ?, 1)", 'ss', [$table, $field['column']]);
 
-            $stmt = mysqli_prepare(
-                $db_connection,
-                'INSERT INTO `' . MODEL_LABELS_TABLE . '` (dep_model_registry, data_short, data_full) VALUES (?, ?, ?)'
-            );
-            mysqli_stmt_bind_param($stmt, 'iss', $field_registry_id, $field['short'], $field['full']);
-            mysqli_stmt_execute($stmt);
+            db_execute($db_connection,
+                'INSERT INTO `' . MODEL_LABELS_TABLE . '` (dep_model_registry, data_short, data_full) VALUES (?, ?, ?)',
+                'iss', [$field_reg['id'], $field['short'], $field['full']]);
 
             if (($field['link_target'] ?? null) !== null) {
                 $link = configurator_register_link($db_connection, $field['column'], $field['link_target']);
