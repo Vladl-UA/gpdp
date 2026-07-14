@@ -1297,22 +1297,18 @@ function record_save(
         $types   .= 'i';
     }
 
-    $statement = mysqli_prepare($db_connection, $sql);
-    if ($statement === false) {
-        $result['errors'][] = 'Ошибка подготовки запроса: ' . mysqli_error($db_connection);
-        return $result;
-    }
-
-    mysqli_stmt_bind_param($statement, $types, ...$values);
-
-    if (!mysqli_stmt_execute($statement)) {
-        $result['errors'][] = 'Ошибка выполнения: ' . mysqli_stmt_error($statement);
+    $outcome = db_execute($db_connection, $sql, $types, $values);
+    if (!$outcome['ok']) {
+        $result['errors'][] = 'Ошибка записи: ' . $outcome['error'];
         return $result;
     }
 
     $result['ok']            = true;
-    $result['affected_rows'] = mysqli_stmt_affected_rows($statement);
-    $result['id']            = $operation === 'insert' ? mysqli_insert_id($db_connection) : $id;
+    $result['affected_rows'] = $outcome['affected_rows'];
+    // insert_id из db_execute верен только для INSERT — для UPDATE он
+    // несёт мусор (id последней вставки в этом соединении, не связан
+    // с текущим запросом), поэтому для update берём переданный $id.
+    $result['id'] = $operation === 'insert' ? $outcome['id'] : $id;
 
     return $result;
 }
@@ -1327,22 +1323,15 @@ function record_delete(mysqli $db_connection, array $snapshot, string $table, in
         return $result;
     }
 
-    $statement = mysqli_prepare($db_connection, "DELETE FROM `$table` WHERE `id` = ? LIMIT 1");
-    if ($statement === false) {
-        $result['errors'][] = 'Ошибка подготовки запроса: ' . mysqli_error($db_connection);
-        return $result;
-    }
-
-    mysqli_stmt_bind_param($statement, 'i', $id);
-
-    if (!mysqli_stmt_execute($statement)) {
-        $result['errors'][] = 'Ошибка выполнения: ' . mysqli_stmt_error($statement);
+    $outcome = db_execute($db_connection, "DELETE FROM `$table` WHERE `id` = ? LIMIT 1", 'i', [$id]);
+    if (!$outcome['ok']) {
+        $result['errors'][] = 'Ошибка удаления: ' . $outcome['error'];
         return $result;
     }
 
     $result['ok']            = true;
     $result['id']            = $id;
-    $result['affected_rows'] = mysqli_stmt_affected_rows($statement);
+    $result['affected_rows'] = $outcome['affected_rows'];
 
     return $result;
 }
