@@ -1,8 +1,9 @@
 # ARCHITECTURE_SNAPSHOT_AI.md
 
-generated_at_commit: ddcdebe
-sections_verified: §1, §2, §3, §4.1-4.13, §7, §8, §11
-status: partial-code verification; see per-node markers
+generated_at_commit: 5ef443b
+sections_verified: §1, §2, §3, §4.1-4.13, §6, §7, §8, §11, Open risks
+status: content verified against current main; exact per-range blame remains partial
+source_scope: PHP architecture files; freshness must be checked by file history, not this self-reported field
 
 ## 1. Purpose
 
@@ -19,16 +20,16 @@ Entity modes: `new | edit | read | validate`. Entities never own a `save` mode; 
 ## 3. Layers
 
 - `config.php` → environment and paths. loc `config.php:13-54`, commit `ddcdebe`, status ✓.
-- `index.php` → runtime orchestration; request must stop here as raw input. commit `40e40a0+`, status ⚠.
-- `core.php` → entity registry, field boundary, snapshot compiler, generic record/view pipeline. commit `83f11d0+`, status ⚠.
-- `entities.php` → `ent_<id>` passports and handlers. commit `ddcdebe`, status ✓.
-- `helpers.php` → entity helpers; kernel must not depend on it directly. commit `ddcdebe`, status ✓.
+- `index.php` → runtime orchestration; request must stop here as raw input. current blob `d40a1e3`, status ✓ for current file content.
+- `core.php` → entity registry, field boundary, snapshot compiler, generic record/view pipeline. current blob `c0063ab`, status ⚠ for exact per-function blame.
+- `entities.php` → `ent_<id>` passports and handlers. current blob `39719cd`, status ✓ for current file content.
+- `helpers.php` → entity helpers; kernel must not depend on it directly. `lookup_labels()` now executes through `db_select`; commit `afa0cab`, status ✓.
 - `db.php` → low-level SQL executor only: `db_select`, `db_execute`. loc `db.php:43-105`, commit `40e40a0`, status ✓.
 - `render.php` → layout of structured views; no DB/model compilation.
-- `configurator.php` → separate admin/DDL/repair perimeter. commit `a1c8144`, status ⚠.
-- `labels.php` → presentation/model metadata editor; separate admin page.
+- `configurator.php` → separate admin/DDL/repair perimeter. current blob `c77978c`, status ⚠ for exact per-function blame.
+- `labels.php` → presentation/model metadata editor; registry reads and label UPSERT execute through `db_select/db_execute`; commit `2c15076`, status ✓.
 
-Allowed direction: `index → core → entities → helpers`; query execution may go through `db.php`; view result goes to `render.php`.
+Allowed direction: `index → core → entities → helpers`; SQL execution goes through `db.php`; view results go to `render.php`. Admin entry files remain separate until real role/permission filtering replaces file-level access separation.
 
 ## 4. Nodes
 
@@ -40,13 +41,13 @@ Owns DB credentials, entity/snapshot paths, snapshot mode, temporary application
 
 ### 4.2 Runtime conductor
 
-`index.php`, commit `40e40a0+`, status ⚠.
+`index.php`, current blob `d40a1e3`, status ✓.
 
 Owns boot, DB connection, snapshot init, request validation, prepared task construction, generic operation selection, PRG and renderer handoff. Must contain no entity behavior, DDL or domain SQL.
 
 ### 4.3 Entity registry
 
-`entity_registry_load`, `entities`, `field_exec`; loc/calls in `FUNCTION_PASSPORTS_AI.md`; current core status ⚠.
+`entity_registry_load`, `entities`, `field_exec`; loc/calls in `FUNCTION_PASSPORTS_AI.md`; exact per-function blame remains ⚠.
 
 Passport invariants: zero-arg `ent_<id>()`; passport id equals suffix; handler names come only from trusted passport; handler returns data, not HTML; handler never writes domain rows.
 
@@ -54,7 +55,7 @@ Current entities: `data voc link ltext footnote date year time int dec bul calc`
 
 ### 4.4 Field naming and structural fields
 
-`field_parse`, `field_data`, `field_exec`; current core status ⚠.
+`field_parse`, `field_data`, `field_exec`; exact per-function blame remains ⚠.
 
 Domain field: `<entity>_<local_name>`. Structural fields: `id`, `dep_*`, `rel_main`, `active`; they are kernel structure, not entities. Unknown fields fail snapshot compilation.
 
@@ -66,7 +67,7 @@ Contract changes here require reading all handlers using the changed key and all
 
 ### 4.6 Snapshot compiler
 
-`snapshot_*`; current core status ⚠.
+`snapshot_*`; exact per-function blame remains ⚠.
 
 Runtime snapshot sections: `structure`, `model.registry`, `model.dictionaries`, `model.relations`, `model.relations_root`, `presentation`, `application`.
 
@@ -74,7 +75,7 @@ Live schema introspection is allowed only during bootstrap, explicit rebuild and
 
 ### 4.7 Dictionaries and explicit links
 
-`snapshot_build_dictionaries`, `snapshot_build_links`, `lookup_labels`; core/helper status ⚠/✓.
+`snapshot_build_dictionaries`, `snapshot_build_links`, `lookup_labels`; execution path verified through `db_select`.
 
 `voc_` resolves source by convention; `link_` reads explicit target from `model_links`. Both compile to one label-plan format and execute through `lookup_labels()`.
 
@@ -82,13 +83,13 @@ Difference between `voc` and `link` is address resolution, not rendering/validat
 
 ### 4.8 Structural relation graph
 
-`snapshot_build_relations`, `record_children`, `record_tree`; current core status ⚠.
+`snapshot_build_relations`, `record_children`, `record_tree`; exact per-function blame remains ⚠.
 
 `dep_<parent>` compiles direct ownership edges. `rel_main` records root dossier membership separately. Runtime traversal reads compiled graph; no table scan per node.
 
 ### 4.9 Generic write
 
-`record_save`, `record_delete`; commit `83f11d0`, status ⚠ for exact loc.
+`record_save`, `record_delete`; execution through `db_execute`; exact loc/blame remains ⚠.
 
 Whitelist comes from snapshot. Each submitted entity field runs `validate`; normalized values feed one generic INSERT/UPDATE through `db_execute`. Structural INSERT values use a separate trusted channel. Update reparenting is not ordinary field input.
 
@@ -104,7 +105,7 @@ View builders produce render-neutral arrays. Renderer lays them out. Renderer mu
 
 ### 4.12 Admin/DDL perimeter
 
-`configurator_*`; commit `a1c8144`, status ⚠ for exact loc.
+`configurator_*`; current blob `c77978c`, exact loc/blame remains ⚠.
 
 Admin request is validated before DDL. Operations mutate schema plus model metadata, then rebuild snapshot under schema lock. MySQL DDL is not transactionally atomic with metadata; partial-state repair remains a design risk.
 
@@ -112,7 +113,11 @@ Admin request is validated before DDL. Operations mutate schema plus model metad
 
 `db_select` loc `db.php:43-69`; `db_execute` loc `db.php:77-105`; commit `40e40a0`, status ✓.
 
+Migration is complete for production runtime/admin query paths in `core.php`, `configurator.php`, `helpers.php` and `labels.php`. Direct `mysqli_*` remains only for intentionally out-of-scope connection management (`mysqli_connect`, `mysqli_set_charset`, `mysqli_close`) and the explicitly retained schema-introspection case.
+
 This is a mechanical `mysqli` wrapper, not SQL builder, query-plan compiler or dialect adapter. SQL text remains in calling code. Future `record_select($plan)` is a separate semantic layer.
+
+Failure contract: `db_select()` maps both query failure and no rows to `[]`; callers whose prior failure behavior differed must document that difference locally. `db_execute()` returns `ok`, `affected_rows`, `id`, `error`.
 
 ## 6. Change impact map
 
@@ -124,6 +129,7 @@ This is a mechanical `mysqli` wrapper, not SQL builder, query-plan compiler or d
 - Write pipeline → `record_save`, validation handlers, index save branch, `db_execute` contract.
 - Snapshot format → validate/build/save/load/init + all consumers of changed section.
 - DDL → configurator validators, operation, registry/labels/link writes, lock/rebuild and compensation path.
+- DB wrapper → `db.php` contract + every caller whose error path distinguishes failure from empty result.
 
 ## 7. Forbidden dependencies
 
@@ -138,6 +144,7 @@ This is a mechanical `mysqli` wrapper, not SQL builder, query-plan compiler or d
 - core → domain table/field names
 - model data → executable SQL text
 - `db.php` → model semantics
+- new production query path → direct `mysqli_query/prepare/stmt_*` instead of `db_select/db_execute`
 
 ## 8. Regression signals
 
@@ -152,6 +159,7 @@ This is a mechanical `mysqli` wrapper, not SQL builder, query-plan compiler or d
 9. A domain SELECT is added before classifying a reusable selection form.
 10. Renderer learns DB/model structure.
 11. `db.php` starts building SQL or interpreting model plans.
+12. A production caller reintroduces direct query-execution `mysqli_*` calls.
 
 ## 11. Minimum context by task
 
@@ -176,13 +184,16 @@ Read: relation compiler; `record_children`; `record_tree`; `render_object_tree`.
 ### Configurator change
 Read: exact configurator passport; validator/parser; one DDL operation; metadata writes; snapshot rebuild/lock.
 
+### DB-call migration or audit
+Read: `db.php`; target caller; its previous failure behavior; HANDOFF constraints. Do not redesign SQL or selection semantics.
+
 ## Open risks
 
 - complete exact blame/range refresh for `core.php` and `configurator.php` passports;
 - semantic query-plan layer (`record_select`) without storing SQL in model;
 - MySQL DDL compensation/operation journal;
 - `model_links` cleanup on field/table deletion;
-- admin authorization;
+- admin authorization and eventual replacement of file-level access separation with role/context filtering;
 - local degradation instead of whole-model 503;
 - stable full-address identity versus global field-name identity;
 - explicit snapshot format version;
