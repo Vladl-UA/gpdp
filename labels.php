@@ -38,16 +38,15 @@ function labels_registry_id(mysqli $db, string $kind, ?string $owner, string $el
     if ($owner === null) {
         $sql = 'SELECT id FROM `' . MODEL_REGISTRY_TABLE
              . '` WHERE data_kind = ? AND data_owner IS NULL AND data_element = ? AND active = 1';
-        $stmt = mysqli_prepare($db, $sql);
-        mysqli_stmt_bind_param($stmt, 'ss', $kind, $element);
+        $rows = db_select($db, $sql, 'ss', [$kind, $element]);
     } else {
         $sql = 'SELECT id FROM `' . MODEL_REGISTRY_TABLE
              . '` WHERE data_kind = ? AND data_owner = ? AND data_element = ? AND active = 1';
-        $stmt = mysqli_prepare($db, $sql);
-        mysqli_stmt_bind_param($stmt, 'sss', $kind, $owner, $element);
+        $rows = db_select($db, $sql, 'sss', [$kind, $owner, $element]);
     }
-    mysqli_stmt_execute($stmt);
-    $row = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+    // Поведение при ошибке меняется явно: db_select() сводит ошибку к [],
+    // поэтому функция возвращает null так же, как при отсутствии адреса.
+    $row = $rows[0] ?? null;
     return $row ? (int) $row['id'] : null;
 }
 
@@ -65,9 +64,8 @@ function labels_save_label(mysqli $db, int $registry_id, string $short, string $
               data_short = VALUES(data_short),
               data_full  = VALUES(data_full),
               data_label_template = VALUES(data_label_template)';
-    $stmt = mysqli_prepare($db, $sql);
-    mysqli_stmt_bind_param($stmt, 'isss', $registry_id, $short_v, $full_v, $template_v);
-    return mysqli_stmt_execute($stmt);
+    $result = db_execute($db, $sql, 'isss', [$registry_id, $short_v, $full_v, $template_v]);
+    return $result['ok'];
 }
 
 // ---------------------------------------------------------------------------
