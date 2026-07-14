@@ -729,13 +729,9 @@ function snapshot_build_registry(mysqli $db_connection, array $structure): array
 
     $sql = 'SELECT id, data_kind, data_owner, data_element FROM `'
          . MODEL_REGISTRY_TABLE . '` WHERE active = 1';
-    $result = @mysqli_query($db_connection, $sql);
+    $rows = db_select($db_connection, $sql);
 
-    if ($result === false) {
-        return ['map' => $registry, 'orphans' => $orphans];
-    }
-
-    while ($row = mysqli_fetch_assoc($result)) {
+    foreach ($rows as $row) {
         $kind    = $row['data_kind'];
         $owner   = $row['data_owner'];
         $element = $row['data_element'];
@@ -776,19 +772,16 @@ function snapshot_build_presentation(mysqli $db_connection): array
              JOIN `' . MODEL_REGISTRY_TABLE . '` r
                ON r.id = l.dep_model_registry
              WHERE r.active = 1';
-    $result = @mysqli_query($db_connection, $sql);
 
-    if ($result !== false) {
-        while ($row = mysqli_fetch_assoc($result)) {
-            $kind    = $row['data_kind'];
-            $owner   = $row['data_owner'];
-            $element = $row['data_element'];
+    foreach (db_select($db_connection, $sql) as $row) {
+        $kind    = $row['data_kind'];
+        $owner   = $row['data_owner'];
+        $element = $row['data_element'];
 
-            if ($kind === 'table') {
-                $labels['table'][$element] = $row;
-            } elseif ($kind === 'field') {
-                $labels['field'][$owner][$element] = $row;
-            }
+        if ($kind === 'table') {
+            $labels['table'][$element] = $row;
+        } elseif ($kind === 'field') {
+            $labels['field'][$owner][$element] = $row;
         }
     }
 
@@ -825,12 +818,8 @@ function snapshot_templates(array $presentation): array
  */
 function snapshot_build_links(mysqli $db_connection): array
 {
-    $links  = [];
-    $result = @mysqli_query($db_connection, 'SELECT data_element, data_target_table FROM `model_links`');
-    if ($result === false) {
-        return $links;
-    }
-    while ($row = mysqli_fetch_assoc($result)) {
+    $links = [];
+    foreach (db_select($db_connection, 'SELECT data_element, data_target_table FROM `model_links`') as $row) {
         $links[(string) $row['data_element']] = (string) $row['data_target_table'];
     }
 
@@ -1706,15 +1695,9 @@ function model_diagnose(mysqli $db_connection): array
 
     // Сырые строки реестра (все active), без свёртки в map — чтобы
     // увидеть дубли, которые map затирает.
-    $reg_rows = [];
     $sql = 'SELECT id, data_kind, data_owner, data_element FROM `'
          . MODEL_REGISTRY_TABLE . '` WHERE active = 1';
-    $res = @mysqli_query($db_connection, $sql);
-    if ($res !== false) {
-        while ($row = mysqli_fetch_assoc($res)) {
-            $reg_rows[] = $row;
-        }
-    }
+    $reg_rows = db_select($db_connection, $sql);
 
     // Индекс адресов реестра: адрес → список id (список, а не одно —
     // чтобы поймать дубли).
