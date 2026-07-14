@@ -1406,22 +1406,18 @@ function record_children(mysqli $db_connection, array $snapshot, string $table, 
         $child = $relation['child'];
         $fk    = $relation['fk'];
 
-        $statement = mysqli_prepare(
-            $db_connection,
-            "SELECT * FROM `$child` WHERE `$fk` = ? ORDER BY `id` DESC"
-        );
-        if ($statement === false) {
-            continue;
-        }
-        mysqli_stmt_bind_param($statement, 'i', $id);
-        if (!mysqli_stmt_execute($statement)) {
-            continue;
-        }
-
+        // Отличие от версии до db_select (журнал 07-14): раньше сбой
+        // запроса пропускал блок целиком (continue). db_select при
+        // ошибке молча возвращает [] — блок появится с пустыми rows,
+        // не исчезнет. Считаю несущественным: $child/$fk берутся из
+        // УЖЕ проверенного графа связей (§16.1, компилируется на
+        // сборке снапшота), сбоя структуры здесь по построению не
+        // бывает — остаётся только сбой соединения, при котором оба
+        // исхода (пустой блок / пропавший блок) одинаково неполны.
         $blocks[] = [
             'table' => $child,
             'fk'    => $fk,
-            'rows'  => mysqli_fetch_all(mysqli_stmt_get_result($statement), MYSQLI_ASSOC),
+            'rows'  => db_select($db_connection, "SELECT * FROM `$child` WHERE `$fk` = ? ORDER BY `id` DESC", 'i', [$id]),
         ];
     }
 
@@ -1516,20 +1512,7 @@ function record_list(mysqli $db_connection, array $snapshot, string $table, int 
         return [];
     }
 
-    $statement = mysqli_prepare($db_connection, "SELECT * FROM `$table` ORDER BY `id` DESC LIMIT ?");
-    if ($statement === false) {
-        return [];
-    }
-
-    mysqli_stmt_bind_param($statement, 'i', $limit);
-
-    if (!mysqli_stmt_execute($statement)) {
-        return [];
-    }
-
-    $rows = mysqli_fetch_all(mysqli_stmt_get_result($statement), MYSQLI_ASSOC);
-
-    return $rows;
+    return db_select($db_connection, "SELECT * FROM `$table` ORDER BY `id` DESC LIMIT ?", 'i', [$limit]);
 }
 
 /**
