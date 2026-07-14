@@ -291,15 +291,20 @@ function configurator_parse_field(array $raw_field, array $known_entities, array
  * ON DUPLICATE KEY: повторная регистрация того же имени с ДРУГОЙ целью
  * обязана упасть громко (первичный ключ = data_element), а не молча
  * переписать адрес — «не переопределяется после создания» из решения.
+ *
+ * Возврат — точный результат db_execute (журнал 07-14): раньше был
+ * голый bool, вызывающий код брал mysqli_error($db_connection) при
+ * провале — после переноса на db_execute() эта ошибка уже спрятана
+ * внутри, снаружи текст был бы неточным (или вовсе не тем запросом).
  */
-function configurator_register_link(mysqli $db_connection, string $column, string $target): bool
+function configurator_register_link(mysqli $db_connection, string $column, string $target): array
 {
     return db_execute(
         $db_connection,
         'INSERT INTO `model_links` (data_element, data_target_table) VALUES (?, ?)',
         'ss',
         [$column, $target]
-    )['ok'];
+    );
 }
 
 // ============================================================================
@@ -375,10 +380,10 @@ function configurator_create_table(mysqli $db_connection, array $spec, array $ap
             mysqli_stmt_execute($stmt);
 
             if (($field['link_target'] ?? null) !== null) {
-                if (!configurator_register_link($db_connection, $field['column'], $field['link_target'])) {
+                $link = configurator_register_link($db_connection, $field['column'], $field['link_target']);
+                if (!$link['ok']) {
                     return ['ok' => false, 'errors' => [
-                        "Поле {$field['column']} создано, но адрес link_ не записан: "
-                        . mysqli_error($db_connection),
+                        "Поле {$field['column']} создано, но адрес link_ не записан: " . $link['error'],
                     ]];
                 }
             }
@@ -475,25 +480,18 @@ function configurator_adopt_field(mysqli $db_connection, string $table, string $
             return ['ok' => false, 'errors' => ["Поле $table.$field не существует или структурное."]];
         }
         // Уже зарегистрировано? (могли починить между показом и нажатием)
-        $chk = mysqli_prepare($db_connection, 'SELECT id FROM `' . MODEL_REGISTRY_TABLE
-            . "` WHERE data_kind='field' AND data_owner=? AND data_element=? AND active=1");
-        mysqli_stmt_bind_param($chk, 'ss', $table, $field);
-        mysqli_stmt_execute($chk);
-        if (mysqli_fetch_assoc(mysqli_stmt_get_result($chk))) {
+        $chk = db_select($db_connection, 'SELECT id FROM `' . MODEL_REGISTRY_TABLE
+            . "` WHERE data_kind='field' AND data_owner=? AND data_element=? AND active=1", 'ss', [$table, $field]);
+        if ($chk !== []) {
             return ['ok' => false, 'errors' => ["Поле $table.$field уже под управлением."]];
         }
 
-        $stmt = mysqli_prepare($db_connection, 'INSERT INTO `' . MODEL_REGISTRY_TABLE
-            . "` (data_kind, data_owner, data_element, active) VALUES ('field', ?, ?, 1)");
-        mysqli_stmt_bind_param($stmt, 'ss', $table, $field);
-        mysqli_stmt_execute($stmt);
-        $rid = mysqli_insert_id($db_connection);
+        $reg = db_execute($db_connection, 'INSERT INTO `' . MODEL_REGISTRY_TABLE
+            . "` (data_kind, data_owner, data_element, active) VALUES ('field', ?, ?, 1)", 'ss', [$table, $field]);
 
         // Дефолтная подпись = имя поля; осмысленную человек правит в labels.
-        $stmt = mysqli_prepare($db_connection, 'INSERT INTO `' . MODEL_LABELS_TABLE
-            . '` (dep_model_registry, data_short, data_full) VALUES (?, ?, ?)');
-        mysqli_stmt_bind_param($stmt, 'iss', $rid, $field, $field);
-        mysqli_stmt_execute($stmt);
+        db_execute($db_connection, 'INSERT INTO `' . MODEL_LABELS_TABLE
+            . '` (dep_model_registry, data_short, data_full) VALUES (?, ?, ?)', 'iss', [$reg['id'], $field, $field]);
 
         return configurator_refresh($db_connection, $application);
     } finally {
@@ -616,26 +614,22 @@ function configurator_add_field(mysqli $db_connection, string $table, array $fie
 
         $sql = 'ALTER TABLE `' . $table . '` ADD COLUMN `' . $field['column'] . '` '
              . $field['db_type'] . ' NULL';
-        if (!mysqli_query($db_connection, $sql)) {
-            return ['ok' => false, 'errors' => ['DDL: ' . mysqli_error($db_connection)]];
+        $alter = db_execute($db_connection, $sql);
+        if (!$alter['ok']) {
+            return ['ok' => false, 'errors' => ['DDL: ' . $alter['error']]];
         }
 
-        $stmt = mysqli_prepare($db_connection, 'INSERT INTO `' . MODEL_REGISTRY_TABLE
-            . "` (data_kind, data_owner, data_element, active) VALUES ('field', ?, ?, 1)");
-        mysqli_stmt_bind_param($stmt, 'ss', $table, $field['column']);
-        mysqli_stmt_execute($stmt);
-        $rid = mysqli_insert_id($db_connection);
+        $reg = db_execute($db_connection, 'INSERT INTO `' . MODEL_REGISTRY_TABLE
+            . "` (data_kind, data_owner, data_element, active) VALUES ('field', ?, ?, 1)", 'ss', [$table, $field['column']]);
 
-        $stmt = mysqli_prepare($db_connection, 'INSERT INTO `' . MODEL_LABELS_TABLE
-            . '` (dep_model_registry, data_short, data_full) VALUES (?, ?, ?)');
-        mysqli_stmt_bind_param($stmt, 'iss', $rid, $field['short'], $field['full']);
-        mysqli_stmt_execute($stmt);
+        db_execute($db_connection, 'INSERT INTO `' . MODEL_LABELS_TABLE
+            . '` (dep_model_registry, data_short, data_full) VALUES (?, ?, ?)', 'iss', [$reg['id'], $field['short'], $field['full']]);
 
         if (($field['link_target'] ?? null) !== null) {
-            if (!configurator_register_link($db_connection, $field['column'], $field['link_target'])) {
+            $link = configurator_register_link($db_connection, $field['column'], $field['link_target']);
+            if (!$link['ok']) {
                 return ['ok' => false, 'errors' => [
-                    "Поле {$field['column']} добавлено, но адрес link_ не записан: "
-                    . mysqli_error($db_connection),
+                    "Поле {$field['column']} добавлено, но адрес link_ не записан: " . $link['error'],
                 ]];
             }
         }
@@ -670,8 +664,8 @@ function configurator_drop_field(mysqli $db_connection, string $table, string $f
 
         // Проверка данных: есть ли непустые значения в колонке.
         $cnt_sql = 'SELECT COUNT(*) AS c FROM `' . $table . '` WHERE `' . $field . '` IS NOT NULL';
-        $res = @mysqli_query($db_connection, $cnt_sql);
-        $with_data = $res ? (int) (mysqli_fetch_assoc($res)['c'] ?? 0) : 0;
+        $cnt_rows = db_select($db_connection, $cnt_sql);
+        $with_data = (int) ($cnt_rows[0]['c'] ?? 0);
         if ($with_data > 0 && !$force) {
             return ['ok' => false, 'errors' => [
                 "В поле $table.$field есть данные ($with_data значений). "
@@ -679,15 +673,14 @@ function configurator_drop_field(mysqli $db_connection, string $table, string $f
             ]];
         }
 
-        if (!mysqli_query($db_connection, 'ALTER TABLE `' . $table . '` DROP COLUMN `' . $field . '`')) {
-            return ['ok' => false, 'errors' => ['DDL: ' . mysqli_error($db_connection)]];
+        $drop = db_execute($db_connection, 'ALTER TABLE `' . $table . '` DROP COLUMN `' . $field . '`');
+        if (!$drop['ok']) {
+            return ['ok' => false, 'errors' => ['DDL: ' . $drop['error']]];
         }
 
         // Снять регистрацию (подпись — каскадом FK).
-        $stmt = mysqli_prepare($db_connection, 'DELETE FROM `' . MODEL_REGISTRY_TABLE
-            . "` WHERE data_kind='field' AND data_owner=? AND data_element=?");
-        mysqli_stmt_bind_param($stmt, 'ss', $table, $field);
-        mysqli_stmt_execute($stmt);
+        db_execute($db_connection, 'DELETE FROM `' . MODEL_REGISTRY_TABLE
+            . "` WHERE data_kind='field' AND data_owner=? AND data_element=?", 'ss', [$table, $field]);
 
         return configurator_refresh($db_connection, $application);
     } finally {
@@ -1020,10 +1013,8 @@ if ($caction === 'diagnose') {
             foreach ($entity_fields as $f) {
                 $parts[] = 'COUNT(`' . $f . '`) AS `' . $f . '`';
             }
-            $res = @mysqli_query($db_connection, 'SELECT ' . implode(', ', $parts) . ' FROM `' . $table . '`');
-            if ($res !== false) {
-                $data_counts = mysqli_fetch_assoc($res) ?: [];
-            }
+            $rows = db_select($db_connection, 'SELECT ' . implode(', ', $parts) . ' FROM `' . $table . '`');
+            $data_counts = $rows[0] ?? [];
         }
 
         $tbl_esc = render_escape($table);
