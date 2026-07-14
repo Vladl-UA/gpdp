@@ -18,6 +18,7 @@ ini_set('display_errors', '1');
 error_reporting(E_ALL);
 
 require 'config.php';
+require 'db.php';
 require 'core.php';
 require 'helpers.php';
 require 'render.php';

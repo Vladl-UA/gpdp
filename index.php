@@ -21,6 +21,7 @@ error_reporting(E_ALL);
 // --- 1. boot -----------------------------------------------------------------
 
 require 'config.php';
+require 'db.php';
 require 'core.php';
 require 'helpers.php';
 require 'render.php';

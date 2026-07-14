@@ -1500,20 +1500,9 @@ function record_fetch(mysqli $db_connection, array $snapshot, string $table, int
         return null;
     }
 
-    $statement = mysqli_prepare($db_connection, "SELECT * FROM `$table` WHERE `id` = ? LIMIT 1");
-    if ($statement === false) {
-        return null;
-    }
+    $rows = db_select($db_connection, "SELECT * FROM `$table` WHERE `id` = ? LIMIT 1", 'i', [$id]);
 
-    mysqli_stmt_bind_param($statement, 'i', $id);
-
-    if (!mysqli_stmt_execute($statement)) {
-        return null;
-    }
-
-    $row = mysqli_fetch_assoc(mysqli_stmt_get_result($statement));
-
-    return is_array($row) ? $row : null;
+    return $rows[0] ?? null;
 }
 
 /**
