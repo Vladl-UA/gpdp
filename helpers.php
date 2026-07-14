@@ -72,8 +72,11 @@ function lookup_labels(mysqli $db_connection, array $dict): array
     }
 
     $labels = [];
-    $result = mysqli_query($db_connection, "SELECT * FROM `$source`");
-    while ($row = mysqli_fetch_assoc($result)) {
+    // Поведение при ошибке меняется явно: db_select() возвращает [],
+    // поэтому ошибочная выборка теперь не вызывает mysqli warning/TypeError,
+    // а даёт тот же внешний результат, что и пустой словарь.
+    $rows = db_select($db_connection, "SELECT * FROM `$source`");
+    foreach ($rows as $row) {
         $text = '';
         foreach ($dict['plan'] as $item) {
             if ($item['kind'] === 'literal') {
