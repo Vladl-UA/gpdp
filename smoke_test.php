@@ -299,6 +299,48 @@ check('record_reparent на неизвестной таблице → честн
 // дереве (Влад подтверждает кликом). Пункт 5 остаётся «код написан
 // и частично проверен», не «выполнено целиком» до одного из двух.
 
+echo "\n=== 1е. Формулы calc_ (STATE.md «Позже», решение 2026-07-14) ===\n";
+// Чистые функции — синтетика без БД, тот же приём, что 1д для
+// record_parent_relation.
+check('formula_parse: два поля с минусом — корректный план',
+    formula_parse('{dec_volume_plan} - {dec_volume_fact}') === [
+        ['type' => 'field', 'name' => 'dec_volume_plan'],
+        ['type' => 'op', 'value' => '-'],
+        ['type' => 'field', 'name' => 'dec_volume_fact'],
+    ]);
+check('formula_parse: одно поле без оператора — тоже корректный план',
+    formula_parse('{dec_volume_plan}') === [['type' => 'field', 'name' => 'dec_volume_plan']]);
+check('formula_parse: незакрытая скобка — null, не тихий обрыв',
+    formula_parse('{dec_volume_plan - {dec_volume_fact}') === null);
+check('formula_parse: висящий оператор в конце — null',
+    formula_parse('{dec_volume_plan} -') === null);
+check('formula_parse: пустая строка — null',
+    formula_parse('') === null);
+
+$plan = formula_parse('{dec_volume_plan} - {dec_volume_fact}');
+check('formula_eval: корректный расчёт (план 15 минус факт 12 = 3)',
+    formula_eval($plan, ['dec_volume_plan' => '15.00', 'dec_volume_fact' => '12.00']) === 3.0);
+check('formula_eval: пустая переменная в строке → null, не 0 и не фатал',
+    formula_eval($plan, ['dec_volume_plan' => '15.00', 'dec_volume_fact' => null]) === null);
+
+$div_plan = formula_parse('{a} / {b}');
+check('formula_eval: деление на ноль → null, не фатал',
+    formula_eval($div_plan, ['a' => '10', 'b' => '0']) === null);
+
+// Живая проверка: сборка снапшота НЕ падает при отсутствующей таблице
+// model_formulas (её ещё не завёл Влад — SQL передан отдельно, не
+// DDL смоука). db_select возвращает [] на ошибку запроса (db.php) —
+// snapshot_build_formulas() деградирует до пустой карты, тем же
+// способом, что snapshot_build_links() при отсутствующей model_links.
+check('snapshot несёт model.formulas (даже пустой, до появления таблицы)',
+    isset($snapshot['model']['formulas']) && is_array($snapshot['model']['formulas']));
+
+// НЕ ПРОВЕРЕНО ЭТИМ СМОУКОМ: живой JOIN model_formulas/model_registry
+// и whitelist-отказ на переменной вне владеющей таблицы — оба требуют
+// реальной строки в model_formulas, которой ещё нет. Живая проверка —
+// после того как Влад применит SQL и добавит первую формулу
+// (calc_volume_deviation, cementing_interval).
+
 echo "\n=== 2. Пространство имён ===\n";
 check('в системе не осталось функций gpdp_*',
     array_filter(get_defined_functions()['user'],

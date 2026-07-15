@@ -197,6 +197,100 @@ function field_parse(string $field_name): array
     return $parsed;
 }
 
+/**
+ * Разбор формулы `calc_` в план вычисления — НЕ `template_parse` (§15.8,
+ * решение 07-14 по итогам прохода `calc_volume_deviation`): токенайзер
+ * похож (тот же синтаксис `{поле}`), но результат — не строка, а
+ * арифметика, и первая версия сознательно ПРОЩЕ `template_parse` тоже:
+ * строго слева направо, БЕЗ приоритета операторов и БЕЗ скобок — ровно
+ * то, что покрывает «план минус факт». Приоритет/скобки — когда придёт
+ * формула, которой они реально нужны, не заранее.
+ *
+ * null — синтаксис нарушен (не строгое чередование `{поле}`/оператор).
+ */
+function formula_parse(string $formula): ?array
+{
+    $formula = trim($formula);
+    if ($formula === '') {
+        return null;
+    }
+
+    $pattern = '/^\{([a-z0-9_]+)\}(?:\s*[+\-*\/]\s*\{[a-z0-9_]+\})*$/i';
+    if (!preg_match($pattern, $formula)) {
+        return null;
+    }
+
+    preg_match_all('/\{([a-z0-9_]+)\}|([+\-*\/])/i', $formula, $matches, PREG_SET_ORDER);
+
+    $plan = [];
+    foreach ($matches as $match) {
+        $plan[] = $match[1] !== ''
+            ? ['type' => 'field', 'name' => $match[1]]
+            : ['type' => 'op', 'value' => $match[2]];
+    }
+
+    return $plan;
+}
+
+/**
+ * Формулы `calc_` (STATE.md «Позже», согласовано 2026-07-14): читает
+ * `model_formulas` JOIN `model_registry` (владеющая таблица/поле — по
+ * `dep_model_registry`), раскладывает по ТАБЛИЦЕ, не глобально по имени
+ * поля, как словари (§15 п.2 — одна и та же формула на разных таблицах
+ * имеет разные операнды, глобальный адрес по имени здесь не годится).
+ *
+ * Whitelist переменных — поля СВОЕЙ ЖЕ владеющей таблицы (§15 п.2/8:
+ * первый шаг — не родительская цепочка); ссылка вовне или на
+ * несуществующее поле — fail-fast с именем формулы, тот же принцип,
+ * что у `dep_` в никуда и цикла словарных шаблонов (§16).
+ */
+function snapshot_build_formulas(mysqli $db_connection, array $structure): array
+{
+    $map        = [];
+    $unresolved = [];
+
+    $rows = db_select($db_connection, '
+        SELECT f.data_formula, r.data_owner, r.data_element
+        FROM `model_formulas` f
+        JOIN `model_registry` r ON r.id = f.dep_model_registry
+    ');
+
+    foreach ($rows as $row) {
+        $table   = (string) $row['data_owner'];
+        $field   = (string) $row['data_element'];
+        $formula = (string) $row['data_formula'];
+
+        $plan = formula_parse($formula);
+        if ($plan === null) {
+            $unresolved[] = "$table.$field: синтаксис формулы «$formula»";
+            continue;
+        }
+
+        $table_fields = $structure['tables'][$table]['fields'] ?? null;
+        if ($table_fields === null) {
+            $unresolved[] = "$table.$field: таблица '$table' не существует";
+            continue;
+        }
+
+        $bad_token = null;
+        foreach ($plan as $step) {
+            if ($step['type'] === 'field'
+                && ($table_fields[$step['name']]['kind'] ?? '') !== 'entity_field') {
+                $bad_token = $step['name'];
+                break;
+            }
+        }
+        if ($bad_token !== null) {
+            $unresolved[] = "$table.$field: переменная '$bad_token' — не поле таблицы '$table'";
+            continue;
+        }
+
+        $map[$table][$field] = ['formula' => $formula, 'plan' => $plan];
+    }
+
+    return ['map' => $map, 'unresolved' => $unresolved];
+}
+
 /** Совместимая обёртка: только идентификатор сущности/структурного элемента. */
 function field_prefix(string $field_name): ?string
 {
@@ -244,6 +338,10 @@ function field_data(
             // сборки подписи. Хендлер самодостаточен, карта целиком
             // ему не нужна.
             'dict'   => $snapshot['model']['dictionaries'][$field_name] ?? null,
+            // Скомпилированная формула calc_ (§15, решение 07-14):
+            // по ТАБЛИЦЕ, не по имени поля глобально — см. docblock
+            // snapshot_build_formulas(). null — формула не задана.
+            'formula' => $snapshot['model']['formulas'][$table][$field_name] ?? null,
             'schema' => [
                 'db_type'  => $field_schema['db_type'],
                 'nullable' => $field_schema['nullable'],
@@ -300,6 +398,11 @@ function snapshot_validate(array $snapshot): bool
     // пересборка на bootstrap. snapshot_validate растёт вместе
     // с форматом (урок журнала 07-08 про ископаемый снапшот).
     if (!isset($snapshot['model']['relations']) || !is_array($snapshot['model']['relations'])) {
+        return false;
+    }
+    // Файл до-формульной эпохи (нет model.formulas, 07-14) — иначе
+    // calc_-поля получили бы formula=null молча вместо пересборки.
+    if (!isset($snapshot['model']['formulas']) || !is_array($snapshot['model']['formulas'])) {
         return false;
     }
 
@@ -879,6 +982,18 @@ function snapshot_build(mysqli $db_connection, array $application = []): ?array
         return null;
     }
 
+    // Формулы calc_ — та же граница сборки, что словари и связи:
+    // fail-fast на синтаксис/переменную вне своей таблицы, рантайм
+    // читает готовый план (§15, решение 07-14).
+    $formulas = snapshot_build_formulas($db_connection, ['tables' => $structure['tables']]);
+    if ($formulas['unresolved'] !== []) {
+        snapshot_last_error(
+            'Формулы не разрешены: ' . implode('; ', $formulas['unresolved'])
+            . '. Конфигуратор не должен был позволить такое состояние.'
+        );
+        return null;
+    }
+
     return [
         'generated_at' => date('Y-m-d H:i:s'),
         'structure'    => ['tables' => $structure['tables']],
@@ -887,6 +1002,7 @@ function snapshot_build(mysqli $db_connection, array $application = []): ?array
             'dictionaries'   => $dictionaries['map'],
             'relations'      => $relations['map'],
             'relations_root' => $relations['root'],
+            'formulas'       => $formulas['map'],
         ],
         'presentation' => $presentation,
         'application'  => $application,
@@ -1131,8 +1247,19 @@ function snapshot_refresh_model(mysqli $db_connection): bool
         return false;
     }
 
+    // Формулы — та же категория (model-слой, зависит от structural,
+    // не от presentation) — пересобираются тем же refresh'ом, что
+    // реестр/словари, тем же fail-safe (§15, решение 07-14).
+    $formulas = snapshot_build_formulas($db_connection, $snapshot['structure']);
+    if ($formulas['unresolved'] !== []) {
+        snapshot_last_error('Refresh отклонён, формулы не разрешены: '
+            . implode('; ', $formulas['unresolved']));
+        return false;
+    }
+
     $snapshot['model']['registry']     = $registry['map'];
     $snapshot['model']['dictionaries'] = $dictionaries['map'];
+    $snapshot['model']['formulas']     = $formulas['map'];
     $snapshot['presentation']          = $presentation;
     $snapshot['registry_orphans']      = $registry['orphans'];
     $snapshot['generated_at']          = date('Y-m-d H:i:s');
