@@ -183,7 +183,7 @@ function bulk_import_insert(
         foreach ($child_records as $i => $child_record) {
             bulk_import_insert(
                 $db_connection, $snapshot, $child_table, $child_record,
-                (int) $result['id'], $stats, "$path.$child_table[$i]"
+                (int) $result['id'], $stats, "$path." . $child_table . "[$i]"
             );
         }
     }
