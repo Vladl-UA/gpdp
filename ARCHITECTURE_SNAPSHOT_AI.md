@@ -1,200 +1,266 @@
 # ARCHITECTURE_SNAPSHOT_AI.md
 
-generated_at_commit: 5ef443b
-sections_verified: §1, §2, §3, §4.1-4.13, §6, §7, §8, §11, Open risks
-status: content verified against current main; exact per-range blame remains partial
-source_scope: PHP architecture files; freshness must be checked by file history, not this self-reported field
+source_main_commit: 3d1af2c
+rebuild_type: full
+status: verified against current main code and current operational documents
+freshness_rule: compare source-file history after this baseline; do not trust self-reported dates alone
 
-## 1. Purpose
+## 1. Purpose and kernel criterion
 
-GPDP is a model-driven runtime. A client application is a DB model plus metadata; generic code compiles that model into a snapshot and executes the same record/field operations for any domain.
+GPDP is a model-driven runtime. A client application is a database model plus model metadata; generic code compiles those facts into a trusted snapshot and performs the same field, record, view and import operations for unrelated domains.
 
-Kernel criterion: code belongs to the kernel only if it can serve an unrelated client model without being edited.
+A mechanism belongs to the kernel only when another client model can use it without editing the mechanism. Domain names and one-off business procedures do not belong in `core.php`, entity handlers, renderer or DB executor.
 
-## 2. Execution formula
+## 2. Runtime formula
 
-`request → boundary validation → prepared task → record/view builder → field_data → field_exec → entity handler → structured result → renderer or record_save`
+`request or trusted adapter input → boundary validation → trusted task/package → generic record/view operation → field_data → field_exec → entity handler → structured result → renderer or record_save/db_execute`
 
-Entity modes: `new | edit | read | validate`. Entities never own a `save` mode; `record_save()` performs physical writes after validation.
+Entity modes are exactly `new | edit | read | validate`. Physical writes are not an entity mode. `record_save()`, `record_delete()` and `record_reparent()` are generic record operations with honest result contracts.
 
-## 3. Layers
+## 3. Layers and files
 
-- `config.php` → environment and paths. loc `config.php:13-54`, commit `ddcdebe`, status ✓.
-- `index.php` → runtime orchestration; request must stop here as raw input. current blob `d40a1e3`, status ✓ for current file content.
-- `core.php` → entity registry, field boundary, snapshot compiler, generic record/view pipeline. current blob `c0063ab`, status ⚠ for exact per-function blame.
-- `entities.php` → `ent_<id>` passports and handlers. current blob `39719cd`, status ✓ for current file content.
-- `helpers.php` → entity helpers; kernel must not depend on it directly. `lookup_labels()` now executes through `db_select`; commit `afa0cab`, status ✓.
-- `db.php` → low-level SQL executor only: `db_select`, `db_execute`. loc `db.php:43-105`, commit `40e40a0`, status ✓.
-- `render.php` → layout of structured views; no DB/model compilation.
-- `configurator.php` → separate admin/DDL/repair perimeter. current blob `c77978c`, status ⚠ for exact per-function blame.
-- `labels.php` → presentation/model metadata editor; registry reads and label UPSERT execute through `db_select/db_execute`; commit `2c15076`, status ✓.
+### Environment and low-level execution
 
-Allowed direction: `index → core → entities → helpers`; SQL execution goes through `db.php`; view results go to `render.php`. Admin entry files remain separate until real role/permission filtering replaces file-level access separation.
+- `config.php` — environment, DB credentials, paths, snapshot mode and temporary application settings.
+- `db.php` — mechanical SQL execution only: `db_select()` and `db_execute()`.
+- Connection open/charset/close remains outside the wrappers by design.
+- Live schema introspection retains direct `mysqli` because `SHOW TABLES/SHOW COLUMNS` has a different result shape and is restricted to compiler/admin paths.
 
-## 4. Nodes
+### Runtime and model compiler
 
-### 4.1 Configuration
+- `index.php` — HTTP conductor: boot, request boundary, operation routing, PRG and renderer handoff.
+- `core.php` — entity registry, naming parser, trusted field package, snapshot compiler, generic CRUD, relation/reparent operations and render-neutral views.
+- `entities.php` — zero-argument `ent_<id>()` passports and handlers.
+- `helpers.php` — reusable entity helpers, currently dictionary label execution and reverse label lookup.
 
-`config()` loc `config.php:13-54`, commit `ddcdebe`, status ✓.
+### Presentation and administration
 
-Owns DB credentials, entity/snapshot paths, snapshot mode, temporary application parameters. It is environment, not client model.
+- `render.php` — the only PHP layer that creates HTML. It receives structured results and compiled snapshot views; it does not query the DB or infer model facts.
+- `style.css` — shared static admin stylesheet. `render_admin_styles()` now returns only a `<link>`.
+- `configurator.php` — separate DDL/model-repair perimeter.
+- `labels.php` — labels/templates and dictionary-row administration.
 
-### 4.2 Runtime conductor
+### Data-loading adapter
 
-`index.php`, current blob `d40a1e3`, status ✓.
+- `tools_bulk_import.php` — CLI adapter for hierarchical JSON import. It is not a second kernel and does not bypass the runtime contracts.
+- `BULK_IMPORT_FORMAT.md` — authoritative input-format description for humans and AI preparing import files.
 
-Owns boot, DB connection, snapshot init, request validation, prepared task construction, generic operation selection, PRG and renderer handoff. Must contain no entity behavior, DDL or domain SQL.
+Allowed core direction remains: `entrypoint/adapter → core → entities → helpers`; SQL execution passes through `db.php`; structured views pass to `render.php`.
 
-### 4.3 Entity registry
+## 4. Naming-driven model
 
-`entity_registry_load`, `entities`, `field_exec`; loc/calls in `FUNCTION_PASSPORTS_AI.md`; exact per-function blame remains ⚠.
+Domain entity fields use `<entity>_<local_name>`. Structural fields are kernel facts rather than entities: `id`, `dep_*`, `rel_main`, `active`.
 
-Passport invariants: zero-arg `ent_<id>()`; passport id equals suffix; handler names come only from trusted passport; handler returns data, not HTML; handler never writes domain rows.
+`field_parse()` classifies names using the entity registry and structural rules. Unknown fields stop snapshot compilation. Runtime code does not rediscover behavior from DB types after the entity passport has supplied it.
 
-Current entities: `data voc link ltext footnote date year time int dec bul calc`. `calc` is quarantine, not precedent.
+## 5. Entity registry and field package
 
-### 4.4 Field naming and structural fields
+`entity_registry_load()` discovers trusted zero-argument `ent_<id>()` passports. The callable handler name comes only from this registry, never from request or model data.
 
-`field_parse`, `field_data`, `field_exec`; exact per-function blame remains ⚠.
+Current entities:
 
-Domain field: `<entity>_<local_name>`. Structural fields: `id`, `dep_*`, `rel_main`, `active`; they are kernel structure, not entities. Unknown fields fail snapshot compilation.
+`data, voc, link, ltext, footnote, date, year, time, int, bul, dec, calc`
 
-### 4.5 Trusted field package
+`field_data()` is the main trust-boundary product. It carries:
 
-`field_data()` is the boundary product. It carries trusted table/field identity, entity, labels, schema, compiled dictionary entry, value, optional row and DB handle. Handlers do not rediscover model facts.
+- confirmed table and field identity;
+- entity id and local name;
+- compiled labels and schema facts;
+- compiled dictionary entry when applicable;
+- compiled table-scoped formula when applicable;
+- current value and optional complete row;
+- DB handle for trusted helper calls.
 
-Contract changes here require reading all handlers using the changed key and all snapshot builders producing it.
+Handlers consume this package and return structured data. They do not query model tables, derive source addresses, emit HTML or write domain rows.
 
-### 4.6 Snapshot compiler
+## 6. Snapshot format and compiler
 
-`snapshot_*`; exact per-function blame remains ⚠.
+Required snapshot sections now include:
 
-Runtime snapshot sections: `structure`, `model.registry`, `model.dictionaries`, `model.relations`, `model.relations_root`, `presentation`, `application`.
+- `structure.tables`;
+- `model.registry`;
+- `model.dictionaries`;
+- `model.relations`;
+- `model.relations_root`;
+- `model.formulas`;
+- `presentation`;
+- `application`;
+- diagnostic `registry_orphans`.
 
-Live schema introspection is allowed only during bootstrap, explicit rebuild and admin operations. Cached runtime reads compiled state.
+`snapshot_validate()` intentionally invalidates pre-formula snapshots that lack `model.formulas`, forcing a rebuild rather than silently giving calc_ fields no plan.
 
-### 4.7 Dictionaries and explicit links
+There is one full build path: `snapshot_build()`. Cached and live modes differ only in storage, not in compilation semantics.
 
-`snapshot_build_dictionaries`, `snapshot_build_links`, `lookup_labels`; execution path verified through `db_select`.
+- cached: load validated PHP snapshot; bootstrap rebuild under lock when absent/invalid;
+- live: execute the same `snapshot_build()` on each request without reading/writing the cache file.
 
-`voc_` resolves source by convention; `link_` reads explicit target from `model_links`. Both compile to one label-plan format and execute through `lookup_labels()`.
+Structural introspection is permitted only during bootstrap, explicit rebuild and admin operations. Presentation/model refreshes reuse trusted structural state and are fail-safe: a rejected refresh leaves the old snapshot intact.
 
-Difference between `voc` and `link` is address resolution, not rendering/validation.
+## 7. Dictionaries, labels and explicit links
 
-### 4.8 Structural relation graph
+`snapshot_build_dictionaries()` compiles one execution format for:
 
-`snapshot_build_relations`, `record_children`, `record_tree`; exact per-function blame remains ⚠.
+- conventional `voc_` sources;
+- simple `data_name` labels;
+- composite table-label templates;
+- explicit `link_` targets from `model_links`.
 
-`dep_<parent>` compiles direct ownership edges. `rel_main` records root dossier membership separately. Runtime traversal reads compiled graph; no table scan per node.
+The difference between `voc_` and `link_` is address resolution, not rendering or validation. Both execute through `lookup_labels()`.
 
-### 4.9 Generic write
+`lookup_labels()` performs one flat source SELECT and constructs labels in PHP from compiled literal/field/dict steps. Nested dictionary plans are embedded during compilation, and request-local caching prevents repeated SELECTs.
 
-`record_save`, `record_delete`; execution through `db_execute`; exact loc/blame remains ⚠.
+`lookup_id_by_label()` is the exact reverse map used by bulk import. It returns an honest result and rejects absent or ambiguous labels; it never picks the first duplicate silently.
 
-Whitelist comes from snapshot. Each submitted entity field runs `validate`; normalized values feed one generic INSERT/UPDATE through `db_execute`. Structural INSERT values use a separate trusted channel. Update reparenting is not ordinary field input.
+## 8. Formula subsystem
 
-### 4.10 Generic reads and views
+The quarantined hard-coded calc spike has been replaced by production metadata-driven formulas.
 
-`record_fetch`, `record_list`, `record_children`, `record_tree`, `record_label`, `record_table_view`, `record_form_view`.
+- `formula_parse()` accepts a deliberately small grammar: `{field} operator {field}`, evaluated strictly left-to-right, with no precedence or parentheses.
+- `snapshot_build_formulas()` reads `model_formulas JOIN model_registry`, scopes every plan by owning table, and whitelists variables against entity fields of that table.
+- syntax errors, missing tables and foreign/non-entity operands produce compiler `unresolved` diagnostics and reject build/refresh.
+- `field_data()` injects `model.formulas[table][field]` into the calc_ package.
+- `formula_eval()` evaluates the compiled plan over the current row; missing operands and division by zero yield `null`, not a fatal error.
+- `calc_handler()` remains non-editable in new/edit and computes only during read.
 
-Reads are semantic generic operations, not domain queries. `db.php` only executes their SQL; it does not define selection semantics.
+Formula syntax and label-template syntax are separate semantic consumers. `formula_parse()` is not `template_parse()` and is not a general expression engine.
 
-### 4.11 View boundary
+## 9. Relation graph and object tree
 
-View builders produce render-neutral arrays. Renderer lays them out. Renderer must not read DB, resolve dictionaries, parse fields or build relation trees.
+`dep_<parent>` is the immediate ownership edge. `rel_main` is broader root-dossier membership. `snapshot_build_relations()` compiles both without runtime table scanning.
 
-### 4.12 Admin/DDL perimeter
+`record_children()` reads direct children from the compiled graph. `record_tree()` recursively builds the complete render-neutral object tree without an arbitrary depth cap. `render_object_tree()` only lays out that prepared tree.
 
-`configurator_*`; current blob `c77978c`, exact loc/blame remains ⚠.
+## 10. Reparent as a separate protected operation
 
-Admin request is validated before DDL. Operations mutate schema plus model metadata, then rebuild snapshot under schema lock. MySQL DDL is not transactionally atomic with metadata; partial-state repair remains a design risk.
+Changing a parent is not ordinary edit input and is not a hidden channel inside `record_save()`.
 
-### 4.13 DB execution layer
+- `record_parent_relation()` resolves the unique dep_ relation from the table’s own structural fields.
+- `record_reparent()` validates the record and proposed parent, then updates exactly one resolved dep_ column.
+- `record_parent_candidates()` builds id→label options for the parent table.
+- `record_reparent_view()` prepares the form view.
+- `render_reparent_form()` lays it out.
+- `record_tree()` includes `reparentable`; `render_object_tree()` shows ⇄ only when true.
 
-`db_select` loc `db.php:43-69`; `db_execute` loc `db.php:77-105`; commit `40e40a0`, status ✓.
+The FK column name never comes from request. Server smoke verification for this contour is green.
 
-Migration is complete for production runtime/admin query paths in `core.php`, `configurator.php`, `helpers.php` and `labels.php`. Direct `mysqli_*` remains only for intentionally out-of-scope connection management (`mysqli_connect`, `mysqli_set_charset`, `mysqli_close`) and the explicitly retained schema-introspection case.
+## 11. Generic writes and views
 
-This is a mechanical `mysqli` wrapper, not SQL builder, query-plan compiler or dialect adapter. SQL text remains in calling code. Future `record_select($plan)` is a separate semantic layer.
+`record_save()`:
 
-Failure contract: `db_select()` maps both query failure and no rows to `[]`; callers whose prior failure behavior differed must document that difference locally. `db_execute()` returns `ok`, `affected_rows`, `id`, `error`.
+1. confirms table and fields against snapshot;
+2. sends each entity field through `validate`;
+3. collects normalized values;
+4. accepts structural values only through a separate trusted INSERT channel;
+5. performs one generic INSERT/UPDATE through `db_execute()`;
+6. returns the canonical result shape.
 
-## 6. Change impact map
+`record_delete()` and `record_reparent()` use the same honest result family.
 
-- Handler logic → passport + handler + used field-package keys + matching renderer widget.
-- Handler result shape → all producers of that type + view builders + renderer.
-- Field package → `field_data`, consuming handlers, producing snapshot entries.
-- Dictionary/link → `ent_voc`, `ent_link`, `voc_handler`, dictionary/link builders, `lookup_labels`, configurator target UI.
-- Relations → structural parser, relation compiler, child/tree readers, parent binding, dependent-table creation.
-- Write pipeline → `record_save`, validation handlers, index save branch, `db_execute` contract.
-- Snapshot format → validate/build/save/load/init + all consumers of changed section.
-- DDL → configurator validators, operation, registry/labels/link writes, lock/rebuild and compensation path.
-- DB wrapper → `db.php` contract + every caller whose error path distinguishes failure from empty result.
+View builders (`record_table_view`, `record_form_view`, `record_reparent_view`, record-tree node views, schema views) return arrays, not HTML. Renderer functions only arrange those arrays.
 
-## 7. Forbidden dependencies
+## 12. Bulk import architecture
 
-- raw request → handler
-- request value → callable name
-- unverified request identifier → SQL
-- entity → HTML
-- entity → domain INSERT/UPDATE/DELETE
-- renderer → DB or snapshot compiler
-- helper → request/index
-- normal runtime → DDL
-- core → domain table/field names
-- model data → executable SQL text
-- `db.php` → model semantics
-- new production query path → direct `mysqli_query/prepare/stmt_*` instead of `db_select/db_execute`
+The import format is hierarchical JSON:
 
-## 8. Regression signals
+`{"table": [{entity fields..., "child_table": [{...}]}]}`
 
-1. Adding one client field/type requires kernel edit without a new generic entity contract.
-2. SQL contains a concrete client table name as a new special case.
-3. A table gets its own form instead of a generic view builder.
-4. A second dictionary executor appears beside `lookup_labels`.
-5. Behavior is inferred again from DB type when entity already owns it.
-6. Raw request crosses preparation boundary.
-7. Same invariant is rechecked on several layers without a boundary reason.
-8. A second snapshot build path appears.
-9. A domain SELECT is added before classifying a reusable selection form.
-10. Renderer learns DB/model structure.
-11. `db.php` starts building SQL or interpreting model plans.
-12. A production caller reintroduces direct query-execution `mysqli_*` calls.
+Human labels, not internal ids, are used for `voc_`/`link_` values.
 
-## 11. Minimum context by task
+Pipeline:
 
-### Scalar entity
-Read: this snapshot §4.3-4.5; nearest handler/passport; renderer widget; configurator field parser; entity smoke tests.
+1. CLI boots the same config, DB connection and `snapshot_init()`.
+2. `bulk_import_split_record()` classifies entity fields, nested child tables and unknown keys from snapshot structure.
+3. `bulk_import_resolve_fields()` converts dictionary labels through `lookup_id_by_label()`.
+4. `bulk_import_dep_field()` resolves the child’s structural parent field.
+5. `bulk_import_insert()` calls the same `record_save()` as the web runtime and recursively inserts children using the returned parent id.
 
-### New relation
-Read: §4.4, §4.6-4.10; relation compiler; one relation executor; configurator; view builder.
+A branch stops when its parent or fields fail; children are never inserted “into nowhere”. `--dry-run` executes the real path inside a transaction and rolls back. InnoDB auto-increment gaps after rollback are explicitly documented.
 
-### Form bug
-Read: index action branch; `record_form_view`; affected handler; widget renderer.
+Bulk import is an adapter over the kernel, not a competing write implementation.
 
-### Write bug
-Read: index save branch; `record_save`; affected validate handler; `db_execute`; result/error path.
+## 13. Admin/DDL perimeter
 
-### Dictionary/link bug
-Read: link/dictionary builders; `field_data`; `voc_handler`; `lookup_labels`; configurator target registration.
+Configurator operations validate before DDL, write model metadata, and rebuild the snapshot under structural lock. Drift diagnosis exposes explicit human repair choices rather than guessing.
 
-### Object-tree bug
-Read: relation compiler; `record_children`; `record_tree`; `render_object_tree`.
+MySQL DDL and metadata writes are not transactionally atomic together. Compensation/operation journaling remains an open engineering risk.
 
-### Configurator change
-Read: exact configurator passport; validator/parser; one DDL operation; metadata writes; snapshot rebuild/lock.
+## 14. DB abstraction boundary
 
-### DB-call migration or audit
-Read: `db.php`; target caller; its previous failure behavior; HANDOFF constraints. Do not redesign SQL or selection semantics.
+The project-wide migration to `db_select/db_execute` is complete for production runtime/admin query paths. Direct query-execution `mysqli_*` must not reappear outside the declared connection and schema-introspection exceptions.
 
-## Open risks
+`db.php` is not:
 
-- complete exact blame/range refresh for `core.php` and `configurator.php` passports;
-- semantic query-plan layer (`record_select`) without storing SQL in model;
+- a SQL builder;
+- a dialect abstraction;
+- a semantic query planner;
+- a place for model rules.
+
+Future reusable selection plans (`record_select` or equivalent) are a separate semantic layer and must be justified by real filter/relation/projection/aggregate/report cases.
+
+## 15. Change-impact map
+
+- entity contract → passport, handler, field-package keys, renderer widget and configurator parser;
+- field package → `field_data`, all consuming handlers and snapshot producer;
+- snapshot format → validate/build/save/load/init/refresh plus all consumers;
+- dictionary/link → compilers, `field_data`, `voc_handler`, `lookup_labels`, reverse lookup and configurator target UI;
+- formula → model_formulas schema, formula compiler/evaluator, calc handler, refresh paths and tests;
+- relation/reparent → structural parser, relation compiler, record operations, index branches and renderer;
+- write pipeline → record operations, validate handlers, adapters and `db_execute` contract;
+- bulk-import format → `BULK_IMPORT_FORMAT.md`, importer split/resolve/insert logic and dictionary-label uniqueness assumptions;
+- renderer result shape → all producers and all consumers of that result type;
+- CSS shell → `style.css` plus `render_admin_styles()` link contract.
+
+## 16. Forbidden dependencies
+
+- raw request or unvalidated JSON → handler/callable/SQL identifier;
+- model data → executable SQL text;
+- entity → HTML or domain write;
+- renderer → DB, handler dispatch or model compilation;
+- helper → request/index;
+- normal runtime → DDL;
+- core → concrete client table/field special case;
+- importer → direct domain INSERT bypassing `record_save()`;
+- DB executor → model semantics;
+- formula/template plan → arbitrary PHP or SQL execution;
+- ordinary edit → hidden reparenting;
+- production query path → direct mysqli query/prepare APIs outside declared exceptions.
+
+## 17. Regression signals
+
+1. A second snapshot compiler path appears.
+2. A second dictionary executor or reverse resolver appears.
+3. Bulk import validates or writes differently from `record_save()`.
+4. Renderer starts reading DB/model internals.
+5. A calc_ handler receives hard-coded field names again.
+6. Formula scope becomes global by field name instead of table+field.
+7. Reparent accepts an FK column from request.
+8. A domain-specific form/list appears beside generic view builders.
+9. `db.php` starts constructing SQL or interpreting plans.
+10. New direct query-execution mysqli calls appear.
+11. A malformed snapshot section silently degrades instead of invalidating/rejecting refresh.
+12. Human dictionary labels are resolved by fuzzy/first-match behavior.
+
+## 18. Minimum context by task
+
+- scalar entity: entity passport/handler, `field_data`, renderer widget, configurator parser, smoke tests;
+- dictionary/link: dictionary/link compiler, `field_data`, `voc_handler`, lookup helpers, target registration;
+- formula: `formula_parse`, `snapshot_build_formulas`, `field_data`, `formula_eval`, `calc_handler`, model refresh and tests;
+- object tree/reparent: relation compiler, parent resolver, tree builders, index operation branch and render functions;
+- bulk import: `BULK_IMPORT_FORMAT.md`, importer functions, lookup reverse resolver, `record_save`, transaction behavior;
+- form/list bug: index branch, matching view builder, handler and renderer;
+- write bug: record operation, validate handler, `db_execute`, PRG/error path;
+- configurator change: validator/parser, exact DDL operation, metadata writes, lock/rebuild and repair path;
+- DB-call audit: `db.php`, caller failure contract and declared exceptions.
+
+## 19. Open risks and deferred work
+
+- semantic query-plan/report layer based on demonstrated reusable forms;
 - MySQL DDL compensation/operation journal;
-- `model_links` cleanup on field/table deletion;
-- admin authorization and eventual replacement of file-level access separation with role/context filtering;
-- local degradation instead of whole-model 503;
-- stable full-address identity versus global field-name identity;
+- `model_links` and formula metadata cleanup on field/table deletion;
+- authorization replacing file-level admin separation;
+- local degradation for isolated model faults instead of whole-model unavailability;
+- stable full-address identity where global field-name identity is insufficient;
 - explicit snapshot format version;
-- m2m with relation payload; formulas/templates; report plans; multi-root model.
+- m2m with payload, report plans and multi-root models;
+- dictionary-label uniqueness or an explicit import disambiguation mechanism;
+- bulk importer completion beyond current steps, including broader live validation and operational UX.
