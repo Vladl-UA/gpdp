@@ -1,0 +1,41 @@
+/* GPDP / RNA — общий вид admin-интерфейсов (index.php, configurator.php,
+   labels.php). Один файл, не три копии в разных местах — правка стиля
+   не требует правки PHP. Раньше жил heredoc'ом внутри render_admin_styles()
+   (render.php); перенесён без изменения правил, только форма.
+   sync: 2026-07-14, оформление п.1 (CSS) */
+
+body{font-family:sans-serif;margin:2em;color:#222;text-align:left}
+table{border-collapse:collapse;width:100%;margin-bottom:1em}
+td,th{border:1px solid #ccc;padding:6px 10px;text-align:left}
+td:first-child a{display:block;margin:-6px -10px;padding:6px 10px;color:inherit;text-decoration:none}
+td:first-child a:hover{background:#eef}
+ul{padding-left:20px}
+li{margin-bottom:4px}
+.badge{display:inline-block;background:#eef;color:#225;border-radius:3px;padding:1px 6px;font-size:.8em;margin-left:6px}
+.flash{padding:8px 12px;margin-bottom:1em;border-radius:4px}
+.flash-ok{background:#e6f6e6}
+.flash-err{background:#f8e2e2}
+fieldset{margin-bottom:.5em}
+.field-row{display:flex;gap:8px;align-items:center;margin-bottom:6px}
+.field-row select, .field-row input{padding:4px}
+.home-link{display:inline-block;margin-bottom:1em}
+.act{display:inline-block;min-width:1.6em;text-align:center;text-decoration:none;
+     border:1px solid #ccc;border-radius:3px;padding:1px 6px;margin-left:4px;color:#225}
+.act:hover{background:#eef}
+.act-danger{color:#a22}
+.act-danger:hover{background:#fee}
+.data-list th{background:#f6f6f4;font-weight:500}
+.data-list td:first-child a{font-weight:500}
+.schema-fields{width:auto;margin:4px 0 0 20px}
+.schema-fields td{border:none;padding:1px 24px 1px 0;color:#444}
+.schema-card{width:70%;max-width:calc(100% - 24px);margin-bottom:12px;
+             border:1px solid #e2e2e0;border-radius:4px;overflow:hidden}
+.schema-family{width:70%;max-width:calc(100% - 24px);margin-bottom:16px;
+               border:1px solid #d8d8d5;border-radius:4px;overflow:hidden;padding-bottom:4px}
+.schema-card-bare{width:auto;max-width:none;margin-bottom:0;border:none;border-radius:0}
+.schema-card-bare .schema-head{border-radius:0}
+.schema-head{display:flex;align-items:center;justify-content:space-between;
+             gap:8px;background:#f6f6f4;padding:6px 10px;border-bottom:1px solid #eee}
+.schema-title{min-width:0}
+.schema-acts{flex-shrink:0;white-space:nowrap}
+.schema-fields{margin:6px 0 8px 20px}
