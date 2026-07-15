@@ -214,9 +214,20 @@ function configurator_validate_spec(array $input, array $live_structure): array
  * field при ok: ['column','entity','db_type','short','full'].
  * 'id' — синтетический структурный выбор: ok=true, field=null (в реестр
  * не пишется).
+ *
+ * $table_fields — уже существующие entity-поля таблицы-владельца (для
+ * calc_: whitelist переменных формулы, тот же критерий, что
+ * snapshot_build_formulas()). null — контекста нет (создание новой
+ * таблицы, полей которой ещё не существует) — calc_ там осмысленно
+ * недоступен: переменных для формулы взять неоткуда раньше, чем поля
+ * реально появятся (шаг 3 архивного плана, решение 2026-07-15).
  */
-function configurator_parse_field(array $raw_field, array $known_entities, array $live_structure): array
-{
+function configurator_parse_field(
+    array $raw_field,
+    array $known_entities,
+    array $live_structure,
+    ?array $table_fields = null
+): array {
     $errors        = [];
     $entity_choice = (string) ($raw_field['entity'] ?? '');
     $f_short       = trim((string) ($raw_field['short'] ?? ''));
@@ -251,6 +262,32 @@ function configurator_parse_field(array $raw_field, array $known_entities, array
         }
     }
 
+    // calc_: формула — отдельное поле формы, не «именная часть» (та же
+    // причина разделения, что у link_target). Whitelist переменных —
+    // ЗДЕСЬ, до записи, тем же правилом, что snapshot_build_formulas()
+    // применит при сборке снапшота: поле своей же таблицы, иначе — вовсе
+    // не предлагать (§14.2 архивного плана: невозможный выбор не ошибка
+    // постфактум, а недоступный вариант).
+    $formula = null;
+    if ($entity_choice === 'calc') {
+        if ($table_fields === null) {
+            return ['ok' => false, 'errors' => [
+                'вычисляемое поле добавляется только к существующей таблице, после остальных полей — переменных для формулы ещё нет.',
+            ], 'field' => null];
+        }
+        $formula = trim((string) ($raw_field['formula'] ?? ''));
+        $plan = formula_parse($formula);
+        if ($plan === null) {
+            return ['ok' => false, 'errors' => ['формула: синтаксис не распознан (ожидается {поле} оператор {поле} ...).'], 'field' => null];
+        }
+        foreach ($plan as $step) {
+            if ($step['type'] === 'field'
+                && ($table_fields[$step['name']]['kind'] ?? '') !== 'entity_field') {
+                return ['ok' => false, 'errors' => ["формула: переменная \"{$step['name']}\" — не поле этой таблицы."], 'field' => null];
+            }
+        }
+    }
+
     $column = $entity_choice . '_' . $name_part;
 
     if (strlen($column) > 64) {
@@ -282,6 +319,7 @@ function configurator_parse_field(array $raw_field, array $known_entities, array
         'short'       => $f_short,
         'full'        => $f_full,
         'link_target' => $link_target, // null для всех, кроме link_
+        'formula'     => $formula,     // null для всех, кроме calc_
     ]];
 }
 
@@ -304,6 +342,22 @@ function configurator_register_link(mysqli $db_connection, string $column, strin
         'INSERT INTO `model_links` (data_element, data_target_table) VALUES (?, ?)',
         'ss',
         [$column, $target]
+    );
+}
+
+/**
+ * Записать формулу calc_-поля в model_formulas (шаг 3 архивного плана,
+ * решение 2026-07-15). Синтаксис и whitelist уже проверены в
+ * configurator_parse_field() ДО этого вызова — здесь только запись,
+ * тонкая труба, повторно не перепроверяет (§7).
+ */
+function configurator_register_formula(mysqli $db_connection, int $registry_id, string $formula): array
+{
+    return db_execute(
+        $db_connection,
+        'INSERT INTO `model_formulas` (dep_model_registry, data_formula) VALUES (?, ?)',
+        'is',
+        [$registry_id, $formula]
     );
 }
 
@@ -583,8 +637,15 @@ function configurator_add_field(mysqli $db_connection, string $table, array $fie
         }
 
         // Разбор поля тем же кирпичом, что валидатор создания (общая
-        // configurator_parse_field — не копия проверок).
-        $parsed = configurator_parse_field($field_input, entities(), $live);
+        // configurator_parse_field — не копия проверок). Поля ТЕКУЩЕЙ
+        // таблицы передаются как whitelist для calc_ (существующая
+        // таблица — единственный контекст, где calc_ вообще доступен).
+        $parsed = configurator_parse_field(
+            $field_input,
+            entities(),
+            $live,
+            $live['tables'][$table]['fields']
+        );
         if (!$parsed['ok']) {
             return ['ok' => false, 'errors' => $parsed['errors']];
         }
@@ -615,6 +676,15 @@ function configurator_add_field(mysqli $db_connection, string $table, array $fie
             if (!$link['ok']) {
                 return ['ok' => false, 'errors' => [
                     "Поле {$field['column']} добавлено, но адрес link_ не записан: " . $link['error'],
+                ]];
+            }
+        }
+
+        if (($field['formula'] ?? null) !== null) {
+            $formula_row = configurator_register_formula($db_connection, (int) $reg['id'], $field['formula']);
+            if (!$formula_row['ok']) {
+                return ['ok' => false, 'errors' => [
+                    "Поле {$field['column']} добавлено, но формула не записана: " . $formula_row['error'],
                 ]];
             }
         }
@@ -1080,6 +1150,19 @@ if ($caction === 'diagnose') {
                                    . ' (' . render_escape($t_name) . ')</option>';
         }
 
+        // calc_: подсказка переменных — ТОЛЬКО entity-поля ЭТОЙ таблицы
+        // (тот же whitelist, что проверит configurator_parse_field()
+        // при сохранении, §14.2: недостижимое не предлагается вообще,
+        // не отклоняется постфактум).
+        $formula_fields = [];
+        foreach ($t_schema['fields'] as $f_name => $f_schema) {
+            if (($f_schema['kind'] ?? '') === 'entity_field') {
+                $fl = $live_presentation['labels']['field'][$table][$f_name] ?? [];
+                $formula_fields[$f_name] = (string) ($fl['data_short'] ?? $f_name);
+            }
+        }
+        $formula_fields_json = json_encode($formula_fields, JSON_UNESCAPED_UNICODE);
+
         echo <<<HTML
         <h3>Добавить поле</h3>
         <form method="post" action="?_action=alter_add_field">
@@ -1094,17 +1177,47 @@ if ($caction === 'diagnose') {
             <input type="text" class="f-short" name="field[short]" placeholder="короткая подпись">
             <button type="submit">+ добавить</button>
           </div>
+          <div class="field-row f-formula-row" style="display:none">
+            <input type="text" class="f-formula" name="field[formula]"
+                   placeholder="{поле} оператор {поле} — например {dec_volume_plan} - {dec_volume_fact}"
+                   style="flex:1">
+          </div>
+          <div class="f-formula-hint" style="display:none;margin:-4px 0 8px 0;font-size:.85em;color:#666">
+            переменные (клик — вставить): <span class="f-formula-vars"></span>
+          </div>
         </form>
         <script>
-        const dictLabels = $dict_labels_json;
+        const dictLabels    = $dict_labels_json;
+        const formulaFields = $formula_fields_json;
         function onFieldTypeChange(select) {
-          const row  = select.closest('.field-row');
-          const name = row.querySelector('.f-name');
-          const voc  = row.querySelector('.f-voc-pick');
-          const link = row.querySelector('.f-link-target');
+          const row     = select.closest('.field-row');
+          const name    = row.querySelector('.f-name');
+          const voc     = row.querySelector('.f-voc-pick');
+          const link    = row.querySelector('.f-link-target');
+          const form    = row.parentElement;
+          const fRow    = form.querySelector('.f-formula-row');
+          const fHint   = form.querySelector('.f-formula-hint');
           voc.style.display  = select.value === 'voc'  ? '' : 'none';
           link.style.display = select.value === 'link' ? '' : 'none';
           name.style.display = select.value === 'voc'  ? 'none' : '';
+          fRow.style.display  = select.value === 'calc' ? '' : 'none';
+          fHint.style.display = select.value === 'calc' ? '' : 'none';
+          if (select.value === 'calc' && fHint.querySelector('.f-formula-vars').children.length === 0) {
+            const varsBox = fHint.querySelector('.f-formula-vars');
+            Object.keys(formulaFields).forEach(fname => {
+              const btn = document.createElement('button');
+              btn.type = 'button';
+              btn.className = 'act';
+              btn.textContent = formulaFields[fname] + ' ({' + fname + '})';
+              btn.onclick = () => {
+                const input = fRow.querySelector('.f-formula');
+                input.value += '{' + fname + '}';
+                input.focus();
+              };
+              varsBox.appendChild(btn);
+              varsBox.appendChild(document.createTextNode(' '));
+            });
+          }
         }
         function onVocPick(select) {
           const row = select.closest('.field-row');
