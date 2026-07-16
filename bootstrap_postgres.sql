@@ -18,7 +18,16 @@ CREATE TABLE model_registry (
     data_kind    VARCHAR(16)  NOT NULL,   -- 'table' | 'field'
     data_owner   VARCHAR(64)  NULL,       -- NULL для kind='table'
     data_element VARCHAR(64)  NOT NULL,
-    active       BOOLEAN      NOT NULL DEFAULT TRUE,
+    -- НЕ boolean: весь код (core.php/configurator.php/labels.php) пишет
+    -- и сравнивает active как литеральное целое (`VALUES (...,1)`,
+    -- `WHERE active = 1`), не как PHP true/false — приведение типов
+    -- integer↔boolean в Postgres неявное не работает, при boolean эти
+    -- INSERT/WHERE падали бы ошибкой типа (найдено живьём 2026-07-16,
+    -- первая же тестовая таблица через конфигуратор — DDL прошёл,
+    -- регистрация в реестре тихо не выполнилась, т.к. `configurator_
+    -- create_table` не проверяет ошибку этого INSERT). Простой фикс —
+    -- оставить тип числовым, не трогать ~10 мест кода ради формы.
+    active       SMALLINT     NOT NULL DEFAULT 1,
     CONSTRAINT uq_registry_address UNIQUE (data_kind, data_owner, data_element)
 );
 
