@@ -191,7 +191,7 @@ function bulk_import_insert(
 $stats = ['ok' => 0, 'fail' => 0];
 
 if ($dry_run) {
-    mysqli_begin_transaction($db_connection);
+    pg_query($db_connection, 'BEGIN');
 }
 
 foreach ($data as $table => $records) {
@@ -206,7 +206,7 @@ foreach ($data as $table => $records) {
 }
 
 if ($dry_run) {
-    mysqli_rollback($db_connection);
+    pg_query($db_connection, 'ROLLBACK');
     echo "\n--- DRY RUN: ничего не записано, откат выполнен ---\n";
 } else {
     echo "\n--- Готово ---\n";
