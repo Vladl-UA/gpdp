@@ -94,7 +94,7 @@ if (!$table_requested || $request_action === 'home') {
             . render_escape($t_label) . '</a></li>';
     }
     echo '</ul></body></html>';
-    mysqli_close($db_connection);
+    db_close($db_connection);
     exit;
 }
 
@@ -205,7 +205,7 @@ if ($request_action === 'reparent') {
     echo render_reparent_form($view);
     echo "<p><a href=\"?_table=$task_table&_action=view&_id=$request_id\">Отмена</a></p>";
     echo '</body></html>';
-    mysqli_close($db_connection);
+    db_close($db_connection);
     exit;
 }
 
@@ -326,4 +326,4 @@ if ($mode === 'new' || $mode === 'edit') {
 
 // --- 7. завершение -----------------------------------------------------------------
 echo '</body></html>';
-mysqli_close($db_connection);
+db_close($db_connection);
