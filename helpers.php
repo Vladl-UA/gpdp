@@ -29,7 +29,8 @@ declare(strict_types=1);
  * 2026-07-16: делегирует в db_connect() (db.php) — сама больше не
  * знает деталей протокола подключения (mysqli vs pgsql), только
  * оборачивает отказ в HTTP 500, уместный именно для веб-страниц
- * (db_connect() сам по себе просто exit()'ит текстом, без кода ответа).
+ * (db_connect() бросает RuntimeException при отказе, не exit() —
+ * решение о форме отказа остаётся за вызывающим кодом).
  */
 function admin_db_connect(): PgSql\Connection
 {
