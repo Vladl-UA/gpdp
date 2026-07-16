@@ -476,6 +476,62 @@
    первом касании. Окружение: `pgsql`/`pdo_pgsql` для PHP, сервер Postgres
    на целевом localhost, роль+база — предусловие, не код.
 
+   **Шаг 1 (связь/подключение) — код написан 2026-07-16, НЕ проверено
+   живьём (нет PHP pgsql-расширения на целевом localhost на момент
+   написания).** Сделано: `db.php` переписан на `pg_query_params`
+   (`?`→`$N` внутри файла, вызывающий код не менялся); `db_connect()`/
+   `db_close()` заведены и подставлены во ВСЕ точки подключения — не
+   семь, а фактически шесть источников (`admin_db_connect()` в
+   helpers.php обслуживал index.php/configurator.php/labels.php уже
+   одной функцией — находка при разборе, не была отражена в обследовании
+   07-13) плюс четыре самостоятельных консольных скрипта
+   (`diag_refresh.php`, `smoke_test.php`, `tools_bulk_import.php`,
+   `tools_rebuild_snapshot.php`); тип `mysqli` → `PgSql\Connection`
+   заменён примерно в 30 сигнатурах (`core.php`, `configurator.php`,
+   `helpers.php`, `tools_bulk_import.php`, `labels.php`) — реальный
+   объём правки типа оказался больше, чем «внутри db.php», как
+   формулировка шага 1 звучала изначально в этой же записи; отдельно
+   найден и закрыт `mysqli_begin_transaction`/`mysqli_rollback` в
+   `tools_bulk_import.php` (dry-run транзакция) — не был учтён в
+   обследовании 07-13 вовсе, обнаружен только сплошным grep по
+   `mysqli_` после основной правки. `snapshot_build_structure`
+   (core.php) переведён на `information_schema`/`pg_catalog` вместо
+   `SHOW TABLES`/`SHOW COLUMNS`. Обратные кавычки убраны из ~56 строк
+   реального SQL-текста (`core.php`/`configurator.php`/`labels.php`/
+   `helpers.php`) — оказалось не «46 мест» из обследования 07-13
+   (та цифра была про кавычки-замену один-в-один, здесь — полное
+   удаление, идентификаторы и так строчные). DDL-билдер
+   (`configurator_create_table`) — `id` на `GENERATED ALWAYS AS
+   IDENTITY`, структурные `dep_`/`rel_main`-колонки на `INTEGER`,
+   `ENGINE=`/`CHARSET=`/`COLLATE=` убраны целиком; `ALTER`/`DROP`
+   очищены от кавычек. Пять `INSERT` в `model_registry`, чей `id`
+   читается сразу после (`configurator_create_table` ×2,
+   `configurator_add_field`, `configurator_adopt_field`,
+   `configurator_adopt_table`), и `record_save()` (core.php,
+   единственный универсальный insert-путь) получили `RETURNING id`.
+   `labels.php`: `ON DUPLICATE KEY UPDATE` → `ON CONFLICT (
+   dep_model_registry) DO UPDATE`. Новый файл `bootstrap_postgres.sql`
+   — DDL четырёх системных `model_*`-таблиц в синтаксисе Postgres;
+   **реконструкция по STATE.md + коду, не копия оригинала** (репозиторий
+   никогда не версионировал этот SQL — таблицы заводились ad-hoc,
+   журнал 07-05/07-08/07-14/07-15) — требует сверки Владом со старой
+   боевой схемой перед запуском.
+
+   **Осознанно НЕ тронуто в шаге 1** (следующие шаги той же записи):
+   `entities.php` — типы колонок паспортов (`UNSIGNED`/`TINYINT(1)`/
+   `MEDIUMINT` всё ещё в MySQL-виде, шаг 2); `smoke_test.php` — фикстуры
+   `voc_smoke`/`main`, счётчик N+1 через `SHOW SESSION STATUS LIKE
+   'Questions'` (аналога в Postgres нет в том же виде — нужен другой
+   механизм, например `pg_stat_statements` или счётчик на уровне
+   тестового кода) и статическая проверка «в index.php нет SQL» (сейчас
+   ищет строку `mysqli_query|mysqli_prepare` — тривиально пройдёт даже
+   если правило нарушено, раз этих имён в проекте больше нет нигде;
+   нуждается в собственном пересмотре, не просто переименовании
+   `mysqli_`→`pg_` в тексте проверки). Живой прогон (загрузка страницы,
+   `smoke_test.php`) не выполнялся — на целевом localhost на момент
+   написания не было PHP-расширения `pgsql`/`pdo_pgsql` (пакеты
+   `postgresql-*` есть, `php-pgsql` — не проверено).
+
 Правило миграции SQL (**шаг 1 выполнен 2026-07-03**): новый SQL пишется
 только в трёх семействах — `record_*` (весь рабочий CRUD, включая чтение:
 `record_fetch`, `record_list`), `snapshot_build_*` (интроспекция bootstrap),
