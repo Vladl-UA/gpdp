@@ -1,0 +1,40 @@
+{
+  "voc_mr": [
+    {"data_name": "Мамуринская"}
+  ],
+  "voc_enterprise": [
+    {"data_name": "ООО \"Интер-Ойл\""}
+  ],
+  "voc_subsoiluser": [
+    {"data_name": "ЗАО \"Самара-Нафта\""}
+  ],
+  "voc_usc": [
+    {"data_name": "МСЦ-146"}
+  ],
+  "voc_technolog": [
+    {"data_name": "Назаров"}
+  ],
+  "voc_material": [
+    {"data_name": "ОТМ-3"},
+    {"data_name": "ОТМ-5"},
+    {"data_name": "РТМ-75"},
+    {"data_name": "РТМ-75 ПВ"}
+  ],
+  "voc_composition": [
+    {"data_name": "МБП-С"},
+    {"data_name": "МБП-М"},
+    {"data_name": "НТФ"}
+  ],
+  "voc_component": [
+    {"data_name": "ПЦТ-G-CC-1"},
+    {"data_name": "КМЦ"},
+    {"data_name": "Бентонит"},
+    {"data_name": "НТФ"},
+    {"data_name": "CFL-110"}
+  ],
+  "voc_fluid_type": [
+    {"data_name": "нефть+вода"},
+    {"data_name": "нефть+газ"},
+    {"data_name": "нефть"}
+  ]
+}

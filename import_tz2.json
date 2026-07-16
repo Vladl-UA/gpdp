@@ -1,0 +1,241 @@
+{
+  "well": [
+    {
+      "int_number": "31",
+      "date_done": "2008-06-05",
+      "voc_mr": "Мамуринская",
+      "voc_enterprise": "ООО \"Интер-Ойл\"",
+      "voc_subsoiluser": "ЗАО \"Самара-Нафта\"",
+      "dec_depth": "3000",
+      "dec_temp": "80",
+      "dec_diam_col": "146",
+      "dec_diam_prev_col": "245",
+      "dec_depth_prev_col": "1800",
+      "dec_depth_usc": "2000",
+      "voc_usc": "МСЦ-146",
+      "voc_technolog": "Назаров",
+      "ltext_remark": "Все были пьяные, скважину загубили.",
+
+      "cementing_stage": [
+        {
+          "int_stage_number": "2",
+          "dec_pressure_work": "14",
+          "dec_pressure_stop": "18",
+          "cementing_interval": [
+            {
+              "dec_depth_from": "1000",
+              "dec_depth_to": "300",
+              "voc_material": "ОТМ-3",
+              "dec_amount": "10",
+              "dec_volume_plan": "12",
+              "dec_volume_fact": "12.5",
+              "dec_density_plan": "1.23",
+              "dec_density_fact": "1.25",
+              "cementing_buffer": [
+                {"dec_volume": "3", "voc_composition": "МБП-С", "dec_weight": "150"}
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.85",
+                  "dec_spreadability": "250",
+                  "dec_temp_static": "60",
+                  "dec_temp_dynamic": "48",
+                  "dec_pressure": "300",
+                  "dec_thickening_time": "250",
+                  "data_setting_start": "6-40",
+                  "data_setting_end": "7-25",
+                  "dec_strength_bending": "1.1",
+                  "dec_strength_compress": "3",
+                  "dec_water_separation": "3.1",
+                  "dec_fluid_loss": "3000"
+                }
+              ],
+              "akc_by_material": [
+                {
+                  "dec_partial_casing_m": "200", "dec_partial_rock_m": "180",
+                  "dec_partial_casing_pct": "14.3", "dec_partial_rock_pct": "20",
+                  "dec_rigid_casing_m": "100", "dec_rigid_rock_m": "140"
+                }
+              ]
+            },
+            {
+              "dec_depth_from": "2000",
+              "dec_depth_to": "1000",
+              "voc_material": "ОТМ-5",
+              "dec_amount": "20",
+              "dec_volume_plan": "15",
+              "dec_volume_fact": "16",
+              "dec_density_plan": "1.45",
+              "dec_density_fact": "1.43",
+              "cementing_buffer": [
+                {"dec_volume": "3", "voc_composition": "МБП-М", "dec_weight": "120"}
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.7",
+                  "dec_spreadability": "250",
+                  "dec_temp_static": "60",
+                  "dec_temp_dynamic": "48",
+                  "dec_pressure": "300",
+                  "dec_thickening_time": "190",
+                  "data_setting_start": "4-05",
+                  "data_setting_end": "4-40",
+                  "dec_strength_bending": "2.2",
+                  "dec_strength_compress": "5",
+                  "dec_water_separation": "2",
+                  "dec_fluid_loss": "2000"
+                }
+              ],
+              "akc_by_material": [
+                {
+                  "dec_partial_casing_m": "200", "dec_partial_rock_m": "300",
+                  "dec_partial_casing_pct": "30", "dec_partial_rock_pct": "28",
+                  "dec_rigid_casing_m": "300", "dec_rigid_rock_m": "280"
+                }
+              ]
+            }
+          ],
+          "cementing_reper": [
+            {
+              "dec_volume": "3",
+              "dec_density": "1.48",
+              "cementing_reper_component": [
+                {"voc_component": "ПЦТ-G-CC-1"},
+                {"voc_component": "КМЦ", "dec_amount": "0.01"},
+                {"voc_component": "Бентонит", "dec_amount": "1.02"}
+              ]
+            }
+          ]
+        },
+        {
+          "int_stage_number": "1",
+          "dec_pressure_work": "11",
+          "dec_pressure_stop": "15",
+          "cementing_interval": [
+            {
+              "dec_depth_from": "2700",
+              "dec_depth_to": "2000",
+              "voc_material": "РТМ-75",
+              "dec_amount": "22",
+              "dec_volume_plan": "15",
+              "dec_volume_fact": "15",
+              "dec_density_plan": "1.92",
+              "dec_density_fact": "1.92",
+              "cementing_buffer": [
+                {"dec_volume": "4", "voc_composition": "МБП-С", "dec_weight": "150"},
+                {"dec_volume": "1", "voc_composition": "НТФ", "dec_weight": "10"}
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.41",
+                  "dec_spreadability": "230",
+                  "dec_temp_static": "80",
+                  "dec_temp_dynamic": "65",
+                  "dec_pressure": "400",
+                  "dec_thickening_time": "115",
+                  "data_setting_start": "2-15",
+                  "data_setting_end": "2-25",
+                  "dec_strength_bending": "7.2",
+                  "dec_strength_compress": "12.5",
+                  "dec_linear_expansion": "14",
+                  "dec_water_separation": "1.1",
+                  "dec_fluid_loss": "1400",
+                  "test_reagent": [
+                    {"voc_component": "НТФ", "dec_amount_percent": "0.01"},
+                    {"voc_component": "CFL-110", "dec_amount_percent": "0.1"}
+                  ]
+                }
+              ],
+              "akc_by_material": [
+                {
+                  "dec_partial_casing_m": "100", "dec_partial_rock_m": "50",
+                  "dec_partial_casing_pct": "64.3", "dec_partial_rock_pct": "78.6",
+                  "dec_rigid_casing_m": "450", "dec_rigid_rock_m": "550"
+                }
+              ]
+            },
+            {
+              "dec_depth_from": "3000",
+              "dec_depth_to": "2700",
+              "voc_material": "РТМ-75 ПВ",
+              "dec_amount": "10",
+              "dec_volume_plan": "7.5",
+              "dec_volume_fact": "7",
+              "dec_density_plan": "1.92",
+              "dec_density_fact": "1.93",
+              "cementing_buffer": [
+                {"dec_volume": "3", "voc_composition": "МБП-М", "dec_weight": "120"}
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.41",
+                  "dec_spreadability": "220",
+                  "dec_temp_static": "80",
+                  "dec_temp_dynamic": "65",
+                  "dec_pressure": "400",
+                  "dec_thickening_time": "110",
+                  "data_setting_start": "2-10",
+                  "data_setting_end": "2-30",
+                  "dec_strength_bending": "7.5",
+                  "dec_strength_compress": "12",
+                  "dec_linear_expansion": "18",
+                  "dec_water_separation": "0.3",
+                  "dec_fluid_loss": "60"
+                }
+              ],
+              "akc_by_material": [
+                {
+                  "dec_partial_casing_m": "30", "dec_partial_rock_m": "20",
+                  "dec_partial_casing_pct": "83.3", "dec_partial_rock_pct": "86.7",
+                  "dec_rigid_casing_m": "250", "dec_rigid_rock_m": "260"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+
+      "productive_horizon": [
+        {
+          "data_formation": "АС11",
+          "dec_depth_from": "2790",
+          "dec_depth_to": "2770",
+          "voc_fluid_type": "нефть+вода",
+          "akc_by_horizon": [
+            {
+              "dec_partial_casing_m": "3", "dec_partial_rock_m": "5",
+              "dec_partial_casing_pct": "60", "dec_partial_rock_pct": "70",
+              "dec_rigid_casing_m": "12", "dec_rigid_rock_m": "14"
+            }
+          ]
+        },
+        {
+          "data_formation": "АС12(2)",
+          "dec_depth_from": "2920",
+          "dec_depth_to": "2910",
+          "voc_fluid_type": "нефть+газ",
+          "akc_by_horizon": [
+            {
+              "dec_partial_casing_m": "1", "dec_partial_rock_m": "1",
+              "dec_partial_casing_pct": "80", "dec_partial_rock_pct": "90",
+              "dec_rigid_casing_m": "8", "dec_rigid_rock_m": "9"
+            }
+          ]
+        },
+        {
+          "data_formation": "АС12(3)",
+          "dec_depth_from": "2950",
+          "dec_depth_to": "2930",
+          "voc_fluid_type": "нефть",
+          "akc_by_horizon": [
+            {
+              "dec_partial_casing_m": "5", "dec_partial_rock_m": "5",
+              "dec_partial_casing_pct": "75", "dec_partial_rock_pct": "75",
+              "dec_rigid_casing_m": "15", "dec_rigid_rock_m": "15"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
