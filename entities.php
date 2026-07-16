@@ -102,7 +102,7 @@ function ent_voc(): array
         'db' => [
             'kind'          => 'column_with_table', // поле + собственная таблица-словарь
             'default_type'  => 'int',
-            'allowed_types' => ['int', 'smallint', 'mediumint'],
+            'allowed_types' => ['int', 'smallint'], // mediumint не существует в Postgres (2026-07-16)
             'nullable'      => true,
         ],
 
@@ -196,7 +196,7 @@ function ent_ltext(): array
         'db' => [
             'kind'          => 'column',
             'default_type'  => 'text',
-            'allowed_types' => ['text', 'mediumtext', 'longtext'],
+            'allowed_types' => ['text'], // единый TEXT в Postgres, нет вариантов по длине (2026-07-16)
             'nullable'      => true,
         ],
 
@@ -609,7 +609,7 @@ function ent_int(): array
         'db' => [
             'kind'          => 'column',
             'default_type'  => 'int',
-            'allowed_types' => ['int', 'smallint', 'mediumint', 'bigint'],
+            'allowed_types' => ['int', 'smallint', 'bigint'], // mediumint не существует в Postgres (2026-07-16)
             'nullable'      => true,
         ],
 
@@ -699,8 +699,16 @@ function ent_bul(): array
 
         'db' => [
             'kind'          => 'column',
-            'default_type'  => 'tinyint(1)',
-            'allowed_types' => ['tinyint(1)'],
+            // 2026-07-16: Postgres — tinyint(1) не существует. НЕ boolean:
+            // bul_handler читает значение как литеральное целое
+            // ((int)$value === 1), а php-pgsql возвращает boolean-колонки
+            // строками 't'/'f' (не '1'/'0'), (int)'t' === 0 — читалось бы
+            // как "нет" всегда, тихий баг того же класса, что уже поймали
+            // на model_registry.active (STATE.md «Сейчас» п.9, шаг 1).
+            // smallint избегает этой ловушки — значение туда-обратно
+            // остаётся текстовым '1'/'0', как и было под MySQL.
+            'default_type'  => 'smallint',
+            'allowed_types' => ['smallint'],
             'nullable'      => false,
         ],
 
@@ -1014,7 +1022,7 @@ function ent_link(): array
         'db' => [
             'kind'          => 'column_with_table',
             'default_type'  => 'int',
-            'allowed_types' => ['int', 'smallint', 'mediumint'],
+            'allowed_types' => ['int', 'smallint'], // mediumint не существует в Postgres (2026-07-16)
             'nullable'      => true,
         ],
 
