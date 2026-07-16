@@ -234,7 +234,7 @@ function formula_parse(string $formula): ?array
 
 /**
  * Формулы `calc_` (STATE.md «Позже», согласовано 2026-07-14): читает
- * `model_formulas` JOIN `model_registry` (владеющая таблица/поле — по
+ * model_formulas JOIN model_registry (владеющая таблица/поле — по
  * `dep_model_registry`), раскладывает по ТАБЛИЦЕ, не глобально по имени
  * поля, как словари (§15 п.2 — одна и та же формула на разных таблицах
  * имеет разные операнды, глобальный адрес по имени здесь не годится).
@@ -244,15 +244,15 @@ function formula_parse(string $formula): ?array
  * несуществующее поле — fail-fast с именем формулы, тот же принцип,
  * что у `dep_` в никуда и цикла словарных шаблонов (§16).
  */
-function snapshot_build_formulas(mysqli $db_connection, array $structure): array
+function snapshot_build_formulas(PgSql\Connection $db_connection, array $structure): array
 {
     $map        = [];
     $unresolved = [];
 
     $rows = db_select($db_connection, '
         SELECT f.data_formula, r.data_owner, r.data_element
-        FROM `model_formulas` f
-        JOIN `model_registry` r ON r.id = f.dep_model_registry
+        FROM model_formulas f
+        JOIN model_registry r ON r.id = f.dep_model_registry
     ');
 
     foreach ($rows as $row) {
@@ -311,7 +311,7 @@ function field_prefix(string $field_name): ?string
  */
 function field_data(
     array $snapshot,
-    mysqli $db_connection,
+    PgSql\Connection $db_connection,
     string $table,
     string $field_name,
     mixed $value = null,
@@ -413,13 +413,20 @@ function snapshot_validate(array $snapshot): bool
  * Structural-слой: живое чтение структуры БД. Допустимо только при
  * bootstrap, явной пересборке и в контуре конфигуратора.
  */
-function snapshot_build_structure(mysqli $db_connection): array
+function snapshot_build_structure(PgSql\Connection $db_connection): array
 {
     $tables         = [];
     $unknown_fields = [];
 
-    $tables_result = mysqli_query($db_connection, 'SHOW TABLES');
-    while ($table_row = mysqli_fetch_row($tables_result)) {
+    // 2026-07-16: Postgres, information_schema вместо SHOW TABLES/COLUMNS
+    // (журнал STATE.md «Сейчас» п.9). Остаётся единственным местом вне
+    // db.php по прежней причине — интроспекция схемы, другой формат
+    // возврата (докблок db.php).
+    $tables_result = pg_query(
+        $db_connection,
+        "SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname = 'public' ORDER BY tablename"
+    );
+    while ($table_row = pg_fetch_row($tables_result)) {
         $table_name = $table_row[0];
 
         // Служебные таблицы ядра (model_*) — не предметные данные,
@@ -430,9 +437,28 @@ function snapshot_build_structure(mysqli $db_connection): array
 
         $fields = [];
 
-        $columns_result = mysqli_query($db_connection, "SHOW COLUMNS FROM `$table_name`");
-        while ($column_row = mysqli_fetch_assoc($columns_result)) {
-            $field_name = $column_row['Field'];
+        // Первичный ключ таблицы — отдельным запросом (information_schema
+        // не даёт "Key"-колонку одной строкой, как SHOW COLUMNS у MySQL).
+        $pk_result = pg_query_params(
+            $db_connection,
+            'SELECT a.attname FROM pg_index i '
+            . 'JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey) '
+            . 'WHERE i.indrelid = $1::regclass AND i.indisprimary',
+            [$table_name]
+        );
+        $pk_columns = [];
+        while ($pk_row = pg_fetch_row($pk_result)) {
+            $pk_columns[$pk_row[0]] = true;
+        }
+
+        $columns_result = pg_query_params(
+            $db_connection,
+            'SELECT column_name, data_type, is_nullable FROM information_schema.columns '
+            . 'WHERE table_schema = $1 AND table_name = $2 ORDER BY ordinal_position',
+            ['public', $table_name]
+        );
+        while ($column_row = pg_fetch_assoc($columns_result)) {
+            $field_name = $column_row['column_name'];
             $parsed     = field_parse($field_name);
 
             if ($parsed['kind'] === 'unknown') {
@@ -443,9 +469,9 @@ function snapshot_build_structure(mysqli $db_connection): array
                 'name'     => $field_name,
                 'kind'     => $parsed['kind'],
                 'entity'   => $parsed['entity'],
-                'db_type'  => $column_row['Type'],
-                'nullable' => $column_row['Null'] === 'YES',
-                'key'      => $column_row['Key'],
+                'db_type'  => $column_row['data_type'],
+                'nullable' => $column_row['is_nullable'] === 'YES',
+                'key'      => isset($pk_columns[$field_name]) ? 'PRI' : '',
             ];
         }
 
@@ -506,7 +532,7 @@ function snapshot_build_dictionaries(array $structure, array $templates = [], ar
     // явного маяка, но есть data_name → синтезируем шаблон-по-умолчанию
     // `{data_name}` и идём ТЕМ ЖЕ путём проекции, что и составные подписи.
     // Была вторая машинка (`subtype`='warehouse'/'address'/'link' без
-    // плана, читал `lookup_options` жёстким SELECT) — убрана: одна
+    // плана, читал lookup_options жёстким SELECT) — убрана: одна
     // форма записи в карте на все словари, `$subtype` больше не влияет
     // на форму, только на текст диагностики при отказе.
     $resolve = function (string $field_name, string $source, string $subtype) use (
@@ -825,13 +851,13 @@ function snapshot_build_relations(array $structure): array
  * реестра инертен, в отчёт сборки, НЕ fail-fast) — сирота реестра
  * никого не блокирует, пока на неё никто не ссылается (§17).
  */
-function snapshot_build_registry(mysqli $db_connection, array $structure): array
+function snapshot_build_registry(PgSql\Connection $db_connection, array $structure): array
 {
     $registry = ['table' => [], 'field' => []];
     $orphans  = [];
 
-    $sql = 'SELECT id, data_kind, data_owner, data_element FROM `'
-         . MODEL_REGISTRY_TABLE . '` WHERE active = 1';
+    $sql = 'SELECT id, data_kind, data_owner, data_element FROM '
+         . MODEL_REGISTRY_TABLE . ' WHERE active = 1';
     $rows = db_select($db_connection, $sql);
 
     foreach ($rows as $row) {
@@ -865,14 +891,14 @@ function snapshot_build_registry(mysqli $db_connection, array $structure): array
  * причине: потребитель ищет подпись и адрес по одному пути.
  * Только active=1 — та же компиляционная граница, что у реестра.
  */
-function snapshot_build_presentation(mysqli $db_connection): array
+function snapshot_build_presentation(PgSql\Connection $db_connection): array
 {
     $labels = ['table' => [], 'field' => []];
 
     $sql = 'SELECT r.data_kind, r.data_owner, r.data_element,
                     l.data_short, l.data_full, l.data_label_template
-             FROM `' . MODEL_LABELS_TABLE . '` l
-             JOIN `' . MODEL_REGISTRY_TABLE . '` r
+             FROM ' . MODEL_LABELS_TABLE . ' l
+             JOIN ' . MODEL_REGISTRY_TABLE . ' r
                ON r.id = l.dep_model_registry
              WHERE r.active = 1';
 
@@ -919,10 +945,10 @@ function snapshot_templates(array $presentation): array
  * Отсутствие таблицы (старая установка до этого решения) — не падаем,
  * просто link_-полей в структуре не будет, снапшот соберётся без них.
  */
-function snapshot_build_links(mysqli $db_connection): array
+function snapshot_build_links(PgSql\Connection $db_connection): array
 {
     $links = [];
-    foreach (db_select($db_connection, 'SELECT data_element, data_target_table FROM `model_links`') as $row) {
+    foreach (db_select($db_connection, 'SELECT data_element, data_target_table FROM model_links') as $row) {
         $links[(string) $row['data_element']] = (string) $row['data_target_table'];
     }
 
@@ -934,7 +960,7 @@ function snapshot_build_links(mysqli $db_connection): array
  * принадлежат модели, приходят снаружи, здесь не зашиты.
  * null при unknown-полях — fail-fast, причина в snapshot_last_error().
  */
-function snapshot_build(mysqli $db_connection, array $application = []): ?array
+function snapshot_build(PgSql\Connection $db_connection, array $application = []): ?array
 {
     $structure = snapshot_build_structure($db_connection);
 
@@ -1154,7 +1180,7 @@ function snapshot_lock_force_release(): bool
 // --- два пути обновления -------------------------------------------------------
 
 /** Тяжёлый путь: пересборка structural-слоя. Всегда через lock. */
-function snapshot_rebuild_structure(mysqli $db_connection, string $lock_source, array $application = []): bool
+function snapshot_rebuild_structure(PgSql\Connection $db_connection, string $lock_source, array $application = []): bool
 {
     if (!snapshot_lock_acquire($lock_source, 'Пересборка structural-слоя snapshot')) {
         return false;
@@ -1177,7 +1203,7 @@ function snapshot_rebuild_structure(mysqli $db_connection, string $lock_source, 
  * подписи не блокирует систему. Под чужим lock отступает: пересборка
  * прочитает свежие подписи сама.
  */
-function snapshot_refresh_presentation(mysqli $db_connection): bool
+function snapshot_refresh_presentation(PgSql\Connection $db_connection): bool
 {
     if (snapshot_lock_read() !== null) {
         return false;
@@ -1219,7 +1245,7 @@ function snapshot_refresh_presentation(mysqli $db_connection): bool
  * уже загруженного снапшота, не пересобираем: structural не менялся,
  * лишь потому и разрешён refresh без lock.
  */
-function snapshot_refresh_model(mysqli $db_connection): bool
+function snapshot_refresh_model(PgSql\Connection $db_connection): bool
 {
     if (snapshot_lock_read() !== null) {
         return false;
@@ -1271,7 +1297,7 @@ function snapshot_refresh_model(mysqli $db_connection): bool
  * Главная точка входа обычного запроса.
  * null — штатный сигнал «модель сейчас недоступна», не ошибка.
  */
-function snapshot_init(mysqli $db_connection, array $application = []): ?array
+function snapshot_init(PgSql\Connection $db_connection, array $application = []): ?array
 {
     // Лок уважается ОДИНАКОВО в обеих ветках, первым шагом: означает
     // «структура сейчас в незавершённом состоянии» — не про способ
@@ -1332,7 +1358,7 @@ function record_result(string $operation, string $table): array
  *   - идентификаторы только из snapshot + backticks, значения — bind.
  */
 function record_save(
-    mysqli $db_connection,
+    PgSql\Connection $db_connection,
     array $snapshot,
     string $table,
     array $input,
@@ -1411,15 +1437,18 @@ function record_save(
     $types       = str_repeat('s', count($values)); // MySQL приводит по схеме колонки
 
     if ($operation === 'insert') {
-        $columns      = '`' . implode('`, `', $field_names) . '`';
+        $columns      = implode(', ', $field_names);
         $placeholders = implode(', ', array_fill(0, count($values), '?'));
-        $sql          = "INSERT INTO `$table` ($columns) VALUES ($placeholders)";
+        // RETURNING id — Postgres не имеет mysqli_insert_id() (докблок
+        // db.php); каждая таблица имеет колонку id (STATE.md, правило
+        // суррогатного ключа), безопасно требовать её здесь всегда.
+        $sql = "INSERT INTO $table ($columns) VALUES ($placeholders) RETURNING id";
     } else {
         $assignments = implode(', ', array_map(
-            static fn(string $name): string => "`$name` = ?",
+            static fn(string $name): string => "$name = ?",
             $field_names
         ));
-        $sql      = "UPDATE `$table` SET $assignments WHERE `id` = ?";
+        $sql      = "UPDATE $table SET $assignments WHERE id = ?";
         $values[] = $id;
         $types   .= 'i';
     }
@@ -1441,7 +1470,7 @@ function record_save(
 }
 
 /** Универсальное удаление по id. Тот же честный результат. */
-function record_delete(mysqli $db_connection, array $snapshot, string $table, int $id): array
+function record_delete(PgSql\Connection $db_connection, array $snapshot, string $table, int $id): array
 {
     $result = record_result('delete', $table);
 
@@ -1450,7 +1479,7 @@ function record_delete(mysqli $db_connection, array $snapshot, string $table, in
         return $result;
     }
 
-    $outcome = db_execute($db_connection, "DELETE FROM `$table` WHERE `id` = ? LIMIT 1", 'i', [$id]);
+    $outcome = db_execute($db_connection, "DELETE FROM $table WHERE id = ? LIMIT 1", 'i', [$id]);
     if (!$outcome['ok']) {
         $result['errors'][] = 'Ошибка удаления: ' . $outcome['error'];
         return $result;
@@ -1479,7 +1508,7 @@ function record_delete(mysqli $db_connection, array $snapshot, string $table, in
  * тот же паттерн проверки, что и everywhere в этом файле).
  */
 function record_reparent(
-    mysqli $db_connection,
+    PgSql\Connection $db_connection,
     array $snapshot,
     string $table,
     int $id,
@@ -1505,7 +1534,7 @@ function record_reparent(
 
     $outcome = db_execute(
         $db_connection,
-        "UPDATE `$table` SET `{$relation['fk']}` = ? WHERE `id` = ?",
+        "UPDATE $table SET {$relation['fk']} = ? WHERE id = ?",
         'ii',
         [$new_parent_id, $id]
     );
@@ -1539,7 +1568,7 @@ function record_reparent(
  *   иначе          → «#id» (запись существует, подписи нет).
  * Никакого нового механизма — обёртка над готовым исполнителем.
  */
-function record_label(mysqli $db_connection, array $snapshot, string $table, int $id): string
+function record_label(PgSql\Connection $db_connection, array $snapshot, string $table, int $id): string
 {
     // Подпись собственного объекта лежит под ключом '@table' — резолвер
     // компилирует её для ЛЮБОЙ таблицы, у которой есть чем подписаться
@@ -1592,7 +1621,7 @@ function record_parent_relation(array $snapshot, string $table): ?array
     return ['fk' => $fk_candidates[0], 'parent_table' => substr($fk_candidates[0], 4)];
 }
 
-function record_children(mysqli $db_connection, array $snapshot, string $table, int $id): array
+function record_children(PgSql\Connection $db_connection, array $snapshot, string $table, int $id): array
 {
     $blocks = [];
 
@@ -1611,7 +1640,7 @@ function record_children(mysqli $db_connection, array $snapshot, string $table, 
         $blocks[] = [
             'table' => $child,
             'fk'    => $fk,
-            'rows'  => db_select($db_connection, "SELECT * FROM `$child` WHERE `$fk` = ? ORDER BY `id` DESC", 'i', [$id]),
+            'rows'  => db_select($db_connection, "SELECT * FROM $child WHERE $fk = ? ORDER BY id DESC", 'i', [$id]),
         ];
     }
 
@@ -1637,7 +1666,7 @@ function record_children(mysqli $db_connection, array $snapshot, string $table, 
  * Узел: ['table', 'id', 'label', 'row', 'fields', 'children' => [block...]],
  * где block: ['table', 'label' (подпись таблицы), 'fk', 'nodes' => [узел...]].
  */
-function record_tree(mysqli $db_connection, array $snapshot, string $table, int $id): ?array
+function record_tree(PgSql\Connection $db_connection, array $snapshot, string $table, int $id): ?array
 {
     $row = record_fetch($db_connection, $snapshot, $table, $id);
     if ($row === null) {
@@ -1690,13 +1719,13 @@ function record_tree(mysqli $db_connection, array $snapshot, string $table, int 
     ];
 }
 
-function record_fetch(mysqli $db_connection, array $snapshot, string $table, int $id): ?array
+function record_fetch(PgSql\Connection $db_connection, array $snapshot, string $table, int $id): ?array
 {
     if (!isset($snapshot['structure']['tables'][$table])) {
         return null;
     }
 
-    $rows = db_select($db_connection, "SELECT * FROM `$table` WHERE `id` = ? LIMIT 1", 'i', [$id]);
+    $rows = db_select($db_connection, "SELECT * FROM $table WHERE id = ? LIMIT 1", 'i', [$id]);
 
     return $rows[0] ?? null;
 }
@@ -1712,11 +1741,11 @@ function record_fetch(mysqli $db_connection, array $snapshot, string $table, int
  * собственный SELECT; подпись каждой строки — через record_label (её
  * request-level кэш lookup_labels уже решает N+1, второй кэш не заводим).
  */
-function record_parent_candidates(mysqli $db_connection, array $snapshot, string $parent_table): array
+function record_parent_candidates(PgSql\Connection $db_connection, array $snapshot, string $parent_table): array
 {
     $ids = array_map(
         static fn(array $row): int => (int) $row['id'],
-        db_select($db_connection, "SELECT `id` FROM `$parent_table` ORDER BY `id` DESC")
+        db_select($db_connection, "SELECT id FROM $parent_table ORDER BY id DESC")
     );
 
     $candidates = [];
@@ -1727,13 +1756,13 @@ function record_parent_candidates(mysqli $db_connection, array $snapshot, string
     return $candidates;
 }
 
-function record_list(mysqli $db_connection, array $snapshot, string $table, int $limit = 50): array
+function record_list(PgSql\Connection $db_connection, array $snapshot, string $table, int $limit = 50): array
 {
     if (!isset($snapshot['structure']['tables'][$table])) {
         return [];
     }
 
-    return db_select($db_connection, "SELECT * FROM `$table` ORDER BY `id` DESC LIMIT ?", 'i', [$limit]);
+    return db_select($db_connection, "SELECT * FROM $table ORDER BY id DESC LIMIT ?", 'i', [$limit]);
 }
 
 /**
@@ -1765,7 +1794,7 @@ function record_view_columns(array $snapshot, string $table): array
  * разрешено в подпись). HTML не рождается: только данные.
  */
 function record_view_row(
-    mysqli $db_connection, array $snapshot, string $table, array $row, array $columns
+    PgSql\Connection $db_connection, array $snapshot, string $table, array $row, array $columns
 ): array {
     $cells = [];
     foreach ($columns as $column) {
@@ -1799,7 +1828,7 @@ function record_view_row(
  * без интерпретации.
  */
 function record_reparent_view(
-    mysqli $db_connection,
+    PgSql\Connection $db_connection,
     array $snapshot,
     string $table,
     int $id,
@@ -1828,7 +1857,7 @@ function record_reparent_view(
     ];
 }
 
-function record_table_view(mysqli $db_connection, array $snapshot, string $table, int $limit = 50): array
+function record_table_view(PgSql\Connection $db_connection, array $snapshot, string $table, int $limit = 50): array
 {
     $columns = record_view_columns($snapshot, $table);
     $rows    = [];
@@ -1855,7 +1884,7 @@ function record_table_view(mysqli $db_connection, array $snapshot, string $table
  * поля формы (действие, таблица, id, родитель), которые нужны PRG.
  */
 function record_form_view(
-    mysqli $db_connection, array $snapshot, string $table, string $mode,
+    PgSql\Connection $db_connection, array $snapshot, string $table, string $mode,
     ?array $row = null, array $hidden = []
 ): array {
     $row      = $row ?? []; // new: записи ещё нет — пустой набор значений
@@ -1961,15 +1990,15 @@ function schema_view(array $snapshot, string $table): array
  * участвуют: они не адресуются реестром по построению, их «отсутствие»
  * в реестре — норма, не расхождение.
  */
-function model_diagnose(mysqli $db_connection): array
+function model_diagnose(PgSql\Connection $db_connection): array
 {
     $structure = snapshot_build_structure($db_connection);
     $sys       = defined('SYSTEM_TABLE_PREFIX') ? SYSTEM_TABLE_PREFIX : 'model_';
 
     // Сырые строки реестра (все active), без свёртки в map — чтобы
     // увидеть дубли, которые map затирает.
-    $sql = 'SELECT id, data_kind, data_owner, data_element FROM `'
-         . MODEL_REGISTRY_TABLE . '` WHERE active = 1';
+    $sql = 'SELECT id, data_kind, data_owner, data_element FROM '
+         . MODEL_REGISTRY_TABLE . ' WHERE active = 1';
     $reg_rows = db_select($db_connection, $sql);
 
     // Индекс адресов реестра: адрес → список id (список, а не одно —

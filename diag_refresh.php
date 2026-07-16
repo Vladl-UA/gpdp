@@ -16,12 +16,11 @@ require 'core.php';
 require 'helpers.php';
 require 'render.php';
 
-$cfg = config()['db'];
-$db_connection = mysqli_connect($cfg['host'], $cfg['user'], $cfg['password'], $cfg['name']);
-if ($db_connection === false) {
-    exit("Нет соединения с БД\n");
+try {
+    $db_connection = db_connect(config()['db']);
+} catch (\Throwable $e) {
+    exit('Нет соединения с БД: ' . $e->getMessage() . "\n");
 }
-mysqli_set_charset($db_connection, 'utf8mb4');
 
 echo 'PHP ' . PHP_VERSION . ', пользователь: ' . get_current_user()
     . ', opcache.enable_cli=' . var_export(ini_get('opcache.enable_cli'), true) . "\n\n";

@@ -14,12 +14,11 @@ require __DIR__ . '/render.php';
 
 // Та же дверь, что у системы: смоук проверяет GPDP в её собственной
 // конфигурации, а не в параллельной (hardcode root — археология).
-$cfg = config()['db'];
-$db_connection = mysqli_connect($cfg['host'], $cfg['user'], $cfg['password'], $cfg['name']);
-if ($db_connection === false) {
-    exit('Смоук не стартовал: нет соединения с БД (' . mysqli_connect_error() . ")\n");
+try {
+    $db_connection = db_connect(config()['db']);
+} catch (\Throwable $e) {
+    exit('Смоук не стартовал: нет соединения с БД (' . $e->getMessage() . ")\n");
 }
-mysqli_set_charset($db_connection, 'utf8mb4');
 
 // --- Изолированный словарь-манекен смоука (журнал 2026-07-12) --------------
 // Раньше фикстура main.voc_mr указывала на БОЕВОЙ словарь месторождений

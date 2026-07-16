@@ -26,18 +26,19 @@ declare(strict_types=1);
  * Соединение с БД для админ-страниц: один boot вместо трёх копий
  * (index.php / configurator.php / labels.php). Конфиг — из config();
  * при отказе — 500 и выход, страница без БД не имеет смысла.
- * utf8mb4 обязателен: иначе кириллица задваивается.
+ * 2026-07-16: делегирует в db_connect() (db.php) — сама больше не
+ * знает деталей протокола подключения (mysqli vs pgsql), только
+ * оборачивает отказ в HTTP 500, уместный именно для веб-страниц
+ * (db_connect() сам по себе просто exit()'ит текстом, без кода ответа).
  */
-function admin_db_connect(): mysqli
+function admin_db_connect(): PgSql\Connection
 {
-    $cfg = config()['db'];
-    $db  = @mysqli_connect($cfg['host'], $cfg['user'], $cfg['password'], $cfg['name']);
-    if ($db === false) {
+    try {
+        return db_connect(config()['db']);
+    } catch (\Throwable $e) {
         http_response_code(500);
-        exit('Нет соединения с БД: ' . mysqli_connect_error());
+        exit('Нет соединения с БД: ' . $e->getMessage());
     }
-    mysqli_set_charset($db, 'utf8mb4');
-    return $db;
 }
 
 /**
@@ -62,7 +63,7 @@ function admin_db_connect(): mysqli
  * $dict ОБЯЗАН быть доверенным: скомпилированная запись из пакета
  * field_data (снапшот), не из request.
  */
-function lookup_labels(mysqli $db_connection, array $dict): array
+function lookup_labels(PgSql\Connection $db_connection, array $dict): array
 {
     static $cache = [];
     $source = $dict['source_table'];
@@ -75,7 +76,7 @@ function lookup_labels(mysqli $db_connection, array $dict): array
     // Поведение при ошибке меняется явно: db_select() возвращает [],
     // поэтому ошибочная выборка теперь не вызывает mysqli warning/TypeError,
     // а даёт тот же внешний результат, что и пустой словарь.
-    $rows = db_select($db_connection, "SELECT * FROM `$source`");
+    $rows = db_select($db_connection, "SELECT * FROM $source");
     foreach ($rows as $row) {
         $text = '';
         foreach ($dict['plan'] as $item) {
@@ -121,7 +122,7 @@ function lookup_labels(mysqli $db_connection, array $dict): array
  * от «ошибка», а вызывающему (загрузчику) нужно различать эти два
  * случая по-разному в отчёте.
  */
-function lookup_id_by_label(mysqli $db_connection, array $dict, string $label): array
+function lookup_id_by_label(PgSql\Connection $db_connection, array $dict, string $label): array
 {
     $matches = array_keys(lookup_labels($db_connection, $dict), $label, true);
 

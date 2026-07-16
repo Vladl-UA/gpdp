@@ -33,15 +33,15 @@ function h(string $s): string
 }
 
 /** id строки реестра по адресу (kind, owner, element); null — адреса нет. */
-function labels_registry_id(mysqli $db, string $kind, ?string $owner, string $element): ?int
+function labels_registry_id(PgSql\Connection $db, string $kind, ?string $owner, string $element): ?int
 {
     if ($owner === null) {
-        $sql = 'SELECT id FROM `' . MODEL_REGISTRY_TABLE
-             . '` WHERE data_kind = ? AND data_owner IS NULL AND data_element = ? AND active = 1';
+        $sql = 'SELECT id FROM ' . MODEL_REGISTRY_TABLE
+             . ' WHERE data_kind = ? AND data_owner IS NULL AND data_element = ? AND active = 1';
         $rows = db_select($db, $sql, 'ss', [$kind, $element]);
     } else {
-        $sql = 'SELECT id FROM `' . MODEL_REGISTRY_TABLE
-             . '` WHERE data_kind = ? AND data_owner = ? AND data_element = ? AND active = 1';
+        $sql = 'SELECT id FROM ' . MODEL_REGISTRY_TABLE
+             . ' WHERE data_kind = ? AND data_owner = ? AND data_element = ? AND active = 1';
         $rows = db_select($db, $sql, 'sss', [$kind, $owner, $element]);
     }
     // Поведение при ошибке меняется явно: db_select() сводит ошибку к [],
@@ -51,19 +51,22 @@ function labels_registry_id(mysqli $db, string $kind, ?string $owner, string $el
 }
 
 /** UPSERT подписи (1:1 с реестром). Пустые строки → NULL. */
-function labels_save_label(mysqli $db, int $registry_id, string $short, string $full, string $template): bool
+function labels_save_label(PgSql\Connection $db, int $registry_id, string $short, string $full, string $template): bool
 {
     $short_v    = $short === '' ? null : $short;
     $full_v     = $full === '' ? null : $full;
     $template_v = trim($template) === '' ? null : trim($template);
 
-    $sql = 'INSERT INTO `' . MODEL_LABELS_TABLE . '`
+    // 2026-07-16: Postgres — ON CONFLICT вместо ON DUPLICATE KEY UPDATE.
+    // Конфликт-таргет — dep_model_registry, он же PRIMARY KEY таблицы
+    // (решение 07-05 «Сейчас» п.1: 1:1 с реестром обеспечено схемой).
+    $sql = 'INSERT INTO ' . MODEL_LABELS_TABLE . '
               (dep_model_registry, data_short, data_full, data_label_template)
             VALUES (?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE
-              data_short = VALUES(data_short),
-              data_full  = VALUES(data_full),
-              data_label_template = VALUES(data_label_template)';
+            ON CONFLICT (dep_model_registry) DO UPDATE SET
+              data_short = EXCLUDED.data_short,
+              data_full  = EXCLUDED.data_full,
+              data_label_template = EXCLUDED.data_label_template';
     $result = db_execute($db, $sql, 'isss', [$registry_id, $short_v, $full_v, $template_v]);
     return $result['ok'];
 }
@@ -198,7 +201,7 @@ if (!$valid_selected) {
     ], ['show_system' => false, 'reports_note' => 'Отчёты не созданы.']);
 
     echo '</body></html>';
-    mysqli_close($db_connection);
+    db_close($db_connection);
     exit;
 }
 
@@ -282,4 +285,4 @@ if ($is_dict) {
 }
 
 echo '</body></html>';
-mysqli_close($db_connection);
+db_close($db_connection);

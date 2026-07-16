@@ -15,8 +15,11 @@ function config(): array
     if ($config === null) {
         $config = [
 
+            // 2026-07-16: переезд на Postgres (STATE.md «Сейчас» п.9) —
+            // MySQL из конфигурации убран целиком, не второй вариант.
             'db' => [
-                'host'     => 'localhost',
+                'host'     => '127.0.0.1',
+                'port'     => 5432,
                 'user'     => 'gpdp',
                 'password' => '111',
                 'name'     => 'gpdp_test',

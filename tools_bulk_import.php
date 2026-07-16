@@ -41,13 +41,12 @@ if (!is_array($data)) {
     exit(1);
 }
 
-$cfg = config()['db'];
-$db_connection = mysqli_connect($cfg['host'], $cfg['user'], $cfg['password'], $cfg['name']);
-if ($db_connection === false) {
-    fwrite(STDERR, "Нет соединения с БД\n");
+try {
+    $db_connection = db_connect(config()['db']);
+} catch (\Throwable $e) {
+    fwrite(STDERR, 'Нет соединения с БД: ' . $e->getMessage() . "\n");
     exit(1);
 }
-mysqli_set_charset($db_connection, 'utf8mb4');
 
 $snapshot = snapshot_init($db_connection, config()['application']);
 if ($snapshot === null) {
@@ -106,7 +105,7 @@ function bulk_import_split_record(array $snapshot, string $table, array $record)
  * record_save разберётся сам по паспорту сущности.
  */
 function bulk_import_resolve_fields(
-    mysqli $db_connection,
+    PgSql\Connection $db_connection,
     array $snapshot,
     array $fields,
     array &$errors
@@ -136,7 +135,7 @@ function bulk_import_resolve_fields(
  * получилось (§9 — доверенный канал несёт факт, не догадку).
  */
 function bulk_import_insert(
-    mysqli $db_connection,
+    PgSql\Connection $db_connection,
     array $snapshot,
     string $table,
     array $record,
