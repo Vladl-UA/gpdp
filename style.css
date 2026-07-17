@@ -27,15 +27,15 @@ fieldset{margin-bottom:.5em}
 .act-danger{color:#a22}
 .act-danger:hover{background:#fee}
 
-/* Спокойная светлая шкала: корневая таблица начинается с #f6f6f4,
-   каждый следующий уровень равномерно светлеет. Иерархию дополнительно
-   держат отступы, рамки и акцентная строка ступени, поэтому сильный
-   цветовой перепад здесь больше не нужен. */
-.data-list th,.data-list-fit th,.data-list-wide th{background:#f6f6f4;color:#30363d;font-weight:650;font-size:15px;line-height:1.2;padding:4px 7px}
-.rel-wrap .data-list th,.rel-wrap .data-list-fit th,.rel-wrap .data-list-wide th{background:#f8f8f6}
-.rel-wrap .rel-wrap .data-list th,.rel-wrap .rel-wrap .data-list-fit th,.rel-wrap .rel-wrap .data-list-wide th{background:#fafaf8}
-.rel-wrap .rel-wrap .rel-wrap .data-list th,.rel-wrap .rel-wrap .rel-wrap .data-list-fit th,.rel-wrap .rel-wrap .rel-wrap .data-list-wide th{background:#fcfbf9}
-.rel-wrap .rel-wrap .rel-wrap .rel-wrap .data-list th,.rel-wrap .rel-wrap .rel-wrap .rel-wrap .data-list-fit th,.rel-wrap .rel-wrap .rel-wrap .rel-wrap .data-list-wide th{background:#fefdfb}
+/* Контрастная спокойная шкала: корневая шапка остаётся #f6f6f4,
+   а вложенные уровни постепенно теплеют и чуть темнеют. Так различие
+   читается не только по яркости, но и по оттенку; граница шапок усилена,
+   чтобы они не растворялись в белом фоне карточки. */
+.data-list th,.data-list-fit th,.data-list-wide th{background:#f6f6f4;color:#30363d;font-weight:650;font-size:15px;line-height:1.2;padding:4px 7px;border-color:#b8b8b1}
+.rel-wrap .data-list th,.rel-wrap .data-list-fit th,.rel-wrap .data-list-wide th{background:#f2f1ec}
+.rel-wrap .rel-wrap .data-list th,.rel-wrap .rel-wrap .data-list-fit th,.rel-wrap .rel-wrap .data-list-wide th{background:#eeeae1}
+.rel-wrap .rel-wrap .rel-wrap .data-list th,.rel-wrap .rel-wrap .rel-wrap .data-list-fit th,.rel-wrap .rel-wrap .rel-wrap .data-list-wide th{background:#e9e2d5}
+.rel-wrap .rel-wrap .rel-wrap .rel-wrap .data-list th,.rel-wrap .rel-wrap .rel-wrap .rel-wrap .data-list-fit th,.rel-wrap .rel-wrap .rel-wrap .rel-wrap .data-list-wide th{background:#e4dac8}
 .data-list td:first-child a{font-weight:500}
 
 .schema-fields{width:auto;margin:4px 0 0 20px}
