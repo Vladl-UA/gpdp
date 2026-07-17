@@ -252,7 +252,7 @@ function render_object_tree(array $node, int $depth = 0): void
     // карточки/заголовки, не пиксели.
     $indent = min($depth, 1) * 24;
 
-    echo '<div style="margin-left:' . $indent . 'px;border-left:2px solid #dde;padding-left:12px;margin-bottom:8px">';
+    echo '<div style="margin-left:' . $indent . 'px;padding-left:12px;margin-bottom:8px">';
 
     // Поля узла — готовая заготовка от record_tree (ядро), рендер только
     // укладывает. Действия (править/сменить родителя/удалить) — одной
