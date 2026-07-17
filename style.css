@@ -90,10 +90,24 @@ body>div[style*="margin-left:0px"]>.rel-wrap>div[style*="margin-left:24px"]{
     border-radius:4px;
     background:#fbfcfe;
 }
+
+/* Строка самой ступени должна читаться как заголовок карточки, а не как
+   обычная компактная запись. Усиливаем только её: более плотный холодный фон,
+   отдельная левая полоса, чуть больший внутренний отступ и более сильный текст. */
 body>div[style*="margin-left:0px"]>.rel-wrap>div[style*="margin-left:24px"]>.rec-line:first-child{
-    background:#eef3f8;
-    border-color:#bcc9d8;
-    font-size:15px;
+    background:#dce7f2;
+    border-color:#aebed0;
+    border-left:5px solid #6f8fae;
+    border-radius:3px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.7);
+    padding:6px 9px;
+    font-size:16px;
+    font-weight:600;
+    color:#2f3d4a;
+}
+body>div[style*="margin-left:0px"]>.rel-wrap>div[style*="margin-left:24px"]>.rec-line:first-child b{
+    color:#2f3d4a;
+    font-weight:700;
 }
 
 .block-head{display:flex;width:fit-content;align-items:center;gap:6px;margin:8px 0 3px}
