@@ -30,7 +30,15 @@ declare(strict_types=1);
  */
 function render_admin_styles(): string
 {
-    return '<link rel="stylesheet" href="style.css">';
+    // 2026-07-17: версия файла в самой ссылке (не просто "жёсткое
+    // обновление, надеюсь поможет") — после нескольких правок style.css
+    // без видимого эффекта на экране (сервер отдавал верный файл,
+    // подтверждено curl'ом; дело было в кэше конкретно style.css у
+    // браузера, не у HTML-страницы) единственный надёжный способ —
+    // сделать правку физически другим URL. filemtime — не хардкод
+    // версии, меняется сам с каждой правкой файла.
+    $version = @filemtime(__DIR__ . '/style.css') ?: time();
+    return '<link rel="stylesheet" href="style.css?v=' . $version . '">';
 }
 
 /**
