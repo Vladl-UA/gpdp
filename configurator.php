@@ -611,6 +611,11 @@ function configurator_create_view(PgSql\Connection $db_connection, array $spec, 
         }
 
         configurator_register_element($db_connection, 'table', null, $view, $spec['table_short'], $spec['table_full']);
+        // data_name — та же самая регистрация, что делает voc_simple для
+        // синтетического поля своего словаря (короткая/полная подпись
+        // "Имя"/"Наименование"). Без этого шага поле оставалось сиротой
+        // (найдено живьём диагностикой сразу после первого создания).
+        configurator_register_element($db_connection, 'field', $view, 'data_name', 'Имя', 'Наименование');
 
         $snapshot = snapshot_build($db_connection, $application);
         if ($snapshot === null) {
