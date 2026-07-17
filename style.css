@@ -74,6 +74,28 @@ h4{margin:0}
 /* Старый технический padding узла не должен добавлять ещё 12px к таблице. */
 .rel-wrap>div[style*="padding-left:12px"]{padding-left:0!important}
 
+/* Записи первого уровня под корневым объектом — крупные смысловые секции
+   вроде ступени цементирования. Не заливаем их тяжёлым цветом: даём почти
+   белый фон, тонкую рамку и более заметную левую грань. Так секция читается
+   как единый блок, но не превращается в массивную карточку. */
+body>div[style*="margin-left:0px"]>.rel-wrap>div[style*="margin-left:24px"]{
+    width:fit-content;
+    max-width:calc(100% - 24px);
+    box-sizing:border-box;
+    margin-top:4px!important;
+    margin-bottom:16px!important;
+    padding:7px 10px 10px!important;
+    border:1px solid #cbd4df;
+    border-left:4px solid #9fb3ca;
+    border-radius:4px;
+    background:#fbfcfe;
+}
+body>div[style*="margin-left:0px"]>.rel-wrap>div[style*="margin-left:24px"]>.rec-line:first-child{
+    background:#eef3f8;
+    border-color:#bcc9d8;
+    font-size:15px;
+}
+
 .block-head{display:flex;width:fit-content;align-items:center;gap:6px;margin:8px 0 3px}
 .block-head h4{font-size:17px;font-weight:650;line-height:1.2;text-align:left}
 .block-head .act{font-size:.8em;padding:0 6px;min-width:1.2em;margin-left:0}
