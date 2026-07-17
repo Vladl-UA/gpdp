@@ -114,6 +114,60 @@ function configurator_validate_spec(array $input, array $live_structure): array
         ];
     }
 
+    // --- kind === 'view_filtered': словарь-представление (2026-07-17,
+    // STATE.md «Сейчас», гибридные словари, второй шаг после links_) —
+    // умышленно узкий v1: источник — существующая таблица с id+data_name
+    // (то же требование, что voc_simple предъявляет к себе самой),
+    // фильтр — ОДНА существующая bul_-колонка источника, `= 1` (не
+    // произвольный WHERE-текст — закрытый перечислимый выбор из уже
+    // известных структурных элементов, тот же принцип §12, что держит
+    // весь остальной конфигуратор; расширение вида фильтра — отдельное
+    // решение с отдельным прогоном §15, не молчаливое обрастание этой
+    // формы). Легаси-прецедент — `mlt_contragent`: контрагент, роль
+    // фильтром по булеву флагу; здесь то же самое, честно, через
+    // Postgres VIEW вместо ручного SQL в каждом запросе.
+    if ($kind === 'view_filtered') {
+        $name_part = trim((string) ($input['dict_name'] ?? ''));
+        $view      = configurator_identifier_valid($name_part) ? 'voc_' . $name_part : '';
+
+        if (!configurator_identifier_valid($name_part)) {
+            $errors[] = 'Имя словаря: только строчные латинские буквы, цифры, "_", начинается с буквы (без префикса — voc_ подставится сам).';
+        } elseif (isset($live_structure['tables'][$view])) {
+            $errors[] = "Словарь \"$view\" уже существует.";
+        }
+
+        $source = trim((string) ($input['view_source'] ?? ''));
+        $source_fields = $live_structure['tables'][$source]['fields'] ?? null;
+        if ($source_fields === null) {
+            $errors[] = 'Исходная таблица не выбрана или не существует.';
+        } elseif (!isset($source_fields['data_name'])) {
+            $errors[] = "таблица \"$source\" существует, но без поля data_name — не может быть источником словаря.";
+        }
+
+        $filter_column = trim((string) ($input['view_filter_column'] ?? ''));
+        if ($source_fields !== null
+            && (($source_fields[$filter_column]['kind'] ?? '') !== 'entity_field'
+                || ($source_fields[$filter_column]['entity'] ?? '') !== 'bul')) {
+            $errors[] = "поле фильтра \"$filter_column\" не существует в \"$source\" или не булево (bul_).";
+        }
+
+        $table_short = trim((string) ($input['table_short'] ?? ''));
+        $table_full  = trim((string) ($input['table_full'] ?? ''));
+        if ($table_short === '' || $table_full === '') {
+            $errors[] = 'Подпись словаря (короткая и полная) обязательна.';
+        }
+
+        return [
+            'ok'             => $errors === [],
+            'errors'         => $errors,
+            'view'           => $view,
+            'source'         => $source,
+            'filter_column'  => $filter_column,
+            'table_short'    => $table_short,
+            'table_full'     => $table_full,
+        ];
+    }
+
     // --- kind === 'dependent': родитель выбирается из ЖИВОГО списка -------
     // (не печатается — тот же приём, что voc_pick: правильный ответ всегда
     // один из уже известных), dep_<parent> генерирует сервер. rel_main —
@@ -531,6 +585,48 @@ function configurator_create_table(PgSql\Connection $db_connection, array $spec,
     });
 }
 
+/**
+ * Создать словарь-представление (2026-07-17, узкий v1 — см. докблок
+ * configurator_validate_spec branch 'view_filtered'): CREATE VIEW,
+ * фильтр по одной bul_-колонке источника (`= 1`, не boolean — тот
+ * же класс осторожности, что у model_registry.active, шаг 1
+ * переезда: php-pgsql отдаёт boolean строками t/f, smallint — нет).
+ * Регистрация и пересборка — теми же кирпичами, что у обычной
+ * таблицы (configurator_with_lock/configurator_register_element,
+ * рефакторинг 07-16) — вьюха не шестая копия каркаса, а третий
+ * потребитель уже готового.
+ */
+function configurator_create_view(PgSql\Connection $db_connection, array $spec, array $application): array
+{
+    return configurator_with_lock($db_connection, 'Создание представления: ' . $spec['view'], function () use ($db_connection, $spec, $application): array {
+        $view          = $spec['view'];
+        $source        = $spec['source'];
+        $filter_column = $spec['filter_column'];
+
+        $sql = "CREATE VIEW $view AS SELECT id, data_name FROM $source WHERE $filter_column = 1";
+
+        $create = db_execute($db_connection, $sql);
+        if (!$create['ok']) {
+            return ['ok' => false, 'errors' => ['DDL: ' . $create['error']]];
+        }
+
+        configurator_register_element($db_connection, 'table', null, $view, $spec['table_short'], $spec['table_full']);
+
+        $snapshot = snapshot_build($db_connection, $application);
+        if ($snapshot === null) {
+            return ['ok' => false, 'errors' => [
+                'Представление создано, но snapshot не собрался: ' . (snapshot_last_error() ?? '?')
+                . '. Структура БД и реестр в рассинхроне — требуется ручной разбор.',
+            ]];
+        }
+        if (!snapshot_save($snapshot)) {
+            return ['ok' => false, 'errors' => ['Snapshot собран, но не сохранён (см. права на state/).']];
+        }
+
+        return ['ok' => true, 'errors' => []];
+    });
+}
+
 function configurator_delete_table(PgSql\Connection $db_connection, string $table, array $application): array
 {
     return configurator_with_lock($db_connection, 'Удаление таблицы: ' . $table, function () use ($db_connection, $table, $application): array {
@@ -543,9 +639,16 @@ function configurator_delete_table(PgSql\Connection $db_connection, string $tabl
             [$table, $table]
         );
 
+        // 2026-07-17: DROP TABLE vs DROP VIEW — задел object_type
+        // (шаг 0 гибридных словарей, добавлен в snapshot_build_structure
+        // именно ради этой развилки) наконец пригодился первому
+        // потребителю: словарю-представлению.
+        $object_type = snapshot_build_structure($db_connection)['tables'][$table]['object_type'] ?? 'table';
+        $drop_verb   = $object_type === 'view' ? 'DROP VIEW ' : 'DROP TABLE ';
+
         // DDL — имя таблицы не параметризуется (ограничение SQL, не
         // db_execute): $types='' — прямой запрос без подготовки.
-        $drop = db_execute($db_connection, 'DROP TABLE ' . $table . '');
+        $drop = db_execute($db_connection, $drop_verb . $table . '');
         if (!$drop['ok']) {
             return ['ok' => false, 'errors' => ['DDL: ' . $drop['error']]];
         }
@@ -793,8 +896,16 @@ if ($caction === 'create_table' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    $outcome = configurator_create_table($db_connection, $spec, $application);
-    $msg     = $outcome['ok'] ? "Таблица \"{$spec['table']}\" создана." : implode(' | ', $outcome['errors']);
+    // 2026-07-17: спецификация вьюхи отличима по форме (ключ 'view',
+    // не 'table') — configurator_validate_spec уже развела их веткой
+    // 'view_filtered' против 'plain'/'dependent'/'voc_simple'.
+    if (isset($spec['view'])) {
+        $outcome = configurator_create_view($db_connection, $spec, $application);
+        $msg     = $outcome['ok'] ? "Представление \"{$spec['view']}\" создано." : implode(' | ', $outcome['errors']);
+    } else {
+        $outcome = configurator_create_table($db_connection, $spec, $application);
+        $msg     = $outcome['ok'] ? "Таблица \"{$spec['table']}\" создана." : implode(' | ', $outcome['errors']);
+    }
     header('Location: ?_action=list&_msg=' . rawurlencode($msg) . '&_ok=' . ($outcome['ok'] ? '1' : '0'));
     exit;
 }
@@ -950,6 +1061,28 @@ if ($caction === 'diagnose') {
                          . render_escape($t_name) . '</option>';
     }
 
+    // 2026-07-17: словарь-представление — источник (любая таблица с
+    // data_name, тот же критерий, что уже у $link_target_options — не
+    // дублирую список отдельно, переиспользую) + карта bul_-полей
+    // каждой такой таблицы (для JS: при выборе источника показать
+    // только ЕЁ булевы колонки — закрытый перечислимый выбор, не
+    // текстовое условие, §12).
+    $view_source_bul_fields = [];
+    foreach ($live_structure['tables'] as $t_name => $t_schema) {
+        if (!isset($t_schema['fields']['data_name'])) {
+            continue;
+        }
+        $bul_fields = [];
+        foreach ($t_schema['fields'] as $f_name => $f_schema) {
+            if (($f_schema['kind'] ?? '') === 'entity_field' && ($f_schema['entity'] ?? '') === 'bul') {
+                $f_labels = $live_presentation['labels']['field'][$t_name][$f_name] ?? [];
+                $bul_fields[] = ['value' => $f_name, 'label' => (string) ($f_labels['data_full'] ?? $f_name)];
+            }
+        }
+        $view_source_bul_fields[$t_name] = $bul_fields;
+    }
+    $view_source_bul_fields_json = json_encode($view_source_bul_fields, JSON_UNESCAPED_UNICODE);
+
     echo <<<HTML
     <h2>Новая таблица</h2>
     <form method="post" action="?_action=create_table" id="create-form">
@@ -963,6 +1096,9 @@ if ($caction === 'diagnose') {
         &nbsp;&nbsp;
         <label><input type="radio" name="table_kind" value="dependent" onchange="onKindChange()">
           Зависимая таблица</label>
+        &nbsp;&nbsp;
+        <label><input type="radio" name="table_kind" value="view_filtered" onchange="onKindChange()">
+          Словарь-представление (фильтр по параметру)</label>
       </p>
 
       <div id="dependent-parent" style="display:none">
@@ -971,6 +1107,11 @@ if ($caction === 'diagnose') {
         <p><label><input type="checkbox" name="add_rel_main" value="1" checked>
            привязать к корневому досье (<code>rel_main</code>)</label>
            <small>— принадлежность центральной записи, не то же, что родитель</small></p>
+      </div>
+
+      <div id="view-source-filter" style="display:none">
+        <p>Источник: <select id="view-source-select" name="view_source" onchange="onViewSourceChange()">$link_target_options</select></p>
+        <p>Фильтр (булево поле источника = «да»): <select name="view_filter_column" id="view-filter-column"></select></p>
       </div>
 
       <div id="plain-name">
@@ -1016,6 +1157,7 @@ if ($caction === 'diagnose') {
 
     <script>
     const dictLabels = $dict_labels_json;
+    const viewSourceBulFields = $view_source_bul_fields_json;
     let fieldCount = 0;
 
     function addField() {
@@ -1061,12 +1203,29 @@ if ($caction === 'diagnose') {
 
     function onKindChange() {
       const kind   = document.querySelector('input[name=table_kind]:checked').value;
-      const isDict = kind === 'voc_simple';
-      document.getElementById('plain-name').style.display       = isDict ? 'none' : 'block';
-      document.getElementById('dict-name').style.display        = isDict ? 'block' : 'none';
-      document.getElementById('fields-section').style.display   = isDict ? 'none' : 'block';
-      document.getElementById('dict-fields-note').style.display  = isDict ? 'block' : 'none';
-      document.getElementById('dependent-parent').style.display = kind === 'dependent' ? 'block' : 'none';
+      const isDict = kind === 'voc_simple' || kind === 'view_filtered';
+      const isView = kind === 'view_filtered';
+      document.getElementById('plain-name').style.display        = isDict ? 'none' : 'block';
+      document.getElementById('dict-name').style.display         = isDict ? 'block' : 'none';
+      document.getElementById('fields-section').style.display    = isDict ? 'none' : 'block';
+      document.getElementById('dict-fields-note').style.display  = isDict && !isView ? 'block' : 'none';
+      document.getElementById('dependent-parent').style.display  = kind === 'dependent' ? 'block' : 'none';
+      document.getElementById('view-source-filter').style.display = isView ? 'block' : 'none';
+      if (isView) {
+        onViewSourceChange(); // сразу наполнить список фильтров под уже выбранный (или первый) источник
+      }
+    }
+
+    // 2026-07-17: при смене источника — список её bul_-полей, не общий
+    // список по всем таблицам (фильтр обязан быть колонкой ИМЕННО
+    // выбранного источника, закрытый выбор, не произвольный текст).
+    function onViewSourceChange() {
+      const source = document.getElementById('view-source-select').value;
+      const select = document.getElementById('view-filter-column');
+      const fields = viewSourceBulFields[source] || [];
+      select.innerHTML = fields.length === 0
+        ? '<option value="">— в источнике нет булевых полей —</option>'
+        : fields.map(f => `<option value="${f.value}">${f.label} (${f.value})</option>`).join('');
     }
 
     addField(); // первое поле сразу видно (для режима "обычная таблица")
