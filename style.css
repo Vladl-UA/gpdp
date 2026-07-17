@@ -1,42 +1,15 @@
 /* GPDP / RNA — общий вид admin-интерфейсов (index.php, configurator.php,
    labels.php). Один файл, не три копии в разных местах — правка стиля
-   не требует правки PHP. Раньше жил heredoc'ом внутри render_admin_styles()
-   (render.php); перенесён без изменения правил, только форма.
-   sync: 2026-07-14, оформление п.1 (CSS) */
+   не требует правки PHP.
+   sync: 2026-07-17, карточка объекта: нормальный левый поток, компактные
+   строки по содержимому, широкие таблицы без искусственного растягивания. */
 
 body{font-family:sans-serif;margin:2em;color:#222;text-align:left}
 table{border-collapse:collapse;table-layout:auto;margin:0}
-/* 2026-07-17 (подсказка Chat): не один режим ширины, а два — margin:
-   auto на table{} конфликтовал с inline-table и давал непредсказуемое
-   поведение. Узкие таблицы (≤7 колонок, порог в render.php) —
-   ширина по содержимому; широкие (8+, много колонок реально нужны
-   технологической таблице целиком) — на всю доступную ширину,
-   сжимать их так же было бы неправильно (стало бы нечитаемо). */
-/* 2026-07-17: единый режим — таблица по содержимому (max-content),
-   потолок max-width:100% включает горизонтальную прокрутку, если
-   контента реально больше ширины экрана. Двухрежимность (fit/wide,
-   width:100% для широких) убрана: на широком мониторе width:100%
-   раздувал ячейки, распределяя весь экран поровну между колонками —
-   а нужно ровно по содержимому и для узких, и для широких. */
-.data-list-fit, .data-list-wide{display:table;width:max-content;max-width:100%;margin:0 0 1em 0}
+.data-list,.data-list-fit,.data-list-wide{display:table;width:max-content;max-width:100%;margin:0}
+.table-wrap{width:100%;max-width:100%;overflow-x:auto;margin:0 0 8px}
+.table-wrap .data-list,.table-wrap .data-list-fit,.table-wrap .data-list-wide{margin:0}
 td,th{border:1px solid #ccc;padding:3px 6px;text-align:center;white-space:nowrap}
-/* 2026-07-17 (Влад): заголовок раздела — по ЛЕВОМУ краю СВОЕЙ таблицы,
-   таблица — у правого края страницы. Обёртка занимает всю доступную
-   ширину (блок), её правый край = край страницы; таблица внутри
-   прижимается вправо сама (margin-left:auto на самой таблице).
-   Заголовок в обёртке — обычный поток, встаёт слева; таблица —
-   у правого края. Так все таблицы выравниваются к ОДНОМУ правому
-   краю независимо от глубины вложенности (раньше width:max-content на
-   обёртке сжимал её по таблице, и margin:auto не имел свободного
-   места для сдвига). */
-.rel-wrap{width:auto}
-.rel-wrap .data-list{margin-left:auto}
-/* Но заголовок раздела должен встать по ЛЕВОМУ краю таблицы, а не
-   страницы — поэтому его обёртку .block-head тоже прижимаем вправо
-   к ширине таблицы. Достигается тем, что block-head — inline-flex
-   по содержимому, а не на всю ширину; выравнивание вправо — через
-   собственный margin-left:auto. */
-.rel-wrap .block-head{width:max-content;margin-left:auto}
 td:first-child a{display:block;margin:-6px -10px;padding:6px 10px;color:inherit;text-decoration:none}
 td:first-child a:hover{background:#eef}
 ul{padding-left:20px}
@@ -47,64 +20,44 @@ li{margin-bottom:4px}
 .flash-err{background:#f8e2e2}
 fieldset{margin-bottom:.5em}
 .field-row{display:flex;gap:8px;align-items:center;margin-bottom:6px}
-.field-row select, .field-row input{padding:4px}
+.field-row select,.field-row input{padding:4px}
 .home-link{display:inline-block;margin-bottom:1em}
-.act{display:inline-block;min-width:1.6em;text-align:center;text-decoration:none;
-     border:1px solid #ccc;border-radius:3px;padding:1px 6px;margin-left:4px;color:#225}
+.act{display:inline-block;min-width:1.6em;text-align:center;text-decoration:none;border:1px solid #ccc;border-radius:3px;padding:1px 6px;margin-left:4px;color:#225}
 .act:hover{background:#eef}
 .act-danger{color:#a22}
 .act-danger:hover{background:#fee}
-.data-list th{background:#ffe58a;font-weight:500}
+.data-list th{background:#f2f4f7;color:#343a40;font-weight:600}
 .data-list td:first-child a{font-weight:500}
 .schema-fields{width:auto;margin:4px 0 0 20px}
 .schema-fields td{border:none;padding:1px 24px 1px 0;color:#444}
-.schema-card{width:70%;max-width:calc(100% - 24px);margin-bottom:12px;
-             border:1px solid #e2e2e0;border-radius:4px;overflow:hidden}
-.schema-family{width:70%;max-width:calc(100% - 24px);margin-bottom:16px;
-               border:1px solid #d8d8d5;border-radius:4px;overflow:hidden;padding-bottom:4px}
+.schema-card{width:70%;max-width:calc(100% - 24px);margin-bottom:12px;border:1px solid #e2e2e0;border-radius:4px;overflow:hidden}
+.schema-family{width:70%;max-width:calc(100% - 24px);margin-bottom:16px;border:1px solid #d8d8d5;border-radius:4px;overflow:hidden;padding-bottom:4px}
 .schema-card-bare{width:auto;max-width:none;margin-bottom:0;border:none;border-radius:0}
 .schema-card-bare .schema-head{border-radius:0}
-.schema-head{display:flex;align-items:center;justify-content:space-between;
-             gap:8px;background:#f6f6f4;padding:6px 10px;border-bottom:1px solid #eee}
+.schema-head{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#f6f6f4;padding:6px 10px;border-bottom:1px solid #eee}
 .schema-title{min-width:0}
 .schema-acts{flex-shrink:0;white-space:nowrap}
 .schema-fields{margin:6px 0 8px 20px}
 h4{margin:0}
-/* 2026-07-17: карточка объекта — по замечанию Влада, элементы
-   управления каждой вложенной таблицы шли отдельной строкой ниже
-   таблицы («одна строка = одна таблица»), разрывая визуальный поток.
-   Теперь — один выпадающий список в последней ячейке той же строки
-   (.act-select, через render_actions_dropdown), не несколько иконок
-   врозь; колонка под него — минимальной ширины, не тянется наравне
-   с текстовыми столбцами. */
 .col-actions{width:1%;white-space:nowrap;text-align:right}
-/* 2026-07-17: замена <select> (Влад — открытие по клику не годится,
-   нужно по наведению; select физически не умеет hover) на чистый
-   CSS hover-menu, без JS: маленькая кнопка-триггер + список ссылок,
-   показывается через :hover. */
 .act-menu{position:relative;display:inline-block}
-.act-trigger{padding:1px 7px;font-size:.8em;border:1px solid #ccc;border-radius:3px;
-             background:#fff;cursor:pointer;color:#225;min-width:1.4em}
+.act-trigger{padding:1px 7px;font-size:.8em;border:1px solid #ccc;border-radius:3px;background:#fff;cursor:pointer;color:#225;min-width:1.4em}
 .act-trigger:hover{background:#eef}
-.act-menu-list{display:none;position:absolute;right:0;top:100%;background:#fff;
-               border:1px solid #ccc;border-radius:3px;min-width:11em;z-index:10;
-               box-shadow:0 2px 6px rgba(0,0,0,.15)}
+.act-menu-list{display:none;position:absolute;right:0;top:100%;background:#fff;border:1px solid #ccc;border-radius:3px;min-width:11em;z-index:10;box-shadow:0 2px 6px rgba(0,0,0,.15)}
 .act-menu:hover .act-menu-list{display:block}
-.act-menu-list a{display:block;padding:5px 10px;white-space:nowrap;
-                 text-decoration:none;color:#225;font-size:.9em}
+.act-menu-list a{display:block;padding:5px 10px;white-space:nowrap;text-decoration:none;color:#225;font-size:.9em}
 .act-menu-list a:hover{background:#eef}
 .act-menu-list a.act-danger{color:#a22}
 .act-menu-list a.act-danger:hover{background:#fee}
-/* Заголовок раздела (label) + кнопка «+ добавить» — одна строка,
-   тот же приём, что .schema-head, для вложенных таблиц карточки.
-   Кнопка «+» здесь меньше обычной .act (Влад: слишком крупная). */
-.block-head{display:flex;align-items:center;gap:8px;margin:10px 0 2px}
+.rel-wrap{width:auto;max-width:100%;margin-top:8px}
+.rel-wrap .data-list,.rel-wrap .data-list-fit,.rel-wrap .data-list-wide{margin-left:0}
+.rel-wrap .block-head{margin-left:0}
+.block-head{display:flex;width:fit-content;align-items:center;gap:6px;margin:8px 0 3px}
+.block-head h4{font-size:13px;font-weight:650}
 .block-head .act{font-size:.8em;padding:0 6px;min-width:1.2em;margin-left:0}
-/* 2026-07-17: компактная строка вместо таблицы-на-три-значения (план
-   Chat п.2-3) — буфер/реагент/репер/компонент. */
-.rec-line{display:flex;justify-content:space-between;align-items:center;
-          gap:12px;padding:5px 8px;border:1px solid var(--line,#e2e2e0);
-          border-top:none;background:#fff}
-.rec-line:first-of-type{border-top:1px solid var(--line,#e2e2e0)}
+.rec-line{display:flex;width:fit-content;max-width:100%;justify-content:flex-start;align-items:center;gap:12px;padding:4px 7px;border:1px solid var(--line,#dfe3e8);background:#fff}
+.rec-line+.rec-line{border-top:none}
 .rec-line b{font-weight:600;color:#555}
+.rec-line>span:first-child{min-width:0;white-space:normal}
 .rec-line .act-menu{flex-shrink:0}
+@media (max-width:900px){body{margin:1em}td,th{padding:3px 5px}}
