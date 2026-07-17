@@ -301,7 +301,7 @@ function render_object_tree_block(array $block, string $parent_table, int $paren
     $indent      = min($depth + 1, 1) * 24;
     $child_table = $block['table'];
 
-    echo '<div style="margin-left:' . $indent . 'px">';
+    echo '<div class="rel-wrap" style="margin-left:' . $indent . 'px">';
     echo '<div class="block-head"><h4>' . render_escape($block['label']) . '</h4>'
        . '<a class="act" href="?_table=' . rawurlencode($child_table)
        . '&_action=new&_parent_table=' . rawurlencode($parent_table)
