@@ -1479,7 +1479,11 @@ function record_delete(PgSql\Connection $db_connection, array $snapshot, string 
         return $result;
     }
 
-    $outcome = db_execute($db_connection, "DELETE FROM $table WHERE id = ? LIMIT 1", 'i', [$id]);
+    // 2026-07-16: LIMIT на DELETE — расширение MySQL, в Postgres такого
+    // синтаксиса нет вовсе (ошибка парсера). Убран, не заменён —
+    // избыточен и под MySQL: id — первичный ключ, WHERE id = ? и так
+    // задевает максимум одну строку.
+    $outcome = db_execute($db_connection, "DELETE FROM $table WHERE id = ?", 'i', [$id]);
     if (!$outcome['ok']) {
         $result['errors'][] = 'Ошибка удаления: ' . $outcome['error'];
         return $result;
