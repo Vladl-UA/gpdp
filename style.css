@@ -21,12 +21,22 @@ table{border-collapse:collapse;table-layout:auto;margin:0}
 .data-list-fit, .data-list-wide{display:table;width:max-content;max-width:100%;margin:0 0 1em 0}
 td,th{border:1px solid #ccc;padding:3px 6px;text-align:center;white-space:nowrap}
 /* 2026-07-17 (Влад): заголовок раздела — по ЛЕВОМУ краю СВОЕЙ таблицы,
-   таблица — у правого края страницы. Общая обёртка сжимается по
-   ширине таблицы (width:max-content) и прижимается вправо
-   (margin-left:auto); заголовок внутри неё встаёт по левому краю
-   таблицы автоматически. Все таблицы теперь по содержимому — отдельный
-   режим для широких больше не нужен, :has() убран. */
-.rel-wrap{width:max-content;max-width:100%;margin-left:auto}
+   таблица — у правого края страницы. Обёртка занимает всю доступную
+   ширину (блок), её правый край = край страницы; таблица внутри
+   прижимается вправо сама (margin-left:auto на самой таблице).
+   Заголовок в обёртке — обычный поток, встаёт слева; таблица —
+   у правого края. Так все таблицы выравниваются к ОДНОМУ правому
+   краю независимо от глубины вложенности (раньше width:max-content на
+   обёртке сжимал её по таблице, и margin:auto не имел свободного
+   места для сдвига). */
+.rel-wrap{width:auto}
+.rel-wrap .data-list{margin-left:auto}
+/* Но заголовок раздела должен встать по ЛЕВОМУ краю таблицы, а не
+   страницы — поэтому его обёртку .block-head тоже прижимаем вправо
+   к ширине таблицы. Достигается тем, что block-head — inline-flex
+   по содержимому, а не на всю ширину; выравнивание вправо — через
+   собственный margin-left:auto. */
+.rel-wrap .block-head{width:max-content;margin-left:auto}
 td:first-child a{display:block;margin:-6px -10px;padding:6px 10px;color:inherit;text-decoration:none}
 td:first-child a:hover{background:#eef}
 ul{padding-left:20px}
