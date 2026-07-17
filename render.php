@@ -216,14 +216,18 @@ function render_object_tree(array $node, int $depth = 0): void
 }
 
 /**
- * Один раздел детей (2026-07-17, замечание Влада: «Компонент состава
- * репера» рвался на N отдельных мини-таблиц, по одной на компонент,
- * вместо одной таблицы с N строками — было так всегда, просто
- * заметно стало только сейчас). Заголовок+«+» — одна строка
- * (`.block-head`), ОДНА таблица на всех сиблингов этого блока (не по
- * таблице на запись), затем — рекурсия в СОБСТВЕННЫХ детях каждого
- * сиблинга, если есть (обёрнута меткой записи — иначе при нескольких
- * строках с детьми непонятно, чьи это дети).
+ * Один раздел детей (2026-07-17, замечание Влада, дважды уточнено).
+ * Первая правка объединила ВСЕХ сиблингов в одну таблицу — правильно
+ * для «Компонент состава репера» (нет своих детей), но сломала
+ * интервалы цементирования (у каждого — свои испытания/буфер/АКЦ):
+ * общая таблица оторвала строку от того, что относится именно к ней.
+ * Итог — развилка по факту: есть ли у сиблингов СВОИ дети.
+ *
+ * Нет своих детей (лист) → ОДНА таблица на все строки (§ситуация
+ * «Компонент состава репера»/«Химреагент испытания»).
+ * Есть свои дети → каждый сиблинг остаётся самостоятельной карточкой
+ * (строка + сразу под ней её собственные дети) — связь строки со
+ * своими детьми важнее компактности таблицы.
  */
 function render_object_tree_block(array $block, string $parent_table, int $parent_id, int $depth): void
 {
@@ -237,15 +241,25 @@ function render_object_tree_block(array $block, string $parent_table, int $paren
        . "&_parent_id=$parent_id\" title=\"добавить в «" . render_escape($block['label']) . '»">+</a></div>';
 
     $siblings = $block['nodes'];
-    if ($siblings !== []) {
+    $has_grandchildren = false;
+    foreach ($siblings as $sibling) {
+        if ($sibling['children'] !== []) {
+            $has_grandchildren = true;
+            break;
+        }
+    }
+
+    if ($siblings !== [] && !$has_grandchildren) {
+        // Лист: ни у кого нет своих детей — безопасно свести в одну
+        // таблицу, разрывать нечего, каждая строка самодостаточна.
         $merged_rows = [];
         foreach ($siblings as $sibling) {
             foreach ($sibling['view']['rows'] ?? [] as $row) {
                 $merged_rows[] = $row;
             }
         }
-        $merged_view          = $siblings[0]['view'];
-        $merged_view['rows']  = $merged_rows;
+        $merged_view         = $siblings[0]['view'];
+        $merged_view['rows'] = $merged_rows;
 
         $opts = [
             'edit_href'   => "?_table=$child_table&_action=edit&_id={id}",
@@ -255,23 +269,11 @@ function render_object_tree_block(array $block, string $parent_table, int $paren
             $opts['reparent_href'] = "?_table=$child_table&_action=reparent&_id={id}";
         }
         echo render_record_table($merged_view, $opts);
-
-        // Собственные дети каждого сиблинга — рекурсия. Метка записи
-        // нужна, только когда сиблингов несколько И у этого конкретного
-        // есть что показать — иначе непонятно, к какой строке таблицы
-        // выше относится вложенный раздел.
-        $show_labels = count($siblings) > 1;
+    } else {
+        // Есть свои дети хоть у одного: каждый сиблинг — своя карточка
+        // (строка + сразу под ней её дети), чтобы связь не терялась.
         foreach ($siblings as $sibling) {
-            if ($sibling['children'] === []) {
-                continue;
-            }
-            if ($show_labels) {
-                echo '<p style="margin:' . ($indent + 24) . 'px 0 0;color:#666;font-size:.9em">'
-                   . '↳ ' . render_escape($sibling['label']) . '</p>';
-            }
-            foreach ($sibling['children'] as $grandchild_block) {
-                render_object_tree_block($grandchild_block, $child_table, $sibling['id'], $depth + 1);
-            }
+            render_object_tree($sibling, $depth + 1);
         }
     }
     echo '</div>';
