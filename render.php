@@ -409,7 +409,15 @@ function render_record_table(array $view, array $opts = []): string
 
     $has_actions = isset($opts['edit_href'], $opts['delete_href']);
 
-    $html = '<table class="data-list"><tr>';
+    // 2026-07-17 (подсказка Chat): два режима ширины, не один — узкие
+    // таблицы (АКЦ, пласт) сжимаются по содержимому, широкие (много
+    // колонок — интервал, лабораторные испытания, скважина) занимают
+    // всю ширину, сжимать их так же было бы нечитаемо. Порог считает
+    // колонку действий тоже (реальная ширина строки, не только полей).
+    $col_count   = count($columns) + ($has_actions ? 1 : 0);
+    $table_class = $col_count <= 7 ? 'data-list data-list-fit' : 'data-list data-list-wide';
+
+    $html = '<table class="' . $table_class . '"><tr>';
     foreach ($columns as $column) {
         $html .= '<th>' . render_escape((string) $column['label']) . '</th>';
     }

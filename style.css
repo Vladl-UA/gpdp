@@ -5,7 +5,15 @@
    sync: 2026-07-14, оформление п.1 (CSS) */
 
 body{font-family:sans-serif;margin:2em;color:#222;text-align:left}
-table{border-collapse:collapse;margin:0 0 1em auto;display:inline-table}
+table{border-collapse:collapse;table-layout:auto;margin:0}
+/* 2026-07-17 (подсказка Chat): не один режим ширины, а два — margin:
+   auto на table{} конфликтовал с inline-table и давал непредсказуемое
+   поведение. Узкие таблицы (≤7 колонок, порог в render.php) —
+   ширина по содержимому; широкие (8+, много колонок реально нужны
+   технологической таблице целиком) — на всю доступную ширину,
+   сжимать их так же было бы неправильно (стало бы нечитаемо). */
+.data-list-fit{display:inline-table;width:auto;max-width:100%;margin:0 0 1em 0;vertical-align:top}
+.data-list-wide{display:table;width:100%;margin:0 0 1em 0}
 td,th{border:1px solid #ccc;padding:6px 10px;text-align:center;white-space:nowrap}
 td:first-child a{display:block;margin:-6px -10px;padding:6px 10px;color:inherit;text-decoration:none}
 td:first-child a:hover{background:#eef}
