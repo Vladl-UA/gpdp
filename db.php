@@ -84,6 +84,30 @@ function db_placeholders(string $sql): string
 }
 
 /**
+ * Счётчик фактически выполненных запросов за текущий запрос/процесс.
+ * 2026-07-16: замена MySQL `SHOW SESSION STATUS LIKE 'Questions'` для
+ * N+1-проверки в smoke_test.php — у Postgres нет прямого аналога этой
+ * status-переменной (`pg_stat_statements` — отдельное расширение,
+ * требует superuser/shared_preload_libraries, к тому же считает по
+ * БАЗЕ данных, не по этому соединению — шумит от чужих сессий на
+ * общем сервере). Свой счётчик точнее для своей же цели: считает
+ * ровно то, что выполнил db.php, ничего больше.
+ *
+ * db_query_count(1) — инкремент (вызывается db_select/db_execute на
+ * каждый реальный запрос, до проверки результата — счёт идёт по
+ * попытке выполнения, не по успеху, тот же принцип, что у MySQL
+ * Questions); db_query_count() или db_query_count(0) — чтение текущего
+ * значения. Одна static-переменная внутри функции — обнуляется каждый
+ * новый процесс/запрос сама по себе.
+ */
+function db_query_count(int $delta = 0): int
+{
+    static $count = 0;
+    $count += $delta;
+    return $count;
+}
+
+/**
  * Чтение (SELECT). $types игнорируется по смыслу (Postgres сам выводит
  * тип параметра из контекста, типовая строка mysqli не нужна) — параметр
  * ОСТАВЛЕН в сигнатуре ради нулевой правки вызывающего кода, только
@@ -95,6 +119,8 @@ function db_placeholders(string $sql): string
  */
 function db_select(PgSql\Connection $db_connection, string $sql, string $types = '', array $params = []): array
 {
+    db_query_count(1);
+
     $result = $types === ''
         ? @pg_query($db_connection, $sql)
         : @pg_query_params($db_connection, db_placeholders($sql), $params);
@@ -115,6 +141,8 @@ function db_select(PgSql\Connection $db_connection, string $sql, string $types =
  */
 function db_execute(PgSql\Connection $db_connection, string $sql, string $types = '', array $params = []): array
 {
+    db_query_count(1);
+
     $result = $types === ''
         ? @pg_query($db_connection, $sql)
         : @pg_query_params($db_connection, db_placeholders($sql), $params);
