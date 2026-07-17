@@ -53,7 +53,7 @@ h4{margin:0}
 .rel-wrap .data-list,.rel-wrap .data-list-fit,.rel-wrap .data-list-wide{margin-left:0}
 .rel-wrap .block-head{margin-left:0}
 .block-head{display:flex;width:fit-content;align-items:center;gap:6px;margin:8px 0 3px}
-.block-head h4{font-size:13px;font-weight:650}
+.block-head h4{font-size:15px;font-weight:650;line-height:1.2}
 .block-head .act{font-size:.8em;padding:0 6px;min-width:1.2em;margin-left:0}
 .rec-line{display:flex;width:fit-content;max-width:100%;justify-content:flex-start;align-items:center;gap:12px;padding:4px 7px;border:1px solid var(--line,#dfe3e8);background:#fff}
 .rec-line+.rec-line{border-top:none}
