@@ -601,18 +601,25 @@ function snapshot_build_dictionaries(array $structure, array $templates = [], ar
         }
     }
 
-    // ---- Проход 1б: link_ — источник ЯВНО из model_links (журнал 07-12) ----
+    // ---- Проход 1б: link_/links_ — источник ЯВНО из model_links (журнал
+    // 07-12, расширено 07-17 для links_) ----
     // Тот же резолвер (маяк/data_name) — другой способ узнать $source:
     // не вычисляется из имени поля, читается из явной записи. Нужно,
     // потому что двум полям на одной таблице требуется один и тот же
     // адрес под разными именами и ролями (Идея А — «любимый цвет» /
     // «нелюбимый цвет» → оба voc_color); имя может адресовать только
     // одно место, значит адрес для link_ не в имени, а в записи.
+    // links_ (2026-07-17) переиспользует ровно тот же адресный
+    // механизм (configurator_register_link/model_links) — отличие
+    // только в кратности хранения (integer[] вместо int), не в
+    // способе узнать источник, поэтому здесь один и тот же проход,
+    // не отдельная копия.
     // Глобально по имени поля — та же конвенция «одно имя = один
     // смысл» (§16.1), что у словарей.
     foreach ($structure['tables'] as $table) {
         foreach ($table['fields'] as $field_name => $field) {
-            if (($field['kind'] ?? '') !== 'entity_field' || ($field['entity'] ?? '') !== 'link') {
+            $field_entity = $field['entity'] ?? '';
+            if (($field['kind'] ?? '') !== 'entity_field' || ($field_entity !== 'link' && $field_entity !== 'links')) {
                 continue;
             }
             if (isset($map[$field_name])) {
