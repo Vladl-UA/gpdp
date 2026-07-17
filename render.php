@@ -74,10 +74,15 @@ function render_escape(string $text): string
     return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
 }
 
-/** Значение для ячейки таблицы / просмотра. */
+/** Значение для ячейки таблицы / просмотра. Список (многозначное поле,
+ *  напр. links_) — в столбик, тот же приём, что render_record_table. */
 function render_value(array $result): string
 {
-    return render_escape((string) ($result['value'] ?? ''));
+    $value = $result['value'] ?? '';
+    if (is_array($value)) {
+        return implode('<br>', array_map(static fn($v): string => render_escape((string) $v), $value));
+    }
+    return render_escape((string) $value);
 }
 
 /** Элемент формы с подписью. */
@@ -137,8 +142,27 @@ function render_choice(array $result): string
 {
     $name    = render_escape((string) ($result['name'] ?? ''));
     $current = $result['value'] ?? null;
-    $options = '';
 
+    // 2026-07-17: links_ — множественный выбор. Тот же трюк, что у
+    // bul_'s чекбокса: скрытое поле ПЕРЕД <select multiple> — иначе
+    // браузер при снятии ВСЕХ отметок не пришлёт ключ вовсе, и
+    // record_save() увидел бы «поле не трогали» (законное частичное
+    // обновление) вместо «выбор явно очищён». Пустая строка в
+    // сентинеле отфильтровывается на стороне validate (links_handler).
+    if (($result['widget'] ?? 'select') === 'select_multiple') {
+        $selected_ids = is_array($current) ? $current : [];
+        $options = '';
+        foreach ($result['options'] ?? [] as $option) {
+            $value    = render_escape((string) $option['value']);
+            $label    = render_escape((string) $option['label']);
+            $selected = in_array($option['value'], $selected_ids, true) ? ' selected' : '';
+            $options .= "<option value=\"$value\"$selected>$label</option>";
+        }
+        return "<input type=\"hidden\" name=\"{$name}[]\" value=\"\">"
+             . "<select name=\"{$name}[]\" multiple>$options</select>";
+    }
+
+    $options = '';
     foreach ($result['options'] ?? [] as $option) {
         $value    = render_escape((string) $option['value']);
         $label    = render_escape((string) $option['label']);
@@ -257,7 +281,13 @@ function render_record_table(array $view, array $opts = []): string
         $cells = $row['cells'] ?? [];
         $html .= '<tr>';
         foreach ($cells as $i => $value) {
-            $escaped = render_escape((string) $value);
+            // 2026-07-17: список (многозначное поле, напр. links_) —
+            // в столбик внутри той же ячейки, не растягивая таблицу
+            // вширь; каждый выбранный вариант словаря — своя строка.
+            // Пустой список — пустая ячейка, не "Array"/мусор.
+            $escaped = is_array($value)
+                ? implode('<br>', array_map(static fn($v): string => render_escape((string) $v), $value))
+                : render_escape((string) $value);
             if ($i === 0 && isset($opts['card_href'])) {
                 $href = render_escape(str_replace('{id}', (string) $id, $opts['card_href']));
                 $html .= '<td><a href="' . $href . '">' . $escaped . '</a></td>';

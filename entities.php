@@ -1038,3 +1038,144 @@ function ent_link(): array
         ],
     ];
 }
+
+// ============================================================
+// links_ — многозначная ссылка на обычный словарь (2026-07-17,
+// STATE.md «Сейчас», порядок Влада: снапшот → links_ → вьюхи).
+// Надстройка над той же адресацией, что link_ (переиспользует
+// configurator_register_link/model_links — тот же кирпич, не новая
+// таблица адресов) — отличие только в форме хранения (Postgres
+// integer[] вместо скалярного int) и в кратности (0..N вместо 0..1).
+//
+// Целостность НЕ на стороне БД (Postgres не умеет REFERENCES на
+// элемент массива — проверено живьём 2026-07-16, патч 2012 года так
+// и не вошёл в ядро) — validate здесь то же самое делает GPDP,
+// что уже делает voc_handler для скаляра. Тот же принцип, что уже
+// принят для dep_/rel_main (без FK-constraint) — не новый прецедент.
+//
+// Форма на новом/edit — <select multiple>, тот же виджет, что уже
+// был у легаси mch() (Влад: «виджет там был правильный, порочным
+// было только хранение»); пустой выбор — тот же трюк, что у bul_
+// (скрытый сентинел ПЕРЕД мультиселектом, иначе браузер не пришлёт
+// ключ вовсе при снятии всех отметок — не «поле не трогали», а
+// «выбор явно очищен»).
+// ============================================================
+
+/** '{1,3,5}'/NULL/'' → [1,3,5] / []. Postgres всегда отдаёт array-колонки
+ *  ТЕКСТОМ в литеральном синтаксисе — pg_* не кастует в PHP-массив сам. */
+function links_array_parse(?string $raw): array
+{
+    if ($raw === null || $raw === '' || $raw === '{}') {
+        return [];
+    }
+    $inner = trim($raw, '{}');
+    if ($inner === '') {
+        return [];
+    }
+    return array_values(array_unique(array_map('intval', explode(',', $inner))));
+}
+
+/** [1,3,5] → '{1,3,5}' — готовый Postgres array-литерал для параметра
+ *  db_execute (pg_query_params сам кастует текст в integer[] по типу
+ *  целевой колонки — тот же приём, что уже работает для bul_'s '1'/'0'). */
+function links_array_build(array $ids): string
+{
+    return '{' . implode(',', array_map('intval', $ids)) . '}';
+}
+
+function links_handler(array $data, string $mode): array
+{
+    $field = $data['field'];
+    $dict  = $field['dict'];
+
+    if ($mode === 'read') {
+        $ids     = links_array_parse(is_string($data['value'] ?? null) ? $data['value'] : null);
+        $options = $ids !== [] ? lookup_labels($data['db'], $dict) : [];
+
+        return [
+            'type'      => 'value',
+            'name'      => $field['raw'],
+            // Список подписей, не строка — раскладку в HTML (столбик,
+            // не строка через запятую) решает render.php, ядро отдаёт
+            // структуру (STATE.md 2026-07-17, ответ на вопрос Влада).
+            'value'     => array_values(array_filter(array_map(
+                static fn(int $id): string => $options[$id] ?? '', $ids
+            ), static fn(string $s): bool => $s !== '')),
+            'raw_value' => $ids,
+            'subscr'    => $field['subscr'],
+        ];
+    }
+
+    if ($mode === 'new' || $mode === 'edit') {
+        $current = $mode === 'new'
+            ? []
+            : links_array_parse(is_string($data['value'] ?? null) ? $data['value'] : null);
+        $options = [];
+        foreach (lookup_labels($data['db'], $dict) as $id => $label) {
+            $options[] = ['value' => $id, 'label' => $label];
+        }
+
+        return [
+            'type'     => 'choice',
+            'widget'   => 'select_multiple',
+            'name'     => $field['raw'],
+            'value'    => $current, // массив выбранных id, не скаляр
+            'options'  => $options,
+            'subscr'   => $field['subscr'],
+        ];
+    }
+
+    if ($mode === 'validate') {
+        // Вход — массив (HTML `name[]` от <select multiple>, PHP сам
+        // собирает в массив) + сентинел от скрытого пустого поля формы
+        // (тот же трюк, что bul_ делает для чекбокса) — пустые/нечисловые
+        // элементы отфильтровываются здесь, не на входе.
+        $raw = $data['value'] ?? [];
+        $ids = is_array($raw)
+            ? array_values(array_unique(array_map('intval', array_filter(
+                $raw, static fn($v): bool => $v !== '' && $v !== null
+            ))))
+            : [];
+
+        $known = $ids !== [] ? lookup_labels($data['db'], $dict) : [];
+        foreach ($ids as $id) {
+            if (!isset($known[$id])) {
+                return [
+                    'valid'  => false,
+                    'value'  => null,
+                    'errors' => ["Значения #$id нет в словаре"],
+                ];
+            }
+        }
+
+        return ['valid' => true, 'value' => links_array_build($ids), 'errors' => []];
+    }
+
+    return ['type' => 'error', 'errors' => ["Неподдерживаемый режим '$mode'"]];
+}
+
+function ent_links(): array
+{
+    return [
+        'id'    => 'links',
+        'label' => 'Список ссылок (0..N, адрес задан явно)',
+
+        'db' => [
+            'kind'          => 'column_with_table',
+            'default_type'  => 'integer[]',
+            'allowed_types' => ['integer[]', 'smallint[]'],
+            'nullable'      => true,
+        ],
+
+        'create' => [
+            'params' => ['name', 'label', 'target_table'], // цель — тот же параметр, что у link_
+        ],
+
+        'handlers' => [
+            'new'      => 'links_handler',
+            'edit'     => 'links_handler',
+            'read'     => 'links_handler',
+            'validate' => 'links_handler',
+        ],
+    ];
+}

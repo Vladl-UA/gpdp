@@ -1819,7 +1819,14 @@ function record_view_row(
         $field_name = $column['field'];
         $data   = field_data($snapshot, $db_connection, $table, $field_name, $row[$field_name] ?? null, $row);
         $result = $data !== null ? field_exec($data, 'read') : null;
-        $cells[] = $result !== null ? (string) ($result['value'] ?? '') : '';
+        // 2026-07-17: значение ячейки МОЖЕТ быть списком (links_ и
+        // подобные многозначные поля) — раскладка в HTML (в столбик,
+        // не одной строкой) решается в render.php (§3: единственное
+        // место, где рождается HTML), не здесь. Ядро больше не
+        // приводит принудительно к (string) — пропускает как есть
+        // (строка для обычных полей, список строк для многозначных).
+        $value = $result !== null ? ($result['value'] ?? '') : '';
+        $cells[] = is_array($value) ? $value : (string) $value;
     }
     return ['id' => (int) ($row['id'] ?? 0), 'cells' => $cells];
 }

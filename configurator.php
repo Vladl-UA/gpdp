@@ -250,12 +250,16 @@ function configurator_parse_field(
             : 'именная часть — латиница/цифры/"_", с буквы.'], 'field' => null];
     }
 
-    // link_: имя поля свободное (как обычное), а не выбор из списка —
-    // в отличие от voc_, где имя = имя целевой таблицы. Цель для link_
+    // link_/links_: имя поля свободное (как обычное), а не выбор из
+    // списка — в отличие от voc_, где имя = имя целевой таблицы. Цель
     // указывается ОТДЕЛЬНО (журнал 2026-07-12: имя поля и адрес цели —
-    // разные вещи, ровно затем и вводили link_).
+    // разные вещи, ровно затем и вводили link_). links_ (2026-07-17) —
+    // тот же механизм адресации, та же проверка; список литералов
+    // здесь короче, чем проверка db.kind==='column_with_table' по
+    // каждому known_entities на этом шаге — не общий случай, других
+    // сущностей этого вида пока нет.
     $link_target = null;
-    if ($entity_choice === 'link') {
+    if ($entity_choice === 'link' || $entity_choice === 'links') {
         $link_target = trim((string) ($raw_field['link_target'] ?? ''));
         if ($link_target === '' || !isset($live_structure['tables'][$link_target])) {
             return ['ok' => false, 'errors' => ['цель ссылки не выбрана или не существует.'], 'field' => null];
@@ -1041,7 +1045,7 @@ if ($caction === 'diagnose') {
       // цели — семантика поля («любимый цвет») не совпадает с
       // подписью цели («Цвет»)).
       voc.style.display  = select.value === 'voc'  ? '' : 'none';
-      link.style.display = select.value === 'link' ? '' : 'none';
+      link.style.display = (select.value === 'link' || select.value === 'links') ? '' : 'none';
       name.style.display = select.value === 'voc'  ? 'none' : '';
       short.style.display = full.style.display = '';
     }
@@ -1227,7 +1231,7 @@ if ($caction === 'diagnose') {
           const fRow    = form.querySelector('.f-formula-row');
           const fHint   = form.querySelector('.f-formula-hint');
           voc.style.display  = select.value === 'voc'  ? '' : 'none';
-          link.style.display = select.value === 'link' ? '' : 'none';
+          link.style.display = (select.value === 'link' || select.value === 'links') ? '' : 'none';
           name.style.display = select.value === 'voc'  ? 'none' : '';
           fRow.style.display  = select.value === 'calc' ? '' : 'none';
           fHint.style.display = select.value === 'calc' ? '' : 'none';
