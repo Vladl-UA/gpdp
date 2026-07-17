@@ -1,8 +1,8 @@
 /* GPDP / RNA — общий вид admin-интерфейсов (index.php, configurator.php,
    labels.php). Один файл, не три копии в разных местах — правка стиля
    не требует правки PHP.
-   sync: 2026-07-17, карточка объекта: нормальный левый поток, компактные
-   строки по содержимому, широкие таблицы без искусственного растягивания. */
+   sync: 2026-07-17, карточка объекта: заголовки отношений выровнены по
+   левому краю своих записей; глубина дерева различается фоном шапок. */
 
 body{font-family:sans-serif;margin:2em;color:#222;text-align:left}
 table{border-collapse:collapse;table-layout:auto;margin:0}
@@ -27,14 +27,14 @@ fieldset{margin-bottom:.5em}
 .act-danger{color:#a22}
 .act-danger:hover{background:#fee}
 
-/* Карточка: первый уровень заметнее, затем фон шапки светлеет примерно
-   на 5% на каждом уровне вложенности. Селекторы на .rel-wrap отражают
-   реальную глубину дерева, не имена предметных таблиц. */
-.data-list th,.data-list-fit th,.data-list-wide th{background:#d8dde3;color:#343a40;font-weight:600}
-.rel-wrap .data-list th,.rel-wrap .data-list-fit th,.rel-wrap .data-list-wide th{background:#e2e6ea}
-.rel-wrap .rel-wrap .data-list th,.rel-wrap .rel-wrap .data-list-fit th,.rel-wrap .rel-wrap .data-list-wide th{background:#eaedf0}
-.rel-wrap .rel-wrap .rel-wrap .data-list th,.rel-wrap .rel-wrap .rel-wrap .data-list-fit th,.rel-wrap .rel-wrap .rel-wrap .data-list-wide th{background:#f1f3f5}
-.rel-wrap .rel-wrap .rel-wrap .rel-wrap .data-list th,.rel-wrap .rel-wrap .rel-wrap .rel-wrap .data-list-fit th,.rel-wrap .rel-wrap .rel-wrap .rel-wrap .data-list-wide th{background:#f7f8f9}
+/* Карточка: корневая таблица заметно темнее, затем шапка светлеет
+   примерно на 5% на каждом реальном уровне вложенности. Контраст сделан
+   нарочно заметным: прежние близкие оттенки на мониторе почти сливались. */
+.data-list th,.data-list-fit th,.data-list-wide th{background:#c8ced5;color:#343a40;font-weight:600}
+.rel-wrap .data-list th,.rel-wrap .data-list-fit th,.rel-wrap .data-list-wide th{background:#d5dae0}
+.rel-wrap .rel-wrap .data-list th,.rel-wrap .rel-wrap .data-list-fit th,.rel-wrap .rel-wrap .data-list-wide th{background:#e1e5e9}
+.rel-wrap .rel-wrap .rel-wrap .data-list th,.rel-wrap .rel-wrap .rel-wrap .data-list-fit th,.rel-wrap .rel-wrap .rel-wrap .data-list-wide th{background:#eceff1}
+.rel-wrap .rel-wrap .rel-wrap .rel-wrap .data-list th,.rel-wrap .rel-wrap .rel-wrap .rel-wrap .data-list-fit th,.rel-wrap .rel-wrap .rel-wrap .rel-wrap .data-list-wide th{background:#f5f6f7}
 .data-list td:first-child a{font-weight:500}
 
 .schema-fields{width:auto;margin:4px 0 0 20px}
@@ -62,10 +62,14 @@ h4{margin:0}
 .rel-wrap .data-list,.rel-wrap .data-list-fit,.rel-wrap .data-list-wide{margin-left:0}
 .rel-wrap .block-head{margin-left:0}
 
-/* Узел с собственной записью раньше добавлял ещё 12px padding-left,
-   поэтому заголовок отношения и таблица начинались с разных линий.
-   Сбрасываем только этот прямой технический отступ; сама вложенность
-   остаётся заданной margin-left контейнера relation. */
+/* Если записи отношения имеют собственных детей, сама запись находится
+   внутри технического узла с отступом 24px. Заголовок такого отношения
+   сдвигаем на тот же шаг — теперь он начинается ровно над таблицей/строкой.
+   Для листовых отношений :has() не срабатывает, потому их уже совпадающее
+   выравнивание остаётся без изменения. */
+.rel-wrap:has(>div> .rel-wrap)>.block-head{margin-left:24px}
+
+/* Старый технический padding узла не должен добавлять ещё 12px к таблице. */
 .rel-wrap>div[style*="padding-left:12px"]{padding-left:0!important}
 
 .block-head{display:flex;width:fit-content;align-items:center;gap:6px;margin:8px 0 3px}
