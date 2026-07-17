@@ -1491,12 +1491,77 @@ function record_save(
 }
 
 /** Универсальное удаление по id. Тот же честный результат. */
+/**
+ * Проверка использования перед удалением строки словаря (замысел
+ * Влада, 2026-07-17, STATE.md «Позже»): если удаляемая строка ЯВЛЯЕТСЯ
+ * значением словаря (её таблица — source_table хоть одного поля в
+ * model.dictionaries), ищем, кто на неё ссылается, ПРЕЖДЕ чем удалять.
+ * Единственная точка встраивания — record_delete() ниже, он один
+ * обслуживает удаление ЛЮБОЙ записи любой таблицы, включая словарные.
+ *
+ * Быстрый выход: для подавляющего большинства таблиц (не словарь ни
+ * для одного поля) — ноль дополнительных запросов, просто пустой
+ * фильтр по уже скомпилированному model.dictionaries.
+ *
+ * voc_/link_ — скаляр (`WHERE field = id`), links_ — массив
+ * (`WHERE id = ANY(field)`) — различаются по entity в структуре
+ * поля-владельца, не по имени поля (одно поле может ссылаться на
+ * source_table и быть voc_ ИЛИ links_ в зависимости от паспорта).
+ */
+function record_delete_check_usage(
+    PgSql\Connection $db_connection, array $snapshot, string $table, int $id
+): array {
+    $referencing_fields = [];
+    foreach ($snapshot['model']['dictionaries'] ?? [] as $field_name => $dict) {
+        if (($dict['source_table'] ?? null) === $table) {
+            $referencing_fields[] = $field_name;
+        }
+    }
+    if ($referencing_fields === []) {
+        return []; // не словарь ни для одного поля — обычная запись, проверять нечего
+    }
+
+    $used_by = [];
+    foreach ($snapshot['structure']['tables'] ?? [] as $owner_table => $owner_schema) {
+        foreach ($referencing_fields as $field_name) {
+            $field_schema = $owner_schema['fields'][$field_name] ?? null;
+            if ($field_schema === null || ($field_schema['kind'] ?? '') !== 'entity_field') {
+                continue;
+            }
+
+            $is_multi = ($field_schema['entity'] ?? '') === 'links';
+            $sql = $is_multi
+                ? "SELECT id FROM $owner_table WHERE ? = ANY($field_name)"
+                : "SELECT id FROM $owner_table WHERE $field_name = ?";
+
+            foreach (db_select($db_connection, $sql, 'i', [$id]) as $row) {
+                $used_by[] = [
+                    'table' => $owner_table,
+                    'field' => $field_name,
+                    'id'    => (int) $row['id'],
+                ];
+            }
+        }
+    }
+
+    return $used_by;
+}
+
 function record_delete(PgSql\Connection $db_connection, array $snapshot, string $table, int $id): array
 {
     $result = record_result('delete', $table);
 
     if (!isset($snapshot['structure']['tables'][$table])) {
         $result['errors'][] = "Таблица '$table' не существует в известной модели";
+        return $result;
+    }
+
+    $used_by = record_delete_check_usage($db_connection, $snapshot, $table, $id);
+    if ($used_by !== []) {
+        $result['used_by'] = $used_by;
+        foreach ($used_by as $usage) {
+            $result['errors'][] = "используется в {$usage['table']}#{$usage['id']} (поле {$usage['field']})";
+        }
         return $result;
     }
 
