@@ -266,23 +266,25 @@ function render_reparent_form(array $view): string
  * таблица, напр. внутри карты объекта).
  */
 /**
- * Выпадающий список действий в одной ячейке (2026-07-17, замечание
- * Влада: отдельные иконки-ссылки ~/⇄/× разрывали визуальный поток —
- * «одна строка = одна таблица» на карточке объекта). Пустой список
- * действий — пустая строка, ячейку не рисуем вовсе.
- * $actions: [['label'=>..., 'href'=>...], ...]
+ * Меню действий в одной ячейке, открывается по наведению — CSS,
+ * без JS (2026-07-17, замечание Влада: список должен раскрываться
+ * при наведении, обычный <select> так не умеет физически). Пустой
+ * список действий — пустая строка, ячейку не рисуем вовсе.
+ * $actions: [['label'=>..., 'href'=>..., 'danger'=>bool], ...]
  */
 function render_actions_dropdown(array $actions): string
 {
     if ($actions === []) {
         return '';
     }
-    $options = '<option value="">···</option>';
+    $items = '';
     foreach ($actions as $action) {
-        $options .= '<option value="' . render_escape((string) $action['href']) . '">'
-                   . render_escape((string) $action['label']) . '</option>';
+        $cls = ($action['danger'] ?? false) ? ' class="act-danger"' : '';
+        $items .= '<a href="' . render_escape((string) $action['href']) . '"' . $cls . '>'
+                 . render_escape((string) $action['label']) . '</a>';
     }
-    return '<select class="act-select" onchange="if(this.value) location.href=this.value">' . $options . '</select>';
+    return '<span class="act-menu"><button type="button" class="act-trigger">···</button>'
+         . '<span class="act-menu-list">' . $items . '</span></span>';
 }
 
 function render_record_table(array $view, array $opts = []): string
@@ -331,7 +333,7 @@ function render_record_table(array $view, array $opts = []): string
             if (isset($opts['reparent_href'])) {
                 $actions[] = ['label' => 'Сменить родителя', 'href' => str_replace('{id}', (string) $id, $opts['reparent_href'])];
             }
-            $actions[] = ['label' => 'Удалить', 'href' => str_replace('{id}', (string) $id, $opts['delete_href'])];
+            $actions[] = ['label' => 'Удалить', 'href' => str_replace('{id}', (string) $id, $opts['delete_href']), 'danger' => true];
             $html .= '<td class="col-actions">' . render_actions_dropdown($actions) . '</td>';
         }
         $html .= '</tr>';

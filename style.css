@@ -48,7 +48,25 @@ h4{margin:0}
    врозь; колонка под него — минимальной ширины, не тянется наравне
    с текстовыми столбцами. */
 .col-actions{width:1%;white-space:nowrap;text-align:right}
-.act-select{padding:2px 4px;font-size:.85em;max-width:11em}
+/* 2026-07-17: замена <select> (Влад — открытие по клику не годится,
+   нужно по наведению; select физически не умеет hover) на чистый
+   CSS hover-menu, без JS: маленькая кнопка-триггер + список ссылок,
+   показывается через :hover. */
+.act-menu{position:relative;display:inline-block}
+.act-trigger{padding:1px 7px;font-size:.8em;border:1px solid #ccc;border-radius:3px;
+             background:#fff;cursor:pointer;color:#225;min-width:1.4em}
+.act-trigger:hover{background:#eef}
+.act-menu-list{display:none;position:absolute;right:0;top:100%;background:#fff;
+               border:1px solid #ccc;border-radius:3px;min-width:11em;z-index:10;
+               box-shadow:0 2px 6px rgba(0,0,0,.15)}
+.act-menu:hover .act-menu-list{display:block}
+.act-menu-list a{display:block;padding:5px 10px;white-space:nowrap;
+                 text-decoration:none;color:#225;font-size:.9em}
+.act-menu-list a:hover{background:#eef}
+.act-menu-list a.act-danger{color:#a22}
+.act-menu-list a.act-danger:hover{background:#fee}
 /* Заголовок раздела (label) + кнопка «+ добавить» — одна строка,
-   тот же приём, что .schema-head, для вложенных таблиц карточки. */
+   тот же приём, что .schema-head, для вложенных таблиц карточки.
+   Кнопка «+» здесь меньше обычной .act (Влад: слишком крупная). */
 .block-head{display:flex;align-items:center;gap:8px;margin:10px 0 2px}
+.block-head .act{font-size:.8em;padding:0 6px;min-width:1.2em;margin-left:0}
