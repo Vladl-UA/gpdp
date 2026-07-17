@@ -362,6 +362,89 @@ function configurator_register_formula(PgSql\Connection $db_connection, int $reg
 }
 
 // ============================================================================
+// Общие кирпичи (вынесены 2026-07-16, рефакторинг перед
+// configurator_create_view — STATE.md «Сейчас», аудит модульности по
+// прямому запросу Влада). Восемь функций ниже дословно повторяли три
+// куска — вынесены без изменения поведения, только снятие дублирования.
+// ============================================================================
+
+/**
+ * Каркас «захватить структурный лок → выполнить $body → снять лок в
+ * finally». Было продублировано дословно в восьми функциях (create_table,
+ * delete_table, adopt_field, adopt_table, drop_registry_row, drop_column,
+ * add_field, drop_field), различаясь только причиной лока и телом try.
+ * Текст отказа при занятом локе унифицирован на более частый вариант
+ * («Схема заблокирована другой операцией.» — было в 6 из 8 мест; 2 места
+ * — create_table/delete_table — говорили чуть иначе, «уже заблокирована
+ * другой структурной операцией»; смысл тот же, различие не несло сведений
+ * пользователю).
+ */
+function configurator_with_lock(PgSql\Connection $db_connection, string $reason, callable $body): array
+{
+    if (!snapshot_lock_acquire('configurator', $reason)) {
+        return ['ok' => false, 'errors' => ['Схема заблокирована другой операцией.']];
+    }
+    try {
+        return $body();
+    } finally {
+        snapshot_lock_release('configurator');
+    }
+}
+
+/**
+ * Зарегистрировать элемент (таблицу или поле) в model_registry +
+ * подписать в model_labels. $kind — 'table' | 'field'; $owner — NULL
+ * для таблицы, имя владеющей таблицы для поля. Возвращает id новой
+ * строки реестра (RETURNING id, см. db.php). Было продублировано
+ * дословно четыре раза (create_table — дважды: таблица и поле;
+ * adopt_field; adopt_table).
+ */
+function configurator_register_element(
+    PgSql\Connection $db_connection,
+    string $kind,
+    ?string $owner,
+    string $element,
+    string $short,
+    string $full
+): int {
+    $reg = db_execute(
+        $db_connection,
+        'INSERT INTO ' . MODEL_REGISTRY_TABLE
+        . ' (data_kind, data_owner, data_element, active) VALUES (?, ?, ?, 1) RETURNING id',
+        'sss',
+        [$kind, $owner, $element]
+    );
+
+    db_execute(
+        $db_connection,
+        'INSERT INTO ' . MODEL_LABELS_TABLE . ' (dep_model_registry, data_short, data_full) VALUES (?, ?, ?)',
+        'iss',
+        [$reg['id'], $short, $full]
+    );
+
+    return (int) $reg['id'];
+}
+
+/**
+ * Уже под управлением реестра (активная строка, data_kind/owner/element
+ * совпадают)? Было продублировано дословно дважды (adopt_field,
+ * drop_column). `IS NOT DISTINCT FROM` вместо `=` — корректно сравнивает
+ * NULL-владельца (таблица), не только непустого (поле), хотя оба текущих
+ * вызывающих места передают только непустой $owner.
+ */
+function configurator_is_managed(PgSql\Connection $db_connection, string $kind, ?string $owner, string $element): bool
+{
+    $rows = db_select(
+        $db_connection,
+        'SELECT id FROM ' . MODEL_REGISTRY_TABLE
+        . ' WHERE data_kind = ? AND data_owner IS NOT DISTINCT FROM ? AND data_element = ? AND active = 1',
+        'sss',
+        [$kind, $owner, $element]
+    );
+    return $rows !== [];
+}
+
+// ============================================================================
 // Исполнение — единственное место, где спецификация становится DDL.
 // Порядок буквально твой «стоп-файл»: lock → транзакция → пересборка →
 // unlock. lock — уже существующий schema.lock, ничего нового не заведено.
@@ -369,11 +452,7 @@ function configurator_register_formula(PgSql\Connection $db_connection, int $reg
 
 function configurator_create_table(PgSql\Connection $db_connection, array $spec, array $application): array
 {
-    if (!snapshot_lock_acquire('configurator', 'Создание таблицы: ' . $spec['table'])) {
-        return ['ok' => false, 'errors' => ['Схема уже заблокирована другой структурной операцией.']];
-    }
-
-    try {
+    return configurator_with_lock($db_connection, 'Создание таблицы: ' . $spec['table'], function () use ($db_connection, $spec, $application): array {
         $columns_sql = [];
         if ($spec['has_id']) {
             // 2026-07-16: Postgres — GENERATED ALWAYS AS IDENTITY вместо
@@ -412,23 +491,13 @@ function configurator_create_table(PgSql\Connection $db_connection, array $spec,
         }
 
         // Регистрация таблицы в реестре + подпись.
-        $table_reg = db_execute($db_connection,
-            'INSERT INTO ' . MODEL_REGISTRY_TABLE . ' (data_kind, data_owner, data_element, active) '
-            . "VALUES ('table', NULL, ?, 1) RETURNING id", 's', [$table]);
-
-        db_execute($db_connection,
-            'INSERT INTO ' . MODEL_LABELS_TABLE . ' (dep_model_registry, data_short, data_full) VALUES (?, ?, ?)',
-            'iss', [$table_reg['id'], $spec['table_short'], $spec['table_full']]);
+        configurator_register_element($db_connection, 'table', null, $table, $spec['table_short'], $spec['table_full']);
 
         // Регистрация каждого предметного поля (id — структурный, без записи).
         foreach ($spec['fields'] as $field) {
-            $field_reg = db_execute($db_connection,
-                'INSERT INTO ' . MODEL_REGISTRY_TABLE . ' (data_kind, data_owner, data_element, active) '
-                . "VALUES ('field', ?, ?, 1) RETURNING id", 'ss', [$table, $field['column']]);
-
-            db_execute($db_connection,
-                'INSERT INTO ' . MODEL_LABELS_TABLE . ' (dep_model_registry, data_short, data_full) VALUES (?, ?, ?)',
-                'iss', [$field_reg['id'], $field['short'], $field['full']]);
+            configurator_register_element(
+                $db_connection, 'field', $table, $field['column'], $field['short'], $field['full']
+            );
 
             if (($field['link_target'] ?? null) !== null) {
                 $link = configurator_register_link($db_connection, $field['column'], $field['link_target']);
@@ -455,18 +524,12 @@ function configurator_create_table(PgSql\Connection $db_connection, array $spec,
         }
 
         return ['ok' => true, 'errors' => []];
-    } finally {
-        snapshot_lock_release('configurator');
-    }
+    });
 }
 
 function configurator_delete_table(PgSql\Connection $db_connection, string $table, array $application): array
 {
-    if (!snapshot_lock_acquire('configurator', 'Удаление таблицы: ' . $table)) {
-        return ['ok' => false, 'errors' => ['Схема уже заблокирована другой структурной операцией.']];
-    }
-
-    try {
+    return configurator_with_lock($db_connection, 'Удаление таблицы: ' . $table, function () use ($db_connection, $table, $application): array {
         // model_labels чистится каскадом FK (ON DELETE CASCADE, §17).
         db_execute(
             $db_connection,
@@ -492,9 +555,7 @@ function configurator_delete_table(PgSql\Connection $db_connection, string $tabl
         }
 
         return ['ok' => true, 'errors' => []];
-    } finally {
-        snapshot_lock_release('configurator');
-    }
+    });
 }
 
 // ============================================================================
@@ -521,74 +582,49 @@ function configurator_refresh(PgSql\Connection $db_connection, array $applicatio
 /** Взять поле-сироту под управление: строка реестра + дефолтная подпись. */
 function configurator_adopt_field(PgSql\Connection $db_connection, string $table, string $field, array $application): array
 {
-    if (!snapshot_lock_acquire('configurator', "Регистрация поля: $table.$field")) {
-        return ['ok' => false, 'errors' => ['Схема заблокирована другой операцией.']];
-    }
-    try {
+    return configurator_with_lock($db_connection, "Регистрация поля: $table.$field", function () use ($db_connection, $table, $field, $application): array {
         $live = snapshot_build_structure($db_connection);
         $fschema = $live['tables'][$table]['fields'][$field] ?? null;
         if ($fschema === null || ($fschema['kind'] ?? '') !== 'entity_field') {
             return ['ok' => false, 'errors' => ["Поле $table.$field не существует или структурное."]];
         }
         // Уже зарегистрировано? (могли починить между показом и нажатием)
-        $chk = db_select($db_connection, 'SELECT id FROM ' . MODEL_REGISTRY_TABLE
-            . " WHERE data_kind='field' AND data_owner=? AND data_element=? AND active=1", 'ss', [$table, $field]);
-        if ($chk !== []) {
+        if (configurator_is_managed($db_connection, 'field', $table, $field)) {
             return ['ok' => false, 'errors' => ["Поле $table.$field уже под управлением."]];
         }
 
-        $reg = db_execute($db_connection, 'INSERT INTO ' . MODEL_REGISTRY_TABLE
-            . " (data_kind, data_owner, data_element, active) VALUES ('field', ?, ?, 1) RETURNING id", 'ss', [$table, $field]);
-
         // Дефолтная подпись = имя поля; осмысленную человек правит в labels.
-        db_execute($db_connection, 'INSERT INTO ' . MODEL_LABELS_TABLE
-            . ' (dep_model_registry, data_short, data_full) VALUES (?, ?, ?)', 'iss', [$reg['id'], $field, $field]);
+        configurator_register_element($db_connection, 'field', $table, $field, $field, $field);
 
         return configurator_refresh($db_connection, $application);
-    } finally {
-        snapshot_lock_release('configurator');
-    }
+    });
 }
 
 /** Взять таблицу-сироту под управление: строка реестра + дефолтная подпись. */
 function configurator_adopt_table(PgSql\Connection $db_connection, string $table, array $application): array
 {
-    if (!snapshot_lock_acquire('configurator', "Регистрация таблицы: $table")) {
-        return ['ok' => false, 'errors' => ['Схема заблокирована другой операцией.']];
-    }
-    try {
+    return configurator_with_lock($db_connection, "Регистрация таблицы: $table", function () use ($db_connection, $table, $application): array {
         $live = snapshot_build_structure($db_connection);
         if (!isset($live['tables'][$table])) {
             return ['ok' => false, 'errors' => ["Таблица $table не существует."]];
         }
-        $reg = db_execute($db_connection, 'INSERT INTO ' . MODEL_REGISTRY_TABLE
-            . " (data_kind, data_owner, data_element, active) VALUES ('table', NULL, ?, 1) RETURNING id", 's', [$table]);
-
-        db_execute($db_connection, 'INSERT INTO ' . MODEL_LABELS_TABLE
-            . ' (dep_model_registry, data_short, data_full) VALUES (?, ?, ?)', 'iss', [$reg['id'], $table, $table]);
+        configurator_register_element($db_connection, 'table', null, $table, $table, $table);
 
         return configurator_refresh($db_connection, $application);
-    } finally {
-        snapshot_lock_release('configurator');
-    }
+    });
 }
 
 /** Убрать строку реестра по id (призрак или лишний дубль). Подпись —
  *  каскадом FK (ON DELETE CASCADE, §17). */
 function configurator_drop_registry_row(PgSql\Connection $db_connection, int $id, array $application): array
 {
-    if (!snapshot_lock_acquire('configurator', "Удаление записи реестра: #$id")) {
-        return ['ok' => false, 'errors' => ['Схема заблокирована другой операцией.']];
-    }
-    try {
+    return configurator_with_lock($db_connection, "Удаление записи реестра: #$id", function () use ($db_connection, $id, $application): array {
         $outcome = db_execute($db_connection, 'DELETE FROM ' . MODEL_REGISTRY_TABLE . ' WHERE id = ?', 'i', [$id]);
         if ($outcome['affected_rows'] === 0) {
             return ['ok' => false, 'errors' => ["Записи реестра #$id нет (уже убрана?)."]];
         }
         return configurator_refresh($db_connection, $application);
-    } finally {
-        snapshot_lock_release('configurator');
-    }
+    });
 }
 
 /** Удалить поле-сироту ИЗ БД (единственное, что трогает данные — с
@@ -596,19 +632,14 @@ function configurator_drop_registry_row(PgSql\Connection $db_connection, int $id
  *  действительно вне реестра (иначе это управляемое поле — не сюда). */
 function configurator_drop_column(PgSql\Connection $db_connection, string $table, string $field, array $application): array
 {
-    if (!snapshot_lock_acquire('configurator', "Удаление колонки: $table.$field")) {
-        return ['ok' => false, 'errors' => ['Схема заблокирована другой операцией.']];
-    }
-    try {
+    return configurator_with_lock($db_connection, "Удаление колонки: $table.$field", function () use ($db_connection, $table, $field, $application): array {
         $live = snapshot_build_structure($db_connection);
         $fschema = $live['tables'][$table]['fields'][$field] ?? null;
         if ($fschema === null || ($fschema['kind'] ?? '') !== 'entity_field') {
             return ['ok' => false, 'errors' => ["Поле $table.$field не существует или структурное — не удаляю."]];
         }
         // Защита: удаляем только сироту. Под управлением — не наш случай.
-        $chk = db_select($db_connection, 'SELECT id FROM ' . MODEL_REGISTRY_TABLE
-            . " WHERE data_kind='field' AND data_owner=? AND data_element=? AND active=1", 'ss', [$table, $field]);
-        if ($chk !== []) {
+        if (configurator_is_managed($db_connection, 'field', $table, $field)) {
             return ['ok' => false, 'errors' => ["Поле $table.$field под управлением — удаление колонки под управлением здесь не делается."]];
         }
         $drop = db_execute($db_connection, 'ALTER TABLE ' . $table . ' DROP COLUMN ' . $field . '');
@@ -616,9 +647,7 @@ function configurator_drop_column(PgSql\Connection $db_connection, string $table
             return ['ok' => false, 'errors' => ['DDL: ' . $drop['error']]];
         }
         return configurator_refresh($db_connection, $application);
-    } finally {
-        snapshot_lock_release('configurator');
-    }
+    });
 }
 
 // ============================================================================
@@ -639,10 +668,7 @@ function configurator_drop_column(PgSql\Connection $db_connection, string $table
  */
 function configurator_add_field(PgSql\Connection $db_connection, string $table, array $field_input, array $application): array
 {
-    if (!snapshot_lock_acquire('configurator', "Добавление поля в $table")) {
-        return ['ok' => false, 'errors' => ['Схема заблокирована другой операцией.']];
-    }
-    try {
+    return configurator_with_lock($db_connection, "Добавление поля в $table", function () use ($db_connection, $table, $field_input, $application): array {
         $live = snapshot_build_structure($db_connection);
         if (!isset($live['tables'][$table])) {
             return ['ok' => false, 'errors' => ["Таблица $table не существует."]];
@@ -677,11 +703,9 @@ function configurator_add_field(PgSql\Connection $db_connection, string $table, 
             return ['ok' => false, 'errors' => ['DDL: ' . $alter['error']]];
         }
 
-        $reg = db_execute($db_connection, 'INSERT INTO ' . MODEL_REGISTRY_TABLE
-            . " (data_kind, data_owner, data_element, active) VALUES ('field', ?, ?, 1) RETURNING id", 'ss', [$table, $field['column']]);
-
-        db_execute($db_connection, 'INSERT INTO ' . MODEL_LABELS_TABLE
-            . ' (dep_model_registry, data_short, data_full) VALUES (?, ?, ?)', 'iss', [$reg['id'], $field['short'], $field['full']]);
+        $field_id = configurator_register_element(
+            $db_connection, 'field', $table, $field['column'], $field['short'], $field['full']
+        );
 
         if (($field['link_target'] ?? null) !== null) {
             $link = configurator_register_link($db_connection, $field['column'], $field['link_target']);
@@ -693,7 +717,7 @@ function configurator_add_field(PgSql\Connection $db_connection, string $table, 
         }
 
         if (($field['formula'] ?? null) !== null) {
-            $formula_row = configurator_register_formula($db_connection, (int) $reg['id'], $field['formula']);
+            $formula_row = configurator_register_formula($db_connection, $field_id, $field['formula']);
             if (!$formula_row['ok']) {
                 return ['ok' => false, 'errors' => [
                     "Поле {$field['column']} добавлено, но формула не записана: " . $formula_row['error'],
@@ -702,9 +726,7 @@ function configurator_add_field(PgSql\Connection $db_connection, string $table, 
         }
 
         return configurator_refresh($db_connection, $application);
-    } finally {
-        snapshot_lock_release('configurator');
-    }
+    });
 }
 
 /**
@@ -716,10 +738,7 @@ function configurator_add_field(PgSql\Connection $db_connection, string $table, 
  */
 function configurator_drop_field(PgSql\Connection $db_connection, string $table, string $field, bool $force, array $application): array
 {
-    if (!snapshot_lock_acquire('configurator', "Удаление поля $table.$field")) {
-        return ['ok' => false, 'errors' => ['Схема заблокирована другой операцией.']];
-    }
-    try {
+    return configurator_with_lock($db_connection, "Удаление поля $table.$field", function () use ($db_connection, $table, $field, $force, $application): array {
         $live = snapshot_build_structure($db_connection);
         $fschema = $live['tables'][$table]['fields'][$field] ?? null;
         if ($fschema === null) {
@@ -750,9 +769,7 @@ function configurator_drop_field(PgSql\Connection $db_connection, string $table,
             . " WHERE data_kind='field' AND data_owner=? AND data_element=?", 'ss', [$table, $field]);
 
         return configurator_refresh($db_connection, $application);
-    } finally {
-        snapshot_lock_release('configurator');
-    }
+    });
 }
 
 // ============================================================================
