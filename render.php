@@ -199,7 +199,7 @@ function render_object_tree(array $node, int $depth = 0): void
     // поток). reparent — только у записей с однозначной dep_ связью
     // (флаг уже вычислен в core.php, render его не пересчитывает,
     // STATE.md «Сейчас» п.5); корень дерева (well) флаг false, опция
-    // в выпадающем списке не появляется сама.
+    // в меню не появляется сама.
     $opts = [
         'edit_href'   => "?_table=$task_table&_action=edit&_id={id}",
         'delete_href' => "?_table=$task_table&_action=delete&_id={id}",
@@ -210,19 +210,69 @@ function render_object_tree(array $node, int $depth = 0): void
     echo render_record_table($node['view'], $opts);
 
     foreach ($node['children'] as $block) {
-        echo '<div style="margin-left:' . ($indent + 24) . 'px">';
-        // Заголовок раздела + «+ добавить» — одна строка (2026-07-17,
-        // тот же приём, что .schema-head): раньше «+ добавить в «X»»
-        // висело отдельной ссылкой-абзацем ниже всех дочерних записей,
-        // далеко от своего заголовка.
-        echo '<div class="block-head"><h4>' . render_escape($block['label']) . '</h4>'
-           . '<a class="act" href="?_table=' . rawurlencode($block['table'])
-           . '&_action=new&_parent_table=' . rawurlencode($task_table)
-           . "&_parent_id=$id\" title=\"добавить в «" . render_escape($block['label']) . '»">+</a></div>';
-        foreach ($block['nodes'] as $child_node) {
-            render_object_tree($child_node, $depth + 1);
+        render_object_tree_block($block, $task_table, $id, $depth);
+    }
+    echo '</div>';
+}
+
+/**
+ * Один раздел детей (2026-07-17, замечание Влада: «Компонент состава
+ * репера» рвался на N отдельных мини-таблиц, по одной на компонент,
+ * вместо одной таблицы с N строками — было так всегда, просто
+ * заметно стало только сейчас). Заголовок+«+» — одна строка
+ * (`.block-head`), ОДНА таблица на всех сиблингов этого блока (не по
+ * таблице на запись), затем — рекурсия в СОБСТВЕННЫХ детях каждого
+ * сиблинга, если есть (обёрнута меткой записи — иначе при нескольких
+ * строках с детьми непонятно, чьи это дети).
+ */
+function render_object_tree_block(array $block, string $parent_table, int $parent_id, int $depth): void
+{
+    $indent      = ($depth + 1) * 24;
+    $child_table = $block['table'];
+
+    echo '<div style="margin-left:' . $indent . 'px">';
+    echo '<div class="block-head"><h4>' . render_escape($block['label']) . '</h4>'
+       . '<a class="act" href="?_table=' . rawurlencode($child_table)
+       . '&_action=new&_parent_table=' . rawurlencode($parent_table)
+       . "&_parent_id=$parent_id\" title=\"добавить в «" . render_escape($block['label']) . '»">+</a></div>';
+
+    $siblings = $block['nodes'];
+    if ($siblings !== []) {
+        $merged_rows = [];
+        foreach ($siblings as $sibling) {
+            foreach ($sibling['view']['rows'] ?? [] as $row) {
+                $merged_rows[] = $row;
+            }
         }
-        echo '</div>';
+        $merged_view          = $siblings[0]['view'];
+        $merged_view['rows']  = $merged_rows;
+
+        $opts = [
+            'edit_href'   => "?_table=$child_table&_action=edit&_id={id}",
+            'delete_href' => "?_table=$child_table&_action=delete&_id={id}",
+        ];
+        if ($siblings[0]['reparentable'] ?? false) {
+            $opts['reparent_href'] = "?_table=$child_table&_action=reparent&_id={id}";
+        }
+        echo render_record_table($merged_view, $opts);
+
+        // Собственные дети каждого сиблинга — рекурсия. Метка записи
+        // нужна, только когда сиблингов несколько И у этого конкретного
+        // есть что показать — иначе непонятно, к какой строке таблицы
+        // выше относится вложенный раздел.
+        $show_labels = count($siblings) > 1;
+        foreach ($siblings as $sibling) {
+            if ($sibling['children'] === []) {
+                continue;
+            }
+            if ($show_labels) {
+                echo '<p style="margin:' . ($indent + 24) . 'px 0 0;color:#666;font-size:.9em">'
+                   . '↳ ' . render_escape($sibling['label']) . '</p>';
+            }
+            foreach ($sibling['children'] as $grandchild_block) {
+                render_object_tree_block($grandchild_block, $child_table, $sibling['id'], $depth + 1);
+            }
+        }
     }
     echo '</div>';
 }
