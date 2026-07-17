@@ -422,12 +422,25 @@ function snapshot_build_structure(PgSql\Connection $db_connection): array
     // (журнал STATE.md «Сейчас» п.9). Остаётся единственным местом вне
     // db.php по прежней причине — интроспекция схемы, другой формат
     // возврата (докблок db.php).
+    //
+    // 2026-07-16 (продолжение): table_type IN ('BASE TABLE','VIEW') —
+    // раньше pg_catalog.pg_tables видел только настоящие таблицы,
+    // представления (VIEW) в структуре не появлялись вовсе. Резолвер
+    // словарей (snapshot_build_dictionaries) сам по себе VIEW-агностичен
+    // — ему достаточно видеть id+data_name, таблица это или
+    // представление, ему всё равно (§16.1, а1) — единственным
+    // недостающим звеном была именно эта интроспекция. object_type
+    // сохраняется в структуре для будущего использования там, где
+    // разница всё же важна (DROP TABLE vs DROP VIEW при удалении).
     $tables_result = pg_query(
         $db_connection,
-        "SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname = 'public' ORDER BY tablename"
+        "SELECT table_name, table_type FROM information_schema.tables "
+        . "WHERE table_schema = 'public' AND table_type IN ('BASE TABLE', 'VIEW') "
+        . "ORDER BY table_name"
     );
     while ($table_row = pg_fetch_row($tables_result)) {
-        $table_name = $table_row[0];
+        $table_name  = $table_row[0];
+        $object_type = $table_row[1] === 'VIEW' ? 'view' : 'table';
 
         // Служебные таблицы ядра (model_*) — не предметные данные,
         // классификации полей не подлежат вообще (см. константу выше).
@@ -476,8 +489,9 @@ function snapshot_build_structure(PgSql\Connection $db_connection): array
         }
 
         $tables[$table_name] = [
-            'name'   => $table_name,
-            'fields' => $fields,
+            'name'        => $table_name,
+            'object_type' => $object_type,
+            'fields'      => $fields,
         ];
     }
 
