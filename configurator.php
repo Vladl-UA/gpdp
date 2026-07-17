@@ -1225,7 +1225,7 @@ if ($caction === 'diagnose') {
       const fields = viewSourceBulFields[source] || [];
       select.innerHTML = fields.length === 0
         ? '<option value="">— в источнике нет булевых полей —</option>'
-        : fields.map(f => `<option value="${f.value}">${f.label} (${f.value})</option>`).join('');
+        : fields.map(f => '<option value="' + f.value + '">' + f.label + ' (' + f.value + ')</option>').join('');
     }
 
     addField(); // первое поле сразу видно (для режима "обычная таблица")
