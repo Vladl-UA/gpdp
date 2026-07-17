@@ -12,17 +12,21 @@ table{border-collapse:collapse;table-layout:auto;margin:0}
    ширина по содержимому; широкие (8+, много колонок реально нужны
    технологической таблице целиком) — на всю доступную ширину,
    сжимать их так же было бы неправильно (стало бы нечитаемо). */
-.data-list-fit{display:table;width:max-content;max-width:100%;margin:0 0 1em 0}
-.data-list-wide{display:table;width:100%;margin:0 0 1em 0}
+/* 2026-07-17: единый режим — таблица по содержимому (max-content),
+   потолок max-width:100% включает горизонтальную прокрутку, если
+   контента реально больше ширины экрана. Двухрежимность (fit/wide,
+   width:100% для широких) убрана: на широком мониторе width:100%
+   раздувал ячейки, распределяя весь экран поровну между колонками —
+   а нужно ровно по содержимому и для узких, и для широких. */
+.data-list-fit, .data-list-wide{display:table;width:max-content;max-width:100%;margin:0 0 1em 0}
 td,th{border:1px solid #ccc;padding:3px 6px;text-align:center;white-space:nowrap}
 /* 2026-07-17 (Влад): заголовок раздела — по ЛЕВОМУ краю СВОЕЙ таблицы,
    таблица — у правого края страницы. Общая обёртка сжимается по
    ширине таблицы (width:max-content) и прижимается вправо
    (margin-left:auto); заголовок внутри неё встаёт по левому краю
-   таблицы автоматически. Для широких таблиц (.data-list-wide внутри)
-   обёртка растягивается на всю ширину — переопределяется ниже. */
+   таблицы автоматически. Все таблицы теперь по содержимому — отдельный
+   режим для широких больше не нужен, :has() убран. */
 .rel-wrap{width:max-content;max-width:100%;margin-left:auto}
-.rel-wrap:has(.data-list-wide){width:auto}
 td:first-child a{display:block;margin:-6px -10px;padding:6px 10px;color:inherit;text-decoration:none}
 td:first-child a:hover{background:#eef}
 ul{padding-left:20px}
