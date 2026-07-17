@@ -26,8 +26,17 @@ fieldset{margin-bottom:.5em}
 .act:hover{background:#eef}
 .act-danger{color:#a22}
 .act-danger:hover{background:#fee}
-.data-list th{background:#f2f4f7;color:#343a40;font-weight:600}
+
+/* Карточка: первый уровень заметнее, затем фон шапки светлеет примерно
+   на 5% на каждом уровне вложенности. Селекторы на .rel-wrap отражают
+   реальную глубину дерева, не имена предметных таблиц. */
+.data-list th,.data-list-fit th,.data-list-wide th{background:#d8dde3;color:#343a40;font-weight:600}
+.rel-wrap .data-list th,.rel-wrap .data-list-fit th,.rel-wrap .data-list-wide th{background:#e2e6ea}
+.rel-wrap .rel-wrap .data-list th,.rel-wrap .rel-wrap .data-list-fit th,.rel-wrap .rel-wrap .data-list-wide th{background:#eaedf0}
+.rel-wrap .rel-wrap .rel-wrap .data-list th,.rel-wrap .rel-wrap .rel-wrap .data-list-fit th,.rel-wrap .rel-wrap .rel-wrap .data-list-wide th{background:#f1f3f5}
+.rel-wrap .rel-wrap .rel-wrap .rel-wrap .data-list th,.rel-wrap .rel-wrap .rel-wrap .rel-wrap .data-list-fit th,.rel-wrap .rel-wrap .rel-wrap .rel-wrap .data-list-wide th{background:#f7f8f9}
 .data-list td:first-child a{font-weight:500}
+
 .schema-fields{width:auto;margin:4px 0 0 20px}
 .schema-fields td{border:none;padding:1px 24px 1px 0;color:#444}
 .schema-card{width:70%;max-width:calc(100% - 24px);margin-bottom:12px;border:1px solid #e2e2e0;border-radius:4px;overflow:hidden}
@@ -52,8 +61,15 @@ h4{margin:0}
 .rel-wrap{width:auto;max-width:100%;margin-top:8px}
 .rel-wrap .data-list,.rel-wrap .data-list-fit,.rel-wrap .data-list-wide{margin-left:0}
 .rel-wrap .block-head{margin-left:0}
+
+/* Узел с собственной записью раньше добавлял ещё 12px padding-left,
+   поэтому заголовок отношения и таблица начинались с разных линий.
+   Сбрасываем только этот прямой технический отступ; сама вложенность
+   остаётся заданной margin-left контейнера relation. */
+.rel-wrap>div[style*="padding-left:12px"]{padding-left:0!important}
+
 .block-head{display:flex;width:fit-content;align-items:center;gap:6px;margin:8px 0 3px}
-.block-head h4{font-size:15px;font-weight:650;line-height:1.2}
+.block-head h4{font-size:15px;font-weight:650;line-height:1.2;text-align:left}
 .block-head .act{font-size:.8em;padding:0 6px;min-width:1.2em;margin-left:0}
 .rec-line{display:flex;width:fit-content;max-width:100%;justify-content:flex-start;align-items:center;gap:12px;padding:4px 7px;border:1px solid var(--line,#dfe3e8);background:#fff}
 .rec-line+.rec-line{border-top:none}
