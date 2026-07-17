@@ -27,14 +27,14 @@ fieldset{margin-bottom:.5em}
 .act-danger{color:#a22}
 .act-danger:hover{background:#fee}
 
-/* Карточка: корневая таблица заметно темнее, затем шапка светлеет
-   примерно на 5% на каждом реальном уровне вложенности. Контраст сделан
-   нарочно заметным: прежние близкие оттенки на мониторе почти сливались. */
-.data-list th,.data-list-fit th,.data-list-wide th{background:#c8ced5;color:#343a40;font-weight:600}
-.rel-wrap .data-list th,.rel-wrap .data-list-fit th,.rel-wrap .data-list-wide th{background:#d5dae0}
-.rel-wrap .rel-wrap .data-list th,.rel-wrap .rel-wrap .data-list-fit th,.rel-wrap .rel-wrap .data-list-wide th{background:#e1e5e9}
-.rel-wrap .rel-wrap .rel-wrap .data-list th,.rel-wrap .rel-wrap .rel-wrap .data-list-fit th,.rel-wrap .rel-wrap .rel-wrap .data-list-wide th{background:#eceff1}
-.rel-wrap .rel-wrap .rel-wrap .rel-wrap .data-list th,.rel-wrap .rel-wrap .rel-wrap .rel-wrap .data-list-fit th,.rel-wrap .rel-wrap .rel-wrap .rel-wrap .data-list-wide th{background:#f5f6f7}
+/* Карточка: корневой уровень остаётся холодным серым, а с углублением
+   шапки постепенно светлеют и теплеют. Так глубина различается не только
+   яркостью, но и температурой оттенка. */
+.data-list th,.data-list-fit th,.data-list-wide th{background:#c7ced6;color:#30363d;font-weight:650;font-size:15px;line-height:1.2;padding:4px 7px}
+.rel-wrap .data-list th,.rel-wrap .data-list-fit th,.rel-wrap .data-list-wide th{background:#d8d7d2}
+.rel-wrap .rel-wrap .data-list th,.rel-wrap .rel-wrap .data-list-fit th,.rel-wrap .rel-wrap .data-list-wide th{background:#e4dfd4}
+.rel-wrap .rel-wrap .rel-wrap .data-list th,.rel-wrap .rel-wrap .rel-wrap .data-list-fit th,.rel-wrap .rel-wrap .rel-wrap .data-list-wide th{background:#eee6d8}
+.rel-wrap .rel-wrap .rel-wrap .rel-wrap .data-list th,.rel-wrap .rel-wrap .rel-wrap .rel-wrap .data-list-fit th,.rel-wrap .rel-wrap .rel-wrap .rel-wrap .data-list-wide th{background:#f6efe3}
 .data-list td:first-child a{font-weight:500}
 
 .schema-fields{width:auto;margin:4px 0 0 20px}
@@ -73,11 +73,11 @@ h4{margin:0}
 .rel-wrap>div[style*="padding-left:12px"]{padding-left:0!important}
 
 .block-head{display:flex;width:fit-content;align-items:center;gap:6px;margin:8px 0 3px}
-.block-head h4{font-size:15px;font-weight:650;line-height:1.2;text-align:left}
+.block-head h4{font-size:17px;font-weight:650;line-height:1.2;text-align:left}
 .block-head .act{font-size:.8em;padding:0 6px;min-width:1.2em;margin-left:0}
 .rec-line{display:flex;width:fit-content;max-width:100%;justify-content:flex-start;align-items:center;gap:12px;padding:4px 7px;border:1px solid var(--line,#dfe3e8);background:#fff}
 .rec-line+.rec-line{border-top:none}
 .rec-line b{font-weight:600;color:#555}
 .rec-line>span:first-child{min-width:0;white-space:normal}
 .rec-line .act-menu{flex-shrink:0}
-@media (max-width:900px){body{margin:1em}td,th{padding:3px 5px}}
+@media (max-width:900px){body{margin:1em}td,th{padding:3px 5px}.data-list th,.data-list-fit th,.data-list-wide th{font-size:14px}.block-head h4{font-size:16px}}
