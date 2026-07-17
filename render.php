@@ -184,22 +184,82 @@ function render_choice(array $result): string
  * представления живёт в render.php, входная точка его только вызывает.
  * Поведение идентично прежнему render_object_map — чистый перенос.
  */
+/**
+ * Компактная строка «поле: значение · поле: значение» вместо полной
+ * таблицы (2026-07-17, план Chat, пп.2-3, по заказу Влада: «однострочные
+ * дочерние сущности не должны быть полноценными таблицами» — буфер,
+ * репер, компонент занимали заголовок+кнопку+шапку+строку ради трёх
+ * значений). Применяется по числу колонок (RENDER_COMPACT_MAX_COLS),
+ * не по имени таблицы — универсальный рендерер не знает имён таблиц.
+ * Пустые значения пропускаются молча (не «Поле: —» через всю строку).
+ */
+const RENDER_COMPACT_MAX_COLS = 4;
+
+function render_record_compact(array $view, array $opts = []): string
+{
+    $columns = $view['columns'] ?? [];
+    $rows    = $view['rows'] ?? [];
+    $html    = '';
+
+    foreach ($rows as $row) {
+        $id    = (int) $row['id'];
+        $cells = $row['cells'] ?? [];
+        $parts = [];
+        foreach ($cells as $i => $value) {
+            $text = is_array($value) ? implode(', ', array_map('strval', $value)) : (string) $value;
+            if ($text === '') {
+                continue; // пусто — не загромождаем строку
+            }
+            $label   = (string) ($columns[$i]['label'] ?? '');
+            $parts[] = '<b>' . render_escape($label) . ':</b> ' . render_escape($text);
+        }
+
+        $actions = '';
+        if (isset($opts['edit_href'], $opts['delete_href'])) {
+            $items = [
+                ['label' => 'Править', 'href' => str_replace('{id}', (string) $id, $opts['edit_href'])],
+            ];
+            if (isset($opts['reparent_href'])) {
+                $items[] = ['label' => 'Сменить родителя', 'href' => str_replace('{id}', (string) $id, $opts['reparent_href'])];
+            }
+            $items[]  = ['label' => 'Удалить', 'href' => str_replace('{id}', (string) $id, $opts['delete_href']), 'danger' => true];
+            $actions  = render_actions_dropdown($items);
+        }
+
+        $html .= '<div class="rec-line"><span>' . implode(' · ', $parts) . '</span>' . $actions . '</div>';
+    }
+
+    return $html;
+}
+
+/** Компактно (строкой) или таблицей — решает число колонок, не имя
+ *  таблицы (универсальный рендерер таблиц по именам не различает). */
+function render_record_auto(array $view, array $opts = []): string
+{
+    return count($view['columns'] ?? []) <= RENDER_COMPACT_MAX_COLS
+        ? render_record_compact($view, $opts)
+        : render_record_table($view, $opts);
+}
+
 function render_object_tree(array $node, int $depth = 0): void
 {
     $task_table = $node['table'];
     $id         = $node['id'];
-    $indent     = $depth * 24;
+    // 2026-07-17 (план Chat п.1, по заказу Влада): глубина больше НЕ
+    // кодируется нарастающим отступом (24/48/72/96px — «вертикальные
+    // линии выглядят как случайная проводка», разъезжались с
+    // содержимым). Один шаг отступа на всё, дальше иерархию несут
+    // карточки/заголовки, не пиксели.
+    $indent = min($depth, 1) * 24;
 
     echo '<div style="margin-left:' . $indent . 'px;border-left:2px solid #dde;padding-left:12px;margin-bottom:8px">';
 
     // Поля узла — готовая заготовка от record_tree (ядро), рендер только
     // укладывает. Действия (править/сменить родителя/удалить) — одной
-    // ячейкой в конце ЭТОЙ ЖЕ строки (2026-07-17, замечание Влада: было
-    // отдельной строкой ниже — «одна строка = одна таблица», разрывало
-    // поток). reparent — только у записей с однозначной dep_ связью
-    // (флаг уже вычислен в core.php, render его не пересчитывает,
-    // STATE.md «Сейчас» п.5); корень дерева (well) флаг false, опция
-    // в меню не появляется сама.
+    // ячейкой в конце ЭТОЙ ЖЕ строки. reparent — только у записей с
+    // однозначной dep_ связью (флаг уже вычислен в core.php, render его
+    // не пересчитывает, STATE.md «Сейчас» п.5); корень дерева (well)
+    // флаг false, опция в меню не появляется сама.
     $opts = [
         'edit_href'   => "?_table=$task_table&_action=edit&_id={id}",
         'delete_href' => "?_table=$task_table&_action=delete&_id={id}",
@@ -207,7 +267,7 @@ function render_object_tree(array $node, int $depth = 0): void
     if ($node['reparentable'] ?? false) {
         $opts['reparent_href'] = "?_table=$task_table&_action=reparent&_id={id}";
     }
-    echo render_record_table($node['view'], $opts);
+    echo render_record_auto($node['view'], $opts);
 
     foreach ($node['children'] as $block) {
         render_object_tree_block($block, $task_table, $id, $depth);
@@ -216,22 +276,21 @@ function render_object_tree(array $node, int $depth = 0): void
 }
 
 /**
- * Один раздел детей (2026-07-17, замечание Влада, дважды уточнено).
- * Первая правка объединила ВСЕХ сиблингов в одну таблицу — правильно
- * для «Компонент состава репера» (нет своих детей), но сломала
- * интервалы цементирования (у каждого — свои испытания/буфер/АКЦ):
- * общая таблица оторвала строку от того, что относится именно к ней.
- * Итог — развилка по факту: есть ли у сиблингов СВОИ дети.
+ * Один раздел детей. Развилка по факту: есть ли у сиблингов СВОИХ
+ * детей.
  *
- * Нет своих детей (лист) → ОДНА таблица на все строки (§ситуация
- * «Компонент состава репера»/«Химреагент испытания»).
+ * Нет своих детей (лист) → все строки сведены в одну компактную/
+ * табличную укладку разом (не таблица на запись — «Компонент состава
+ * репера»/«Химреагент испытания», найдено живьём 2026-07-17).
  * Есть свои дети → каждый сиблинг остаётся самостоятельной карточкой
  * (строка + сразу под ней её собственные дети) — связь строки со
- * своими детьми важнее компактности таблицы.
+ * своими детьми важнее компактности.
  */
 function render_object_tree_block(array $block, string $parent_table, int $parent_id, int $depth): void
 {
-    $indent      = ($depth + 1) * 24;
+    // 2026-07-17: тот же принцип, что в render_object_tree — один шаг
+    // отступа на раздел, не нарастающий по глубине.
+    $indent      = min($depth + 1, 1) * 24;
     $child_table = $block['table'];
 
     echo '<div style="margin-left:' . $indent . 'px">';
@@ -250,8 +309,6 @@ function render_object_tree_block(array $block, string $parent_table, int $paren
     }
 
     if ($siblings !== [] && !$has_grandchildren) {
-        // Лист: ни у кого нет своих детей — безопасно свести в одну
-        // таблицу, разрывать нечего, каждая строка самодостаточна.
         $merged_rows = [];
         foreach ($siblings as $sibling) {
             foreach ($sibling['view']['rows'] ?? [] as $row) {
@@ -268,10 +325,8 @@ function render_object_tree_block(array $block, string $parent_table, int $paren
         if ($siblings[0]['reparentable'] ?? false) {
             $opts['reparent_href'] = "?_table=$child_table&_action=reparent&_id={id}";
         }
-        echo render_record_table($merged_view, $opts);
+        echo render_record_auto($merged_view, $opts);
     } else {
-        // Есть свои дети хоть у одного: каждый сиблинг — своя карточка
-        // (строка + сразу под ней её дети), чтобы связь не терялась.
         foreach ($siblings as $sibling) {
             render_object_tree($sibling, $depth + 1);
         }
