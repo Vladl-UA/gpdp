@@ -193,30 +193,35 @@ function render_object_tree(array $node, int $depth = 0): void
     echo '<div style="margin-left:' . $indent . 'px;border-left:2px solid #dde;padding-left:12px;margin-bottom:8px">';
 
     // Поля узла — готовая заготовка от record_tree (ядро), рендер только
-    // укладывает. Без действий: карта read-режим, ~/× явной строкой ниже.
-    echo render_record_table($node['view']);
-
-    // Ссылка «сменить родителя» — только у записей с однозначной dep_
-    // связью (флаг уже вычислен в core.php, render его не пересчитывает,
-    // STATE.md «Сейчас» п.5). Корень дерева (well) её не имеет — родителя
-    // менять нечему, флаг у него false, ссылка не появляется сама.
-    $reparent_link = ($node['reparentable'] ?? false)
-        ? "<a class=\"act\" href=\"?_table=$task_table&_action=reparent&_id=$id\" title=\"сменить родителя\">⇄</a>"
-        : '';
-
-    echo "<p><a class=\"act\" href=\"?_table=$task_table&_action=edit&_id=$id\" title=\"править\">~</a>"
-       . $reparent_link
-       . "<a class=\"act act-danger\" href=\"?_table=$task_table&_action=delete&_id=$id\" title=\"удалить\">×</a></p>";
+    // укладывает. Действия (править/сменить родителя/удалить) — одной
+    // ячейкой в конце ЭТОЙ ЖЕ строки (2026-07-17, замечание Влада: было
+    // отдельной строкой ниже — «одна строка = одна таблица», разрывало
+    // поток). reparent — только у записей с однозначной dep_ связью
+    // (флаг уже вычислен в core.php, render его не пересчитывает,
+    // STATE.md «Сейчас» п.5); корень дерева (well) флаг false, опция
+    // в выпадающем списке не появляется сама.
+    $opts = [
+        'edit_href'   => "?_table=$task_table&_action=edit&_id={id}",
+        'delete_href' => "?_table=$task_table&_action=delete&_id={id}",
+    ];
+    if ($node['reparentable'] ?? false) {
+        $opts['reparent_href'] = "?_table=$task_table&_action=reparent&_id={id}";
+    }
+    echo render_record_table($node['view'], $opts);
 
     foreach ($node['children'] as $block) {
         echo '<div style="margin-left:' . ($indent + 24) . 'px">';
-        echo '<h4>' . render_escape($block['label']) . '</h4>';
+        // Заголовок раздела + «+ добавить» — одна строка (2026-07-17,
+        // тот же приём, что .schema-head): раньше «+ добавить в «X»»
+        // висело отдельной ссылкой-абзацем ниже всех дочерних записей,
+        // далеко от своего заголовка.
+        echo '<div class="block-head"><h4>' . render_escape($block['label']) . '</h4>'
+           . '<a class="act" href="?_table=' . rawurlencode($block['table'])
+           . '&_action=new&_parent_table=' . rawurlencode($task_table)
+           . "&_parent_id=$id\" title=\"добавить в «" . render_escape($block['label']) . '»">+</a></div>';
         foreach ($block['nodes'] as $child_node) {
             render_object_tree($child_node, $depth + 1);
         }
-        echo '<p><a href="?_table=' . rawurlencode($block['table'])
-            . '&_action=new&_parent_table=' . rawurlencode($task_table)
-            . "&_parent_id=$id\">+ добавить в «" . render_escape($block['label']) . '»</a></p>';
         echo '</div>';
     }
     echo '</div>';
@@ -260,6 +265,26 @@ function render_reparent_form(array $view): string
  * Плейсхолдер {id} подставляется. Пусто → без ссылок (нейтральная
  * таблица, напр. внутри карты объекта).
  */
+/**
+ * Выпадающий список действий в одной ячейке (2026-07-17, замечание
+ * Влада: отдельные иконки-ссылки ~/⇄/× разрывали визуальный поток —
+ * «одна строка = одна таблица» на карточке объекта). Пустой список
+ * действий — пустая строка, ячейку не рисуем вовсе.
+ * $actions: [['label'=>..., 'href'=>...], ...]
+ */
+function render_actions_dropdown(array $actions): string
+{
+    if ($actions === []) {
+        return '';
+    }
+    $options = '<option value="">···</option>';
+    foreach ($actions as $action) {
+        $options .= '<option value="' . render_escape((string) $action['href']) . '">'
+                   . render_escape((string) $action['label']) . '</option>';
+    }
+    return '<select class="act-select" onchange="if(this.value) location.href=this.value">' . $options . '</select>';
+}
+
 function render_record_table(array $view, array $opts = []): string
 {
     $columns = $view['columns'] ?? [];
@@ -272,7 +297,7 @@ function render_record_table(array $view, array $opts = []): string
         $html .= '<th>' . render_escape((string) $column['label']) . '</th>';
     }
     if ($has_actions) {
-        $html .= '<th></th>';
+        $html .= '<th class="col-actions"></th>';
     }
     $html .= '</tr>';
 
@@ -296,10 +321,18 @@ function render_record_table(array $view, array $opts = []): string
             }
         }
         if ($has_actions) {
-            $edit   = render_escape(str_replace('{id}', (string) $id, $opts['edit_href']));
-            $delete = render_escape(str_replace('{id}', (string) $id, $opts['delete_href']));
-            $html .= '<td><a class="act" href="' . $edit . '" title="править">~</a>'
-                   . '<a class="act act-danger" href="' . $delete . '" title="удалить">×</a></td>';
+            // 2026-07-17: одна ячейка, выпадающий список — не несколько
+            // иконок врозь (замечание Влада). reparent_href — опционален,
+            // появляется в опциях только когда передан (карточка объекта
+            // знает про конкретную запись; список — нет, как и раньше).
+            $actions = [
+                ['label' => 'Править', 'href' => str_replace('{id}', (string) $id, $opts['edit_href'])],
+            ];
+            if (isset($opts['reparent_href'])) {
+                $actions[] = ['label' => 'Сменить родителя', 'href' => str_replace('{id}', (string) $id, $opts['reparent_href'])];
+            }
+            $actions[] = ['label' => 'Удалить', 'href' => str_replace('{id}', (string) $id, $opts['delete_href'])];
+            $html .= '<td class="col-actions">' . render_actions_dropdown($actions) . '</td>';
         }
         $html .= '</tr>';
     }

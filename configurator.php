@@ -1275,7 +1275,7 @@ if ($caction === 'diagnose') {
         echo '<p><a href="?_action=list">← К таблицам</a></p>';
 
         // Текущие поля: структурные — серым без действий, entity — с удалением.
-        echo '<table class="data-list"><tr><th>поле</th><th>тип</th><th>подпись</th><th>данных</th><th></th></tr>';
+        echo '<table class="data-list"><tr><th>поле</th><th>тип</th><th>подпись</th><th>данных</th><th class="col-actions"></th></tr>';
         foreach ($t_schema['fields'] as $f_name => $f_schema) {
             $f_esc = render_escape($f_name);
             if (($f_schema['kind'] ?? '') !== 'entity_field') {
@@ -1300,7 +1300,7 @@ if ($caction === 'diagnose') {
             echo '<tr><td><code>' . $f_esc . '</code></td>'
                . '<td>' . $entity . '</td><td>' . $f_full . '</td>'
                . '<td>' . ($cnt > 0 ? $cnt : '—') . '</td>'
-               . '<td><form method="post" action="?_action=alter_drop_field" style="margin:0" '
+               . '<td class="col-actions"><form method="post" action="?_action=alter_drop_field" style="margin:0" '
                . 'onsubmit="return confirm(\'' . render_escape($confirm) . '\')">'
                . '<input type="hidden" name="table" value="' . $tbl_esc . '">'
                . '<input type="hidden" name="field" value="' . $f_esc . '">' . $force

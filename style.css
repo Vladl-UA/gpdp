@@ -39,3 +39,16 @@ fieldset{margin-bottom:.5em}
 .schema-title{min-width:0}
 .schema-acts{flex-shrink:0;white-space:nowrap}
 .schema-fields{margin:6px 0 8px 20px}
+h4{margin:0}
+/* 2026-07-17: карточка объекта — по замечанию Влада, элементы
+   управления каждой вложенной таблицы шли отдельной строкой ниже
+   таблицы («одна строка = одна таблица»), разрывая визуальный поток.
+   Теперь — один выпадающий список в последней ячейке той же строки
+   (.act-select, через render_actions_dropdown), не несколько иконок
+   врозь; колонка под него — минимальной ширины, не тянется наравне
+   с текстовыми столбцами. */
+.col-actions{width:1%;white-space:nowrap;text-align:right}
+.act-select{padding:2px 4px;font-size:.85em;max-width:11em}
+/* Заголовок раздела (label) + кнопка «+ добавить» — одна строка,
+   тот же приём, что .schema-head, для вложенных таблиц карточки. */
+.block-head{display:flex;align-items:center;gap:8px;margin:10px 0 2px}
