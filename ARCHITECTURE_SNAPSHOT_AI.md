@@ -1,228 +1,268 @@
 # ARCHITECTURE_SNAPSHOT_AI.md
 
-source_main_commit: 843f89d
+source_main_commit: 1691b43
 rebuild_type: full
-status: verified against current PHP main and HANDOFF_2026-07-17T00-00.md
+status: verified against current PHP main, ARCHITECTURE.md and current/HANDOFF_2026-07-18T00-00.md
 freshness_rule: compare `*.php` history after this baseline; self-reported source commit is only a hint
 
 ## 1. System criterion
 
-GPDP is a model-driven runtime. A client application is a database structure plus model metadata; generic code compiles those facts into a trusted snapshot and applies the same entity, record, view, relation and import mechanisms to unrelated domains.
+GPDP is a model-driven runtime. A client application is a database structure plus model metadata; generic code compiles these facts into one trusted snapshot and applies the same entity, record, relation, view, import and administration mechanisms to unrelated domains.
 
-A mechanism belongs to the kernel only when another client model can use it without editing the mechanism. Domain-specific tables, fields, forms and reports do not belong in the kernel.
+A mechanism belongs to the kernel only when another client model can use it without editing the mechanism. Domain-specific tables, fields, reports and screens do not belong in the kernel.
 
-## 2. Runtime formula
+## 2. Public entry and request contexts
 
-`request or trusted adapter input → boundary validation → trusted task/package → generic record/view operation → field_data → field_exec → entity handler → structured result → renderer or record_save/db_execute`
+`index.php` is the sole public execution entry.
 
-Entity modes are exactly `new | edit | read | validate`. Database writes are record operations, not entity modes.
+The request contour is resolved before the data snapshot:
 
-## 3. Current platform and DB boundary
+`boot → DB connection → request_context(GET, POST) → data | configurator_dispatch | labels_dispatch`
 
-The sole current DB target is PostgreSQL; there is no dual-driver mode.
+`REQUEST_CONTEXTS` is a closed associative map:
 
-`db.php` is the low-level connection/execution boundary:
+- `data`;
+- `configurator`;
+- `labels`.
 
-- `db_connect()` and `db_close()` own connection lifecycle;
-- `db_placeholders()` converts the project’s retained `?` placeholders to PostgreSQL positions;
-- `db_select()` and `db_execute()` execute trusted caller-owned SQL;
-- `db_query_count()` counts attempts executed through db.php for smoke/N+1 checks;
-- the legacy `$types` letters have no PostgreSQL typing meaning; empty/non-empty only chooses direct versus parameterized execution;
-- an inserted id exists only when caller SQL explicitly contains `RETURNING`.
+Each entry carries `icon`, `label` and `href`. The same map is the whitelist for `request_context()` and the source for `render_context_menu()`. An unknown context returns `null` and becomes HTTP 400; absence means `data` for backward compatibility.
 
-`db.php` is not a SQL builder, model interpreter or semantic query planner. SQL text remains in the named record/configurator/lookup/compiler operation that owns its meaning.
+This early decision is structural: the configurator must remain accessible when the data snapshot is broken or schema-locked. Only the `data` contour passes through strict `snapshot_init()` before work.
 
-## 4. File and layer map
+The system-context menu is not the future model-driven presentation/report menu. They have different sources and semantics.
 
-- `config.php` — environment, PostgreSQL credentials, paths, snapshot mode and temporary application settings.
-- `db.php` — connection lifecycle, placeholders, query execution and query counter.
-- `index.php` — HTTP conductor, request boundary, routing, PRG and renderer handoff.
-- `core.php` — entity registry, naming parser, field package, snapshot compiler, generic CRUD, relations, reparent and render-neutral views.
+## 3. Library contours
+
+`configurator.php` and `labels.php` are libraries, not competing entrypoints.
+
+- `index.php` conditionally `require_once`s the selected library and calls `configurator_dispatch()` or `labels_dispatch()`;
+- the caller owns `db_close()`;
+- direct access to either library performs only a redirect to the matching `index.php?_context=...` URL;
+- internal links, forms and PRG redirects carry `_context` explicitly;
+- no dispatcher or DB lifecycle runs outside the dispatch function.
+
+This replaced the former file-per-interface routing without merging the distinct responsibilities of data, structure and presentation metadata.
+
+## 4. Runtime formula
+
+Data contour:
+
+`request → boundary validation → trusted task → record/view operation → field_data → field_exec → entity handler → structured result → render or record_save/db_execute`
+
+Entity modes remain exactly `new | edit | read | validate`. Writes, deletes and reparenting are record operations, not entity modes.
+
+## 5. Current platform and DB boundary
+
+PostgreSQL is the sole current DB target; no dual-driver mode exists.
+
+`db.php` owns:
+
+- `db_connect()` / `db_close()`;
+- `db_placeholders()` for retained `?` placeholders;
+- `db_select()` / `db_execute()` for trusted caller-owned SQL;
+- `db_query_count()` for per-process query-attempt accounting.
+
+The legacy `$types` letters carry no PostgreSQL typing semantics; empty versus non-empty only chooses direct versus parameterized execution. Insert ids exist only when caller SQL explicitly contains `RETURNING`.
+
+`db.php` is not a SQL builder, model interpreter or report planner. SQL meaning remains in the named record/configurator/lookup/compiler operation that owns it.
+
+## 6. File and layer map
+
+- `config.php` — environment, PostgreSQL credentials, paths and snapshot mode.
+- `db.php` — connection, placeholders, mechanical execution and query counter.
+- `index.php` — sole HTTP conductor and context router.
+- `core.php` — request-context whitelist, entity registry, naming parser, field package, snapshot compiler, generic record operations and render-neutral views.
 - `entities.php` — `ent_<id>()` passports and entity handlers.
-- `helpers.php` — reusable entity helpers, currently dictionary label execution and reverse lookup.
-- `render.php` — the only PHP layer that creates HTML.
-- `style.css` — shared static admin stylesheet.
-- `configurator.php` — DDL/model-repair perimeter, including table and filtered-view creation.
-- `labels.php` — labels/templates and dictionary-row administration.
-- `tools_bulk_import.php` — hierarchical JSON adapter over the normal snapshot/dictionary/record pipeline.
-- `smoke_test.php` — executable contract test, not production runtime.
+- `helpers.php` — reusable dictionary execution and reverse lookup.
+- `render.php` — the only PHP layer that creates HTML, including data, configurator and labels interfaces.
+- `style.css` — shared presentation CSS.
+- `configurator.php` — structure/model operations plus `configurator_dispatch()`.
+- `labels.php` — presentation metadata and dictionary-row operations plus `labels_dispatch()`.
+- `tools_bulk_import.php` — hierarchical JSON adapter over the normal runtime pipeline.
+- `smoke_test.php` — executable contract evidence, not production runtime.
 
-Allowed direction remains `entrypoint/adapter → core → entities → helpers`; DB execution passes through `db.php`; structured output passes to `render.php`.
+Function namespaces include `entity_*`, `field_*`, `snapshot_*`, `action_*`, `record_*`, `lookup_*`, `render_*`, `configurator_*`, `model_label_*`, `ent_<id>` and entity-specific `<id>_*`. `request_context()` is an intentional single-function exception, not a new growing family.
 
-## 5. Naming-driven model
+## 7. Rendering boundary
 
-Entity fields use `<entity>_<local_name>`. Structural facts are `id`, `dep_*`, `rel_main`, `active`.
+All PHP HTML is born in `render.php`.
 
-`field_parse()` classifies names against the live entity registry. Unknown fields reject snapshot compilation. New entities therefore become naming-visible without adding literal cases to the parser.
+`configurator.php` and `labels.php` retain validation, DB work, live model reads and dispatch decisions, but hand prepared values to:
 
-Current entities:
+- `render_configurator_*`;
+- `render_labels_*`;
+- common `render_admin_*`, `render_table_directory`, `render_schema_card` and diagnosis functions.
+
+Renderer functions do not query the DB, compile model facts or execute entity handlers.
+
+`render_admin_page_open(title, current_context, extra_head)` builds the system menu itself through `render_context_menu()`. Callers no longer assemble free-form navigation strings. Page-local breadcrumbs remain separate.
+
+`render_admin_styles()` appends `style.css?v=<filemtime>` so each stylesheet change receives a new URL instead of relying on browser hard refresh.
+
+## 8. Naming-driven model and field package
+
+Entity fields use `<entity>_<local_name>`. Structural facts are `id`, `dep_*`, `rel_main` and `active`.
+
+`field_parse()` classifies names against the discovered entity registry. Unknown fields reject snapshot compilation. Current entities:
 
 `data, voc, link, links, ltext, footnote, date, year, time, int, bul, dec, calc`
 
-## 6. Trusted field package
+`field_data()` is the trusted runtime package: confirmed table/field identity, entity id, schema, labels, compiled dictionary/formula metadata, value/row and trusted PostgreSQL connection. Handlers consume it and return structured results; they do not emit HTML or write domain rows.
 
-`field_data()` is the main runtime trust product. It contains confirmed table/field identity, entity id, labels/schema, compiled dictionary metadata, table-scoped formula, current value/row and a trusted PostgreSQL connection for helpers.
+## 9. Snapshot compiler
 
-Handlers do not derive model addresses, write arbitrary rows or emit HTML. They consume the package and return a structured value/input/choice/validation result.
+Required snapshot facts include:
 
-## 7. Snapshot structure and compiler
-
-Required sections include:
-
-- `structure.tables`;
-- per-object `object_type` (`table` or `view`);
+- `structure.tables` and per-object `object_type`;
 - `model.registry`;
 - `model.dictionaries`;
-- `model.relations` and `model.relations_root`;
+- `model.relations` / `relations_root`;
 - `model.formulas`;
 - `presentation`;
 - `application`;
-- `registry_orphans` diagnostics.
+- registry-orphan diagnostics.
 
-`snapshot_build_structure()` reads `information_schema.tables`, so PostgreSQL VIEW objects are visible alongside base tables. Columns come from `information_schema.columns`; primary keys come from PostgreSQL catalogs. The normalized field shape remains `name/kind/entity/db_type/nullable/key`.
+`snapshot_build_structure()` reads PostgreSQL base tables and VIEWs through `information_schema.tables`, columns through `information_schema.columns`, and primary keys through PostgreSQL catalogs.
 
-There is one full compiler path: `snapshot_build()`. Cached and live modes differ only in storage behavior. Structural introspection is limited to bootstrap, explicit rebuild and admin/diagnostic operations. Presentation/model refreshes reuse compiled structure and fail safely without overwriting the last good snapshot.
+There is one full compiler path: `snapshot_build()`. Cached/live modes differ only in storage. Structural introspection is limited to bootstrap, explicit rebuild and admin/diagnostic work. Presentation/model refreshes reuse trusted structure and fail safely, retaining the last good snapshot.
 
-## 8. Dictionaries and explicit addressing
+## 10. Dictionaries, explicit links and hybrid VIEWs
 
-`snapshot_build_dictionaries()` compiles one executable label format for:
+`snapshot_build_dictionaries()` produces one executable label format for:
 
 - conventional `voc_` fields;
 - simple `data_name` dictionaries;
 - composite label templates;
 - scalar explicit `link_` fields;
 - multivalue explicit `links_` fields;
-- PostgreSQL VIEW sources that expose the required dictionary projection.
+- PostgreSQL VIEW sources exposing a valid dictionary projection.
 
-`link_` and `links_` differ in cardinality/storage, not address resolution. Both read their target from `model_links` and use the same compiled dictionary plan.
+`link_` and `links_` share `model_links`, address resolution and label execution. They differ only in cardinality/storage.
 
-`lookup_labels()` performs a flat source read and assembles labels from embedded literal/field/dictionary steps with request-local caching. `lookup_id_by_label()` is the exact reverse used by import and rejects absent or duplicate human labels.
+`configurator_validate_spec()` accepts a deliberately closed `view_filtered` specification: existing source with `id` and `data_name`, one existing `bul_` filter, fixed predicate `= 1`. Arbitrary WHERE/SQL is forbidden.
 
-## 9. `links_`: multivalue dictionary reference
+`configurator_create_view()` creates and registers the VIEW plus its `data_name` field, then rebuilds the snapshot through the same lock/registry/compiler bricks as table creation. `configurator_delete_table()` chooses `DROP TABLE` or `DROP VIEW` from trusted `object_type`.
 
-`links_` is a first-class entity for 0..N references to one explicitly addressed dictionary.
+A VIEW is therefore another source object for the existing dictionary compiler, not a second dictionary runtime.
 
-- storage is PostgreSQL `integer[]`;
-- `links_array_parse()` converts PostgreSQL text array literals to unique PHP integer ids;
-- `links_array_build()` serializes normalized ids back to an integer-array literal;
+## 11. `links_` multivalue entity
+
+`links_` represents 0..N references to one explicitly addressed dictionary.
+
+- PostgreSQL storage: `integer[]`;
+- `links_array_parse()` / `links_array_build()` bridge PostgreSQL text literals and PHP integer lists;
 - `links_handler()` implements read/new/edit/validate;
-- read returns a list of human labels, not a preformatted HTML string;
-- new/edit returns `select_multiple` plus selected-id array;
-- validate verifies every id through the compiled target dictionary;
-- element-level SQL FK constraints are unavailable for array members, so integrity is enforced at the GPDP validation boundary.
+- read returns a list of labels;
+- new/edit uses `select_multiple` with an empty sentinel;
+- validate checks every id through the compiled dictionary.
 
-`record_view_row()` preserves list values instead of forcing string conversion. `render_value()` and `render_record_table()` stack list entries vertically with `<br>`; `render_choice()` renders a multiple select with a hidden empty sentinel so clearing all choices is distinguishable from omitting the field.
+PostgreSQL cannot apply a normal FK to each array element, so integrity is enforced at the GPDP validation boundary.
 
-## 10. Formula subsystem
+`record_view_row()` preserves lists. Renderer functions decide their vertical or compact layout.
 
-`calc_` remains a row-local computed field, not a report/statistics engine.
+## 12. Generic writes, reparent and safe deletion
 
-- `formula_parse()` implements a deliberately small left-to-right grammar;
-- `snapshot_build_formulas()` scopes formulas by owning table and whitelists variables against that table’s entity fields;
-- configurator validation reuses `formula_parse()` rather than duplicating syntax logic;
-- `formula_eval()` returns null on absent operands or division by zero;
-- `calc_handler()` is read-only from the user’s perspective.
+`record_save()` validates only snapshot-whitelisted entity fields. Structural values use a separate trusted INSERT channel. INSERT uses explicit `RETURNING id`.
 
-Formula syntax and label-template syntax remain separate semantic consumers.
+Parent change remains a separate protected operation: the dep_ field comes from trusted structure, record and new parent are verified, and one column is updated. Ordinary edit cannot reparent.
 
-## 11. Relation tree and protected reparent
+`record_delete_check_usage()` now protects dictionary values before deletion:
 
-`dep_<parent>` is immediate ownership; `rel_main` is broader root-dossier membership. Relations are compiled once into snapshot indexes.
+- it first identifies dictionary source usage from compiled `model.dictionaries`;
+- non-dictionary tables exit without an extra query;
+- scalar `voc_`/`link_` references use equality;
+- `links_` array references use `id = ANY(field)`;
+- usages return table, field and record id;
+- `record_delete()` rejects deletion through its existing generic errors contract.
 
-`record_tree()` builds recursive render-neutral object data. Reparent is a separate protected operation: the FK name is resolved from trusted structural fields, the record and proposed parent are validated, and exactly one dep_ column is updated. Ordinary edit cannot smuggle a parent change through `record_save()`.
+The scalar path was verified live on ТЗ-2. The `links_`/ANY branch is structurally implemented but has not yet been independently exercised against an active production links field.
 
-## 12. Generic writes and deletion
+## 13. Formula subsystem
 
-`record_save()` validates only snapshot-whitelisted entity fields, accepts structural values only through a separate trusted INSERT channel and uses explicit `RETURNING id` for inserts.
+`calc_` is a row-local computed field, not a report/statistics engine.
 
-`record_delete()` deletes by trusted primary id without MySQL’s unsupported `LIMIT` extension. The missing PostgreSQL syntax was found by the live smoke suite, demonstrating why executable contract tests remain required even after a mechanical migration appears complete.
+`formula_parse()` implements a deliberately small left-to-right grammar. `snapshot_build_formulas()` scopes plans by owning table and whitelists variables against its entity fields. Configurator validation reuses that parser. `formula_eval()` returns `null` on missing operands or division by zero. `calc_handler()` is read-only for the user.
 
-## 13. Configurator common bricks
+## 14. Configurator common bricks
 
-The configurator’s repeated structural-operation frame was refactored into three reusable functions:
+Structural operations reuse:
 
-- `configurator_with_lock()` — acquire/release schema lock around a supplied operation;
-- `configurator_register_element()` — register table/field metadata plus labels and return registry id;
-- `configurator_is_managed()` — test an active registry address with NULL-safe owner comparison.
+- `configurator_with_lock()`;
+- `configurator_register_element()`;
+- `configurator_is_managed()`.
 
-Create/delete/adopt/drop/add operations reuse these bricks. The refactor intentionally changed structure, not business behavior, and was verified live.
+Table/VIEW creation, deletion, adoption, orphan cleanup and field ALTER paths reuse these bricks rather than copying lock/registry scaffolding.
 
-## 14. Hybrid dictionary VIEW
+## 15. Object-card renderer
 
-`configurator_validate_spec()` now recognizes `view_filtered`, a deliberately narrow dictionary-view specification:
+The object tree remains render-neutral in core; presentation policy is in render.php.
 
-- target name is a managed `voc_` name;
-- source is an existing object exposing `id` and `data_name`;
-- filter is one whitelisted `bul_` column;
-- generated predicate is fixed to `= 1`;
-- arbitrary WHERE text is forbidden.
+Current renderer behavior:
 
-`configurator_create_view()` creates `SELECT id, data_name FROM source WHERE bul_field = 1`, registers both the view and its `data_name` field, then rebuilds the snapshot through the same lock/registration/compiler bricks as table creation.
+- indentation is capped to one visual step rather than increasing indefinitely;
+- records with at most four columns use `render_record_compact()`;
+- `render_record_auto()` chooses compact line versus table by structure, not table name;
+- actions share one hover menu built by `render_actions_dropdown()`;
+- `render_object_tree_block()` merges leaf siblings into one table/compact group;
+- siblings that own children remain separate so parent-child meaning is preserved;
+- relation headers and “add” action share one row;
+- tables are sized to content through CSS.
 
-`configurator_delete_table()` reads trusted `object_type` and chooses `DROP TABLE` or `DROP VIEW`.
+The desired universal right edge is not fully solved: nested wrapper structure still narrows descendant containing blocks. This is a known presentation-structure issue, not reported as completed.
 
-A VIEW is therefore not a parallel dictionary mechanism: once introspected, it enters the same dictionary compiler and lookup executor as a base table.
+## 16. Labels and presentation metadata
 
-## 15. Bulk import
+The former `labels_*` functions are now `model_label_registry_id()` and `model_label_save()`, reflecting that labels/templates belong to model/presentation rather than a separate application namespace.
 
-The importer accepts hierarchical JSON with nested child-table arrays. Dictionary/link values are human labels.
+`labels_dispatch()` owns PRG and prepared data; `render_labels_directory()` / `render_labels_editor()` own HTML.
 
-It resolves fields through compiled dictionary metadata and writes through `record_save()`. Successful parent ids feed trusted child dep_ values; a failed branch stops. Dry-run executes the real PostgreSQL path inside BEGIN/ROLLBACK.
+## 17. Bulk import
 
-The real four-sheet ТЗ-2 hierarchy was loaded on PostgreSQL with zero importer failures and visually matched the source, including calc results.
+The importer accepts hierarchical JSON with nested child arrays and human dictionary labels. It resolves labels through compiled plans and writes only through `record_save()`. Successful parent ids feed trusted child dep_ values; failed branches stop. Dry-run uses the real PostgreSQL path inside BEGIN/ROLLBACK.
 
-## 16. Rendering boundary
+## 18. Smoke contract
 
-Renderer functions consume prepared arrays only. They do not read DB/model metadata or dispatch entity handlers.
+The PostgreSQL smoke suite covers the core runtime and the unified-entry contour. Current live result is 73/73 green.
 
-Scalar and multivalue results remain structurally distinct until rendering. Vertical list layout is presentation policy, not an entity/core string-formatting rule.
+The suite uses isolated fixtures, PostgreSQL syntax and `db_query_count()` for N+1 evidence. Live browser checks additionally confirmed all three contexts, direct-file redirects, menu consistency and full navigation cycles.
 
-## 17. Smoke contract
-
-`smoke_test.php` has been fully migrated to PostgreSQL:
-
-- no mysqli runtime calls;
-- PostgreSQL fixture setup;
-- `UPDATE ... FROM` instead of MySQL UPDATE JOIN;
-- N+1 checks use `db_query_count()`;
-- the delete path covers the PostgreSQL-compatible SQL;
-- current live result is 70/70 green.
-
-Smoke is not the production system, but it is part of the project’s contract evidence and must be migrated whenever its tested platform assumptions change.
-
-## 18. Forbidden dependencies and regression signals
+## 19. Forbidden regressions
 
 Forbidden:
 
-- request/JSON → callable or SQL identifier without boundary validation;
-- model data → executable arbitrary SQL text;
+- request text → dynamic callable/SQL identifier without validation;
+- model data → arbitrary executable SQL;
 - entity → HTML or direct domain write;
 - renderer → DB/model compiler;
-- importer → direct INSERT bypassing record_save;
-- config form → arbitrary VIEW predicate;
-- links_ → second address table or second dictionary executor;
+- configurator/labels → public parallel lifecycle outside index;
+- context routing after `snapshot_init()`;
+- free-form system menus duplicated per page;
+- importer → direct INSERT bypassing `record_save()`;
+- VIEW metadata → arbitrary predicates;
+- `links_` → second address table/executor;
 - ordinary edit → hidden reparent;
-- db.php → model semantics or report planning.
+- deletion of referenced dictionary values without the generic usage guard.
 
 Regression signals:
 
-1. a second snapshot compiler appears;
-2. VIEW dictionaries get a separate runtime executor;
-3. link_ and links_ target resolution diverges;
-4. list values are flattened in core/entities instead of renderer;
-5. configurator operations copy lock/registration scaffolding again;
-6. arbitrary WHERE/SQL enters view metadata;
-7. db query counter is bypassed by new direct production query paths;
-8. PostgreSQL smoke falls behind production SQL again;
-9. a domain-specific report function appears before a reusable semantic selection form is identified.
+1. another public entry lifecycle appears;
+2. configurator/labels start closing the connection themselves;
+3. HTML returns to configurator.php or labels.php;
+4. system context/menu lists diverge;
+5. VIEW dictionaries get a separate runtime executor;
+6. list values are flattened before rendering;
+7. lock/registry scaffolding is copied again;
+8. direct production queries bypass query counting without an explicit exception;
+9. smoke assumptions fall behind production behavior.
 
-## 19. Open work
+## 20. Open work
 
-- semantic selection/report plans from demonstrated reusable cases;
-- true m2m with payload after classification against contextual-table and links_ mechanisms;
+- finish semantic restructuring of the object tree if a common right edge is still required;
+- exercise the `links_` branch of deletion-usage checking on a real active field;
+- semantic report/selection plans from demonstrated reusable cases;
+- true m2m with payload after classification against contextual tables and links_;
 - constraints/index/FK configuration;
-- cleanup and usage checks before deleting dictionary values, fields, views or target metadata;
+- cleanup of model_links/formula/view metadata on structural deletion;
 - role/authorization model;
 - snapshot format versioning and local degradation;
-- full-address identity where global field-name identity becomes insufficient;
-- richer hybrid-view filters only after a concrete consumer justifies each new closed operation.
+- richer hybrid-view operations only when concrete consumers justify additional closed forms.
