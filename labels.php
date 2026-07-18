@@ -230,7 +230,7 @@ echo '<div class="field-row"><span style="min-width:110px">шаблон объе
 echo '</fieldset>';
 
 echo '<fieldset><legend>Подписи полей</legend>';
-echo '<table><tr><th>поле</th><th>кратко</th><th>полностью</th></tr>';
+echo '<table class="data-list"><tr><th>поле</th><th>кратко</th><th>полностью</th></tr>';
 foreach ($t_schema['fields'] as $f_name => $f_schema) {
     if (($f_schema['kind'] ?? '') === 'structural') {
         continue;
@@ -254,7 +254,7 @@ if ($is_dict) {
     $rows = record_list($db_connection, $snapshot, $selected, 500);
 
     if ($rows !== []) {
-        echo '<table><tr><th>id</th><th>значение</th><th></th></tr>';
+        echo '<table class="data-list"><tr><th>id</th><th>значение</th><th></th></tr>';
         foreach ($rows as $row) {
             $rid  = (int) $row['id'];
             $name = (string) ($row['data_name'] ?? '');
