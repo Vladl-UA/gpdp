@@ -999,19 +999,11 @@ echo render_admin_page_open(
     . '<a class="home-link" href="labels.php">Подписи и словари</a>'
 );
 
-echo '<h1>Конфигуратор БД (v0)</h1>';
-echo render_admin_flash($flash, $flash_ok);
-
 // Диагностика структуры (журнал 07-11): при заходе считаем расхождения
 // БД↔реестр. Плашка-уведомление, если есть — не молча. Раздел «Состояние
 // модели» показывает подробно и чинит.
 $diag = model_diagnose($db_connection);
-if (!($diag['clean'] ?? false) && $caction !== 'diagnose') {
-    $n = count($diag['orphan_fields']) + count($diag['orphan_tables'])
-       + count($diag['ghost_registry']) + count($diag['duplicates']);
-    echo '<div class="flash flash-err">В структуре модели расхождений: ' . $n
-       . '. <a href="?_action=diagnose">Состояние модели →</a></div>';
-}
+render_configurator_page_open($flash, $flash_ok, $diag, $caction);
 
 if ($caction === 'diagnose') {
 
@@ -1097,154 +1089,10 @@ if ($caction === 'diagnose') {
     }
     $view_source_bul_fields_json = json_encode($view_source_bul_fields, JSON_UNESCAPED_UNICODE);
 
-    echo <<<HTML
-    <h2>Новая таблица</h2>
-    <form method="post" action="?_action=create_table" id="create-form">
-
-      <p>
-        <label><input type="radio" name="table_kind" value="plain" checked onchange="onKindChange()">
-          Обычная таблица</label>
-        &nbsp;&nbsp;
-        <label><input type="radio" name="table_kind" value="voc_simple" onchange="onKindChange()">
-          Словарь (простой, уровень 0)</label>
-        &nbsp;&nbsp;
-        <label><input type="radio" name="table_kind" value="dependent" onchange="onKindChange()">
-          Зависимая таблица</label>
-        &nbsp;&nbsp;
-        <label><input type="radio" name="table_kind" value="view_filtered" onchange="onKindChange()">
-          Словарь-представление (фильтр по параметру)</label>
-      </p>
-
-      <div id="dependent-parent" style="display:none">
-        <p>Родитель: <select name="parent_table">$parent_options</select>
-           <small>(колонка <code>dep_&lt;родитель&gt;</code> создастся сама)</small></p>
-        <p><label><input type="checkbox" name="add_rel_main" value="1" checked>
-           привязать к корневому досье (<code>rel_main</code>)</label>
-           <small>— принадлежность центральной записи, не то же, что родитель</small></p>
-      </div>
-
-      <div id="view-source-filter" style="display:none">
-        <p>Источник: <select id="view-source-select" name="view_source" onchange="onViewSourceChange()">$link_target_options</select></p>
-        <p>Фильтр (булево поле источника = «да»): <select name="view_filter_column" id="view-filter-column"></select></p>
-      </div>
-
-      <div id="plain-name">
-        <p>Имя таблицы: <input type="text" name="table_name" pattern="[a-z][a-z0-9_]*"></p>
-      </div>
-      <div id="dict-name" style="display:none">
-        <p>Имя словаря: <code>voc_</code><input type="text" name="dict_name" pattern="[a-z][a-z0-9_]*">
-           <small>(префикс voc_ подставится сам)</small></p>
-      </div>
-
-      <p>Полная подпись: <input type="text" name="table_full" required>
-         Короткая подпись: <input type="text" name="table_short" required></p>
-
-      <div id="fields-section">
-        <h3>Поля</h3>
-        <div id="fields"></div>
-        <button type="button" onclick="addField()">+ добавить поле</button>
-      </div>
-      <div id="dict-fields-note" style="display:none">
-        <p><em>Поля словаря создаются автоматически: id + data_name. Больше ничего не нужно —
-        как только словарю потребуются доп. атрибуты, это уже не словарь, а полноценная таблица
-        (создавайте режимом "Обычная таблица", словарь будет адресовать её отдельным решением).</em></p>
-      </div>
-
-      <p><input type="submit" value="Создать"></p>
-    </form>
-    <p><a href="?_action=list">Отмена</a></p>
-
-    <template id="field-template">
-      <div class="field-row">
-        <select name="fields[__I__][entity]" onchange="onFieldTypeChange(this)">
-          <option value="" selected disabled>— тип поля —</option>$type_options</select>
-
-        <input type="text" class="f-name" name="fields[__I__][name]" placeholder="именная часть (без префикса)">
-        <select class="f-voc-pick" name="fields[__I__][voc_pick]" style="display:none" onchange="onVocPick(this)">$dict_options</select>
-        <select class="f-link-target" name="fields[__I__][link_target]" style="display:none">$link_target_options</select>
-
-        <input type="text" class="f-full"  name="fields[__I__][full]"  placeholder="полная подпись">
-        <input type="text" class="f-short" name="fields[__I__][short]" placeholder="короткая подпись">
-        <button type="button" onclick="this.closest('.field-row').remove()" title="убрать поле">×</button>
-      </div>
-    </template>
-
-    <script>
-    const dictLabels = $dict_labels_json;
-    const viewSourceBulFields = $view_source_bul_fields_json;
-    let fieldCount = 0;
-
-    function addField() {
-      const tpl = document.getElementById('field-template').innerHTML.replaceAll('__I__', fieldCount++);
-      const div = document.createElement('div');
-      div.innerHTML = tpl;
-      const row = div.firstElementChild;
-      document.getElementById('fields').appendChild(row);
-      // Сразу предлагаем список типов, не второй клик отдельно на select.
-      const select = row.querySelector('select[name*="[entity]"]');
-      select.focus();
-      try { select.showPicker?.(); } catch { /* браузер не поддерживает — focus() уже сделан */ }
-    }
-
-    function onFieldTypeChange(select) {
-      const row  = select.closest('.field-row');
-      const name = row.querySelector('.f-name');
-      const voc  = row.querySelector('.f-voc-pick');
-      const link = row.querySelector('.f-link-target');
-      const short = row.querySelector('.f-short');
-      const full  = row.querySelector('.f-full');
-
-      // voc_: имя выбирается из существующих словарей, не печатается
-      // (§16, уровень 0). link_: имя СВОБОДНОЕ (как обычное поле) — а
-      // цель выбирается отдельно (журнал 07-12: имя и адрес — разные
-      // вещи, обе видны сразу, никакого авто-заполнения подписи от
-      // цели — семантика поля («любимый цвет») не совпадает с
-      // подписью цели («Цвет»)).
-      voc.style.display  = select.value === 'voc'  ? '' : 'none';
-      link.style.display = (select.value === 'link' || select.value === 'links') ? '' : 'none';
-      name.style.display = select.value === 'voc'  ? 'none' : '';
-      short.style.display = full.style.display = '';
-    }
-
-    function onVocPick(select) {
-      const row = select.closest('.field-row');
-      const info = dictLabels[select.value];
-      if (info) {
-        row.querySelector('.f-short').value = info.short;
-        row.querySelector('.f-full').value  = info.full;
-      }
-    }
-
-    function onKindChange() {
-      const kind   = document.querySelector('input[name=table_kind]:checked').value;
-      const isDict = kind === 'voc_simple' || kind === 'view_filtered';
-      const isView = kind === 'view_filtered';
-      document.getElementById('plain-name').style.display        = isDict ? 'none' : 'block';
-      document.getElementById('dict-name').style.display         = isDict ? 'block' : 'none';
-      document.getElementById('fields-section').style.display    = isDict ? 'none' : 'block';
-      document.getElementById('dict-fields-note').style.display  = isDict && !isView ? 'block' : 'none';
-      document.getElementById('dependent-parent').style.display  = kind === 'dependent' ? 'block' : 'none';
-      document.getElementById('view-source-filter').style.display = isView ? 'block' : 'none';
-      if (isView) {
-        onViewSourceChange(); // сразу наполнить список фильтров под уже выбранный (или первый) источник
-      }
-    }
-
-    // 2026-07-17: при смене источника — список её bul_-полей, не общий
-    // список по всем таблицам (фильтр обязан быть колонкой ИМЕННО
-    // выбранного источника, закрытый выбор, не произвольный текст).
-    function onViewSourceChange() {
-      const source = document.getElementById('view-source-select').value;
-      const select = document.getElementById('view-filter-column');
-      const fields = viewSourceBulFields[source] || [];
-      select.innerHTML = fields.length === 0
-        ? '<option value="">— в источнике нет булевых полей —</option>'
-        : fields.map(f => '<option value="' + f.value + '">' + f.label + ' (' + f.value + ')</option>').join('');
-    }
-
-    addField(); // первое поле сразу видно (для режима "обычная таблица")
-    </script>
-    HTML;
+    render_configurator_new_table(
+        $type_options, $parent_options, $link_target_options,
+        $dict_options, $dict_labels_json, $view_source_bul_fields_json
+    );
 
 } elseif ($caction === 'edit') {
 
@@ -1255,7 +1103,7 @@ if ($caction === 'diagnose') {
     $t_schema = $live_structure['tables'][$table] ?? null;
 
     if ($t_schema === null || str_starts_with($table, SYSTEM_TABLE_PREFIX)) {
-        echo '<p>Таблица не найдена или системная.</p><p><a href="?_action=list">← К таблицам</a></p>';
+        render_configurator_table_not_found();
     } else {
         $t_labels = $live_presentation['labels']['table'][$table] ?? [];
         $t_full   = (string) ($t_labels['data_full'] ?? $table);
@@ -1277,46 +1125,6 @@ if ($caction === 'diagnose') {
             $rows = db_select($db_connection, 'SELECT ' . implode(', ', $parts) . ' FROM ' . $table . '');
             $data_counts = $rows[0] ?? [];
         }
-
-        $tbl_esc = render_escape($table);
-        echo '<h2>Поля таблицы: ' . render_escape($t_full)
-           . ' <span class="badge">' . $tbl_esc . '</span></h2>';
-        echo '<p><a href="?_action=list">← К таблицам</a></p>';
-
-        // Текущие поля: структурные — серым без действий, entity — с удалением.
-        echo '<table class="data-list"><tr><th>поле</th><th>тип</th><th>подпись</th><th>данных</th><th class="col-actions"></th></tr>';
-        foreach ($t_schema['fields'] as $f_name => $f_schema) {
-            $f_esc = render_escape($f_name);
-            if (($f_schema['kind'] ?? '') !== 'entity_field') {
-                echo '<tr><td><code style="color:#999">' . $f_esc . '</code></td>'
-                   . '<td colspan="4" style="color:#999">структурное — не редактируется</td></tr>';
-                continue;
-            }
-            $f_labels = $live_presentation['labels']['field'][$table][$f_name] ?? [];
-            $f_full   = render_escape((string) ($f_labels['data_full'] ?? ''));
-            $entity   = render_escape((string) ($f_schema['entity'] ?? ''));
-            $cnt      = (int) ($data_counts[$f_name] ?? 0);
-
-            // Подтверждение зависит от данных: пустое поле — простое,
-            // с данными — предупреждение + force. Сервер перепроверит.
-            if ($cnt > 0) {
-                $confirm = "В поле $f_name данные: $cnt знач. Удалить ВМЕСТЕ С ДАННЫМИ? Это необратимо.";
-                $force   = '<input type="hidden" name="force" value="1">';
-            } else {
-                $confirm = "Удалить пустое поле $f_name?";
-                $force   = '';
-            }
-            echo '<tr><td><code>' . $f_esc . '</code></td>'
-               . '<td>' . $entity . '</td><td>' . $f_full . '</td>'
-               . '<td>' . ($cnt > 0 ? $cnt : '—') . '</td>'
-               . '<td class="col-actions"><form method="post" action="?_action=alter_drop_field" style="margin:0" '
-               . 'onsubmit="return confirm(\'' . render_escape($confirm) . '\')">'
-               . '<input type="hidden" name="table" value="' . $tbl_esc . '">'
-               . '<input type="hidden" name="field" value="' . $f_esc . '">' . $force
-               . '<button type="submit" class="act act-danger" title="удалить поле">×</button>'
-               . '</form></td></tr>';
-        }
-        echo '</table>';
 
         // --- добавить поле: одна строка, та же механика, что при создании ---
         $type_options = '';
@@ -1369,72 +1177,11 @@ if ($caction === 'diagnose') {
         }
         $formula_fields_json = json_encode($formula_fields, JSON_UNESCAPED_UNICODE);
 
-        echo <<<HTML
-        <h3>Добавить поле</h3>
-        <form method="post" action="?_action=alter_add_field">
-          <input type="hidden" name="table" value="$tbl_esc">
-          <div class="field-row">
-            <select name="field[entity]" onchange="onFieldTypeChange(this)">
-              <option value="" selected disabled>— тип поля —</option>$type_options</select>
-            <input type="text" class="f-name" name="field[name]" placeholder="именная часть (без префикса)">
-            <select class="f-voc-pick" name="field[voc_pick]" style="display:none" onchange="onVocPick(this)">$dict_options</select>
-            <select class="f-link-target" name="field[link_target]" style="display:none">$link_target_options</select>
-            <input type="text" class="f-full"  name="field[full]"  placeholder="полная подпись">
-            <input type="text" class="f-short" name="field[short]" placeholder="короткая подпись">
-            <button type="submit">+ добавить</button>
-          </div>
-          <div class="field-row f-formula-row" style="display:none">
-            <input type="text" class="f-formula" name="field[formula]"
-                   placeholder="{поле} оператор {поле} — например {dec_volume_plan} - {dec_volume_fact}"
-                   style="flex:1">
-          </div>
-          <div class="f-formula-hint" style="display:none;margin:-4px 0 8px 0;font-size:.85em;color:#666">
-            переменные (клик — вставить): <span class="f-formula-vars"></span>
-          </div>
-        </form>
-        <script>
-        const dictLabels    = $dict_labels_json;
-        const formulaFields = $formula_fields_json;
-        function onFieldTypeChange(select) {
-          const row     = select.closest('.field-row');
-          const name    = row.querySelector('.f-name');
-          const voc     = row.querySelector('.f-voc-pick');
-          const link    = row.querySelector('.f-link-target');
-          const form    = row.parentElement;
-          const fRow    = form.querySelector('.f-formula-row');
-          const fHint   = form.querySelector('.f-formula-hint');
-          voc.style.display  = select.value === 'voc'  ? '' : 'none';
-          link.style.display = (select.value === 'link' || select.value === 'links') ? '' : 'none';
-          name.style.display = select.value === 'voc'  ? 'none' : '';
-          fRow.style.display  = select.value === 'calc' ? '' : 'none';
-          fHint.style.display = select.value === 'calc' ? '' : 'none';
-          if (select.value === 'calc' && fHint.querySelector('.f-formula-vars').children.length === 0) {
-            const varsBox = fHint.querySelector('.f-formula-vars');
-            Object.keys(formulaFields).forEach(fname => {
-              const btn = document.createElement('button');
-              btn.type = 'button';
-              btn.className = 'act';
-              btn.textContent = formulaFields[fname] + ' ({' + fname + '})';
-              btn.onclick = () => {
-                const input = fRow.querySelector('.f-formula');
-                input.value += '{' + fname + '}';
-                input.focus();
-              };
-              varsBox.appendChild(btn);
-              varsBox.appendChild(document.createTextNode(' '));
-            });
-          }
-        }
-        function onVocPick(select) {
-          const row = select.closest('.field-row');
-          const info = dictLabels[select.value];
-          if (info) {
-            row.querySelector('.f-short').value = info.short;
-            row.querySelector('.f-full').value  = info.full;
-          }
-        }
-        </script>
-        HTML;
+        render_configurator_edit_table(
+            $table, $t_full, $t_schema, $live_presentation, $data_counts,
+            $type_options, $dict_options, $link_target_options,
+            $dict_labels_json, $formula_fields_json
+        );
     }
 
 } elseif ($caction === 'delete_confirm') {
@@ -1470,7 +1217,7 @@ if ($caction === 'diagnose') {
     render_configurator_directory($snapshot, $referenced_as_dict);
 }
 
-echo '</body></html>';
+render_configurator_page_close();
 db_close($db_connection);
 }
 
