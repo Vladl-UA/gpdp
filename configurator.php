@@ -908,7 +908,7 @@ if ($caction === 'create_table' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$spec['ok']) {
         $msg = implode(' | ', $spec['errors']);
-        header('Location: ?_action=new_table&_msg=' . rawurlencode($msg) . '&_ok=0');
+        header('Location: ?_context=configurator&_action=new_table&_msg=' . rawurlencode($msg) . '&_ok=0');
         exit;
     }
 
@@ -922,7 +922,7 @@ if ($caction === 'create_table' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $outcome = configurator_create_table($db_connection, $spec, $application);
         $msg     = $outcome['ok'] ? "Таблица \"{$spec['table']}\" создана." : implode(' | ', $outcome['errors']);
     }
-    header('Location: ?_action=list&_msg=' . rawurlencode($msg) . '&_ok=' . ($outcome['ok'] ? '1' : '0'));
+    header('Location: ?_context=configurator&_action=list&_msg=' . rawurlencode($msg) . '&_ok=' . ($outcome['ok'] ? '1' : '0'));
     exit;
 }
 
@@ -930,7 +930,7 @@ if ($caction === 'delete_table' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $table   = (string) ($_POST['table'] ?? '');
     $outcome = configurator_delete_table($db_connection, $table, $application);
     $msg     = $outcome['ok'] ? "Таблица \"$table\" удалена." : implode(' | ', $outcome['errors']);
-    header('Location: ?_action=list&_msg=' . rawurlencode($msg) . '&_ok=' . ($outcome['ok'] ? '1' : '0'));
+    header('Location: ?_context=configurator&_action=list&_msg=' . rawurlencode($msg) . '&_ok=' . ($outcome['ok'] ? '1' : '0'));
     exit;
 }
 
@@ -959,7 +959,7 @@ if (in_array($caction, $repair_actions, true) && $_SERVER['REQUEST_METHOD'] === 
         'reg_drop_column' => "Поле $table.$field удалено из базы.",
     };
     $msg = $outcome['ok'] ? $ok_msg : implode(' | ', $outcome['errors']);
-    header('Location: ?_action=diagnose&_msg=' . rawurlencode($msg) . '&_ok=' . ($outcome['ok'] ? '1' : '0'));
+    header('Location: ?_context=configurator&_action=diagnose&_msg=' . rawurlencode($msg) . '&_ok=' . ($outcome['ok'] ? '1' : '0'));
     exit;
 }
 
@@ -971,7 +971,7 @@ if ($caction === 'alter_add_field' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $msg = $outcome['ok']
         ? 'Поле добавлено и взято под управление.'
         : implode(' | ', $outcome['errors']);
-    header('Location: ?_action=edit&table=' . rawurlencode($table)
+    header('Location: ?_context=configurator&_action=edit&table=' . rawurlencode($table)
          . '&_msg=' . rawurlencode($msg) . '&_ok=' . ($outcome['ok'] ? '1' : '0'));
     exit;
 }
@@ -983,7 +983,7 @@ if ($caction === 'alter_drop_field' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $msg = $outcome['ok']
         ? "Поле $field удалено из таблицы."
         : implode(' | ', $outcome['errors']);
-    header('Location: ?_action=edit&table=' . rawurlencode($table)
+    header('Location: ?_context=configurator&_action=edit&table=' . rawurlencode($table)
          . '&_msg=' . rawurlencode($msg) . '&_ok=' . ($outcome['ok'] ? '1' : '0'));
     exit;
 }

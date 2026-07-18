@@ -153,7 +153,7 @@ function labels_dispatch(PgSql\Connection $db_connection): void
                 : ['err', implode('; ', $result['errors'] ?? ['неизвестно'])];
         }
 
-        $back = $table !== '' ? '?table=' . rawurlencode($table) : '?';
+        $back = $table !== '' ? '?_context=labels&table=' . rawurlencode($table) : '?_context=labels';
         if ($flash) {
             $back .= '&flash=' . rawurlencode($flash[0]) . '&msg=' . rawurlencode($flash[1]);
         }

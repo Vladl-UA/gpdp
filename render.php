@@ -582,7 +582,7 @@ function render_configurator_new_table(
 ): void {
     echo <<<HTML
     <h2>Новая таблица</h2>
-    <form method="post" action="?_action=create_table" id="create-form">
+    <form method="post" action="?_context=configurator&_action=create_table" id="create-form">
 
       <p>
         <label><input type="radio" name="table_kind" value="plain" checked onchange="onKindChange()">
@@ -635,7 +635,7 @@ function render_configurator_new_table(
 
       <p><input type="submit" value="Создать"></p>
     </form>
-    <p><a href="?_action=list">Отмена</a></p>
+    <p><a href="?_context=configurator&_action=list">Отмена</a></p>
 
     <template id="field-template">
       <div class="field-row">
@@ -740,7 +740,7 @@ function render_configurator_page_open(?string $flash, bool $flash_ok, array $di
         $n = count($diag['orphan_fields']) + count($diag['orphan_tables'])
            + count($diag['ghost_registry']) + count($diag['duplicates']);
         echo '<div class="flash flash-err">В структуре модели расхождений: ' . $n
-           . '. <a href="?_action=diagnose">Состояние модели →</a></div>';
+           . '. <a href="?_context=configurator&_action=diagnose">Состояние модели →</a></div>';
     }
 }
 
@@ -751,7 +751,7 @@ function render_admin_page_close(): void
 
 function render_configurator_table_not_found(): void
 {
-    echo '<p>Таблица не найдена или системная.</p><p><a href="?_action=list">← К таблицам</a></p>';
+    echo '<p>Таблица не найдена или системная.</p><p><a href="?_context=configurator&_action=list">← К таблицам</a></p>';
 }
 
 function render_configurator_edit_table(
@@ -769,7 +769,7 @@ function render_configurator_edit_table(
     $tbl_esc = render_escape($table);
     echo '<h2>Поля таблицы: ' . render_escape($t_full)
        . ' <span class="badge">' . $tbl_esc . '</span></h2>';
-    echo '<p><a href="?_action=list">← К таблицам</a></p>';
+    echo '<p><a href="?_context=configurator&_action=list">← К таблицам</a></p>';
 
     // Текущие поля: структурные — серым без действий, entity — с удалением.
     echo '<table class="data-list"><tr><th>поле</th><th>тип</th><th>подпись</th><th>данных</th><th class="col-actions"></th></tr>';
@@ -797,7 +797,7 @@ function render_configurator_edit_table(
         echo '<tr><td><code>' . $f_esc . '</code></td>'
            . '<td>' . $entity . '</td><td>' . $f_full . '</td>'
            . '<td>' . ($cnt > 0 ? $cnt : '—') . '</td>'
-           . '<td class="col-actions"><form method="post" action="?_action=alter_drop_field" style="margin:0" '
+           . '<td class="col-actions"><form method="post" action="?_context=configurator&_action=alter_drop_field" style="margin:0" '
            . 'onsubmit="return confirm(\'' . render_escape($confirm) . '\')">'
            . '<input type="hidden" name="table" value="' . $tbl_esc . '">'
            . '<input type="hidden" name="field" value="' . $f_esc . '">' . $force
@@ -808,7 +808,7 @@ function render_configurator_edit_table(
 
     echo <<<HTML
     <h3>Добавить поле</h3>
-    <form method="post" action="?_action=alter_add_field">
+    <form method="post" action="?_context=configurator&_action=alter_add_field">
       <input type="hidden" name="table" value="$tbl_esc">
       <div class="field-row">
         <select name="field[entity]" onchange="onFieldTypeChange(this)">
@@ -877,7 +877,7 @@ function render_configurator_edit_table(
 function render_configurator_diagnose(array $diag): void
 {
     echo '<h2>Состояние модели</h2>';
-    echo '<p><a href="?_action=list">← К таблицам</a></p>';
+    echo '<p><a href="?_context=configurator&_action=list">← К таблицам</a></p>';
     echo render_model_diagnosis($diag);
 }
 
@@ -887,7 +887,7 @@ function render_configurator_delete_confirm(string $table): void
     echo <<<HTML
     <h2>Удаление таблицы "$table"</h2>
     <p>Действие необратимо: физическая таблица и все её записи будут уничтожены.</p>
-    <form method="post" action="?_action=delete_table">
+    <form method="post" action="?_context=configurator&_action=delete_table">
       <input type="hidden" name="table" value="$table">
       <div id="stage1">
         <button type="button" onclick="reveal('stage2')">Я понимаю, что это необратимо</button>
@@ -899,7 +899,7 @@ function render_configurator_delete_confirm(string $table): void
         <button type="submit" style="color:red;font-weight:bold">ПОДТВЕРДИТЬ УДАЛЕНИЕ ОКОНЧАТЕЛЬНО</button>
       </div>
     </form>
-    <p><a href="?_action=list">Отмена</a></p>
+    <p><a href="?_context=configurator&_action=list">Отмена</a></p>
     <script>
     function reveal(id) { document.getElementById(id).style.display = 'block'; }
     </script>
@@ -910,11 +910,11 @@ function render_configurator_delete_confirm(string $table): void
  *  render_table_directory() (та же функция, что и на labels). */
 function render_configurator_directory(array $snapshot, array $referenced_as_dict): void
 {
-    echo '<h2>Таблицы</h2><p><a href="?_action=new_table">+ новая таблица</a></p>';
+    echo '<h2>Таблицы</h2><p><a href="?_context=configurator&_action=new_table">+ новая таблица</a></p>';
     render_table_directory($snapshot, [
-        'содержимое'    => 'index.php?_table={t}&_action=view',
-        'редактировать' => '?_action=edit&table={t}',
-        'удалить'       => '?_action=delete_confirm&table={t}',
+        'содержимое'    => 'index.php?_context=data&_table={t}&_action=view',
+        'редактировать' => '?_context=configurator&_action=edit&table={t}',
+        'удалить'       => '?_context=configurator&_action=delete_confirm&table={t}',
     ], ['referenced' => $referenced_as_dict]);
 }
 
@@ -934,7 +934,7 @@ function render_labels_directory(array $snapshot_view): void
     // же». Под капотом действие одно: выбрать таблицу для правки
     // подписей. Системные (model_) не правятся здесь.
     render_table_directory($snapshot_view, [
-        'править' => '?table={t}',
+        'править' => '?_context=labels&table={t}',
     ], ['show_system' => false, 'reports_note' => 'Отчёты не созданы.']);
 }
 
