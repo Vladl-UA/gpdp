@@ -1015,9 +1015,7 @@ if (!($diag['clean'] ?? false) && $caction !== 'diagnose') {
 
 if ($caction === 'diagnose') {
 
-    echo '<h2>Состояние модели</h2>';
-    echo '<p><a href="?_action=list">← К таблицам</a></p>';
-    echo render_model_diagnosis($diag);
+    render_configurator_diagnose($diag);
 
 } elseif ($caction === 'new_table') {
 
@@ -1441,27 +1439,7 @@ if ($caction === 'diagnose') {
 
 } elseif ($caction === 'delete_confirm') {
 
-    $table = render_escape((string) ($_GET['table'] ?? ''));
-    echo <<<HTML
-    <h2>Удаление таблицы "$table"</h2>
-    <p>Действие необратимо: физическая таблица и все её записи будут уничтожены.</p>
-    <form method="post" action="?_action=delete_table">
-      <input type="hidden" name="table" value="$table">
-      <div id="stage1">
-        <button type="button" onclick="reveal('stage2')">Я понимаю, что это необратимо</button>
-      </div>
-      <div id="stage2" style="display:none">
-        <button type="button" onclick="reveal('stage3')">Да, удалить таблицу "$table"</button>
-      </div>
-      <div id="stage3" style="display:none">
-        <button type="submit" style="color:red;font-weight:bold">ПОДТВЕРДИТЬ УДАЛЕНИЕ ОКОНЧАТЕЛЬНО</button>
-      </div>
-    </form>
-    <p><a href="?_action=list">Отмена</a></p>
-    <script>
-    function reveal(id) { document.getElementById(id).style.display = 'block'; }
-    </script>
-    HTML;
+    render_configurator_delete_confirm((string) ($_GET['table'] ?? ''));
 
 } else {
     // --- список: живой слепок, без кэша ------------------------------------
@@ -1489,15 +1467,7 @@ if ($caction === 'diagnose') {
         }
     }
 
-    echo '<h2>Таблицы</h2><p><a href="?_action=new_table">+ новая таблица</a></p>';
-
-    // Каталог таблиц — общая раскладка (та же, что на labels; render.php).
-    // Под капотом различаются только действия карточек.
-    render_table_directory($snapshot, [
-        'содержимое'    => 'index.php?_table={t}&_action=view',
-        'редактировать' => '?_action=edit&table={t}',
-        'удалить'       => '?_action=delete_confirm&table={t}',
-    ], ['referenced' => $referenced_as_dict]);
+    render_configurator_directory($snapshot, $referenced_as_dict);
 }
 
 echo '</body></html>';

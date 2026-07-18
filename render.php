@@ -564,6 +564,58 @@ function render_schema_card(array $view, array $actions = [], string $badge = ''
  *                      не показывать; по умолчанию true);
  *   'reports_note'  => текст пустой полки отчётов.
  */
+/**
+ * Стадия 3 дорожной карты единого входа (STATE.md «Позже», 2026-07-17):
+ * HTML конфигуратора переезжает сюда действие за действием, начиная с
+ * маленьких и безопасных — configurator.php не должен ничего echo'ить
+ * сам (§3, «HTML рождается только в render.php»), логика (DDL,
+ * валидация, живое чтение структуры) остаётся в configurator.php.
+ */
+
+function render_configurator_diagnose(array $diag): void
+{
+    echo '<h2>Состояние модели</h2>';
+    echo '<p><a href="?_action=list">← К таблицам</a></p>';
+    echo render_model_diagnosis($diag);
+}
+
+function render_configurator_delete_confirm(string $table): void
+{
+    $table = render_escape($table);
+    echo <<<HTML
+    <h2>Удаление таблицы "$table"</h2>
+    <p>Действие необратимо: физическая таблица и все её записи будут уничтожены.</p>
+    <form method="post" action="?_action=delete_table">
+      <input type="hidden" name="table" value="$table">
+      <div id="stage1">
+        <button type="button" onclick="reveal('stage2')">Я понимаю, что это необратимо</button>
+      </div>
+      <div id="stage2" style="display:none">
+        <button type="button" onclick="reveal('stage3')">Да, удалить таблицу "$table"</button>
+      </div>
+      <div id="stage3" style="display:none">
+        <button type="submit" style="color:red;font-weight:bold">ПОДТВЕРДИТЬ УДАЛЕНИЕ ОКОНЧАТЕЛЬНО</button>
+      </div>
+    </form>
+    <p><a href="?_action=list">Отмена</a></p>
+    <script>
+    function reveal(id) { document.getElementById(id).style.display = 'block'; }
+    </script>
+    HTML;
+}
+
+/** Каталог таблиц конфигуратора — обёртка над уже общей
+ *  render_table_directory() (та же функция, что и на labels). */
+function render_configurator_directory(array $snapshot, array $referenced_as_dict): void
+{
+    echo '<h2>Таблицы</h2><p><a href="?_action=new_table">+ новая таблица</a></p>';
+    render_table_directory($snapshot, [
+        'содержимое'    => 'index.php?_table={t}&_action=view',
+        'редактировать' => '?_action=edit&table={t}',
+        'удалить'       => '?_action=delete_confirm&table={t}',
+    ], ['referenced' => $referenced_as_dict]);
+}
+
 function render_table_directory(array $snapshot, array $actions, array $opts = []): void
 {
     $referenced   = $opts['referenced'] ?? [];
