@@ -20,11 +20,11 @@ error_reporting(E_ALL);
 
 // --- 1. boot -----------------------------------------------------------------
 
-require 'config.php';
-require 'db.php';
-require 'core.php';
-require 'helpers.php';
-require 'render.php';
+require_once 'config.php';
+require_once 'db.php';
+require_once 'core.php';
+require_once 'helpers.php';
+require_once 'render.php';
 
 
 $db_connection = admin_db_connect();
@@ -35,18 +35,27 @@ $db_connection = admin_db_connect();
 // единого входа; находка Chat 2026-07-17: configurator обязан работать,
 // когда снапшот сломан — строгий snapshot_init ниже не должен
 // блокировать контур, которому именно это и нужно чинить).
-// Стадии 0-4 сделаны (configurator.php/labels.php — уже библиотеки,
-// весь HTML в render.php); стадия 5 (условная загрузка отсюда) —
-// не начата. Контекст, отличный от 'data', пока не имеет
-// обработчика здесь — это ожидаемо и временно, не регрессия.
+// Стадия 5: configurator.php/labels.php подключаются условно, по
+// контексту — тем же require_once, что уже используют они сами
+// (guard в них проверяет $_SERVER['SCRIPT_FILENAME'] против
+// basename(__FILE__), не совпадёт с index.php — самозагрузка внутри
+// НЕ сработает повторно, дispatch зовётся отсюда явно, один раз).
 $context = request_context($_GET, $_POST);
 if ($context === null) {
     http_response_code(400);
     exit('Неизвестный _context.');
 }
-if ($context !== 'data') {
-    http_response_code(501);
-    exit("Контекст '$context' через index.php ещё не подключён (STATE.md «Позже», стадия 5 дорожной карты не начата) — используйте configurator.php/labels.php напрямую.");
+if ($context === 'configurator') {
+    require_once 'configurator.php';
+    configurator_dispatch($db_connection);
+    db_close($db_connection);
+    exit;
+}
+if ($context === 'labels') {
+    require_once 'labels.php';
+    labels_dispatch($db_connection);
+    db_close($db_connection);
+    exit;
 }
 
 // --- 2. модель -----------------------------------------------------------------
