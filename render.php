@@ -51,17 +51,51 @@ function render_admin_styles(): string
  *               страницам; пустая строка — без навигации);
  * $extra_head — дополнительный <style>/<meta> конкретной страницы.
  */
-function render_admin_page_open(string $title, string $nav_html = '', string $extra_head = ''): string
+/**
+ * Системное меню — три контура (data/configurator/labels), источник —
+ * REQUEST_CONTEXTS (core.php), не отдельный список: контекст запроса
+ * и пункт этого меню — буквально одно и то же (Влад, 2026-07-18: «на
+ * то он и контекст»). Оформление сейчас — просто строка ссылок
+ * (.sys-menu), с прицелом на будущий выпадающий список — см. комментарий
+ * в style.css у .sys-menu, класс менять не придётся, когда дойдёт
+ * очередь до самого вида.
+ *
+ * НЕ источник для будущего меню уровня представления (отчёты/
+ * представления) — тот список растёт из записей модели, отдельный
+ * механизм, задел под него сейчас сознательно не делается (STATE.md
+ * «Позже» — не проектировать раньше реального повода).
+ */
+function render_context_menu(string $current): string
 {
-    $out = '<!doctype html><html><head><meta charset="utf-8"><title>'
+    $items = '';
+    foreach (REQUEST_CONTEXTS as $key => $info) {
+        $label = render_escape($info['icon'] . ' ' . $info['label']);
+        $items .= $key === $current
+            ? '<span class="menu-current">' . $label . '</span>'
+            : '<a class="menu-item" href="' . render_escape($info['href']) . '">' . $label . '</a>';
+    }
+    return '<nav class="sys-menu">' . $items . '</nav>';
+}
+
+/**
+ * $current_context — один из ключей REQUEST_CONTEXTS ('data'/
+ * 'configurator'/'labels'), не свободная строка меню (было
+ * $nav_html — каждый вызывающий сам собирал ссылки, отсюда была
+ * асимметрия 2026-07-17: конфигуратор ссылался на подписи, подписи —
+ * нет; здесь такое структурно невозможно, меню одно на всех).
+ * Постраничные хлебные крошки («← К таблицам» и подобное) — забота
+ * вызывающего, отдельным echo после этой функции, не смешивать с
+ * системным меню (разная природа — переключение контура vs навигация
+ * внутри одного).
+ */
+function render_admin_page_open(string $title, string $current_context, string $extra_head = ''): string
+{
+    return '<!doctype html><html><head><meta charset="utf-8"><title>'
          . render_escape($title) . '</title>'
          . render_admin_styles()
          . $extra_head
-         . '</head><body>';
-    if ($nav_html !== '') {
-        $out .= '<p>' . $nav_html . '</p>';
-    }
-    return $out;
+         . '</head><body>'
+         . render_context_menu($current_context);
 }
 
 /**

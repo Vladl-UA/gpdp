@@ -993,11 +993,7 @@ if ($caction === 'alter_drop_field' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 $flash    = isset($_GET['_msg']) ? render_escape((string) $_GET['_msg']) : null;
 $flash_ok = ($_GET['_ok'] ?? '1') === '1';
 
-echo render_admin_page_open(
-    'Конфигуратор GPDP',
-    '<a class="home-link" href="index.php">← Домой</a> · '
-    . '<a class="home-link" href="index.php?_context=labels">Подписи и словари</a>'
-);
+echo render_admin_page_open('Конфигуратор GPDP', 'configurator');
 
 // Диагностика структуры (журнал 07-11): при заходе считаем расхождения
 // БД↔реестр. Плашка-уведомление, если есть — не молча. Раздел «Состояние

@@ -110,11 +110,7 @@ if (!$table_requested || $request_action === 'home') {
     }
     asort($root_candidates, SORT_NATURAL | SORT_FLAG_CASE);
 
-    echo render_admin_page_open(
-        'GPDP',
-        '<a class="home-link" href="?_context=configurator">⚙ Конфигуратор</a> · '
-        . '<a class="home-link" href="?_context=labels">🏷 Подписи и словари</a>'
-    );
+    echo render_admin_page_open('GPDP', 'data');
     echo '<h2>Главные таблицы</h2><ul>';
     foreach ($root_candidates as $t_name => $t_label) {
         echo '<li><a href="?_table=' . rawurlencode($t_name) . '&_action=view">'
@@ -227,7 +223,7 @@ if ($request_action === 'reparent') {
     $table_title = render_escape(
         (string) ($snapshot['presentation']['labels']['table'][$task_table]['data_full'] ?? $task_table)
     );
-    echo render_admin_page_open($table_title, '<a class="home-link" href="?_action=home">← Домой</a>');
+    echo render_admin_page_open($table_title, 'data');
     echo "<h2>Смена родителя: $table_title</h2>";
     echo render_reparent_form($view);
     echo "<p><a href=\"?_table=$task_table&_action=view&_id=$request_id\">Отмена</a></p>";
@@ -247,10 +243,7 @@ $table_title = render_escape(
     (string) ($snapshot['presentation']['labels']['table'][$task_table]['data_full'] ?? $task_table)
 );
 
-echo render_admin_page_open(
-    $table_title,
-    '<a class="home-link" href="?_action=home">← Домой</a>'
-);
+echo render_admin_page_open($table_title, 'data');
 echo "<h2>$table_title</h2>";
 
 // --- 6. конвейер + рендер ---------------------------------------------------------

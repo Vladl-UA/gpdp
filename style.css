@@ -22,6 +22,17 @@ fieldset{margin-bottom:.5em}
 .field-row{display:flex;gap:8px;align-items:center;margin-bottom:6px}
 .field-row select,.field-row input{padding:4px}
 .home-link{display:inline-block;margin-bottom:1em}
+/* 2026-07-18: системное меню — три контура (data/configurator/labels),
+   источник REQUEST_CONTEXTS (core.php). Оформление сейчас нарочно
+   простое — строка ссылок; когда дойдёт очередь до самого вида,
+   менять придётся только это правило (класс/разметка от render.php
+   не зависят), не PHP. */
+.sys-menu{display:flex;gap:2px;margin-bottom:1em;background:#f6f6f4;
+          border:1px solid #e2e2e0;border-radius:4px;padding:3px;width:fit-content}
+.sys-menu .menu-item,.sys-menu .menu-current{padding:4px 10px;border-radius:3px;
+          text-decoration:none;color:#225;font-size:.95em}
+.sys-menu .menu-item:hover{background:#fff}
+.sys-menu .menu-current{background:#dce7f2;color:#2f3d4a;font-weight:600}
 .act{display:inline-block;min-width:1.6em;text-align:center;text-decoration:none;border:1px solid #ccc;border-radius:3px;padding:1px 6px;margin-left:4px;color:#225}
 .act:hover{background:#eef}
 .act-danger{color:#a22}

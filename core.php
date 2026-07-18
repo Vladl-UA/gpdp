@@ -170,8 +170,20 @@ function entities(): array
  * не динамическая интерпретация (`'dispatch_' . $_GET['_context']`) —
  * тот же принцип §12, что уже держит весь конфигуратор: закрытый
  * перечислимый выбор, не текст из запроса напрямую.
+ *
+ * 2026-07-18 (меню, Влад: «брать пункты меню из контекста — на то он
+ * и контекст»): та же константа — источник и для whitelist, и для
+ * системного меню (render_context_menu()). Не путать с будущим меню
+ * УРОВНЯ ПРЕДСТАВЛЕНИЯ (отчёты/представления) — тот список растёт из
+ * записей модели, не хардкода, и не имеет отношения к REQUEST_CONTEXTS
+ * вообще: контур запроса ('data'/'configurator'/'labels') и пункт
+ * презентационного меню — разные по природе вещи, разные источники.
  */
-const REQUEST_CONTEXTS = ['data', 'configurator', 'labels'];
+const REQUEST_CONTEXTS = [
+    'data'         => ['icon' => '🏠', 'label' => 'Главная',           'href' => 'index.php'],
+    'configurator' => ['icon' => '⚙',  'label' => 'Конфигуратор',      'href' => 'index.php?_context=configurator'],
+    'labels'       => ['icon' => '🏷', 'label' => 'Подписи и словари', 'href' => 'index.php?_context=labels'],
+];
 
 /**
  * Контекст запроса — определяется РАНЬШЕ snapshot_init() (находка
@@ -185,7 +197,7 @@ const REQUEST_CONTEXTS = ['data', 'configurator', 'labels'];
 function request_context(array $get, array $post): ?string
 {
     $raw = (string) ($post['_context'] ?? $get['_context'] ?? 'data');
-    return in_array($raw, REQUEST_CONTEXTS, true) ? $raw : null;
+    return isset(REQUEST_CONTEXTS[$raw]) ? $raw : null;
 }
 
 function field_parse(string $field_name): array
