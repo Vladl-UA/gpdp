@@ -162,6 +162,31 @@ function entities(): array
  * unknown — ошибка конфигурации; роняет сборку snapshot (fail-fast
  * на границе), до конвейера такое поле не доживает.
  */
+/**
+ * Стадия 1 дорожной карты единого входа (STATE.md «Позже», 2026-07-17):
+ * закрытый список контекстов запроса — data (рабочий конвейер) /
+ * configurator (структура) / labels (подписи и словари). Whitelist,
+ * не динамическая интерпретация (`'dispatch_' . $_GET['_context']`) —
+ * тот же принцип §12, что уже держит весь конфигуратор: закрытый
+ * перечислимый выбор, не текст из запроса напрямую.
+ */
+const REQUEST_CONTEXTS = ['data', 'configurator', 'labels'];
+
+/**
+ * Контекст запроса — определяется РАНЬШЕ snapshot_init() (находка
+ * Chat, 2026-07-17, критическая: контур configurator обязан работать,
+ * когда снапшот сломан или схема заблокирована, строгий snapshot_init
+ * — только для data). Отсутствие параметра = 'data' (старые ссылки
+ * без _context не ломаются). Незнакомое значение — null, не тихий
+ * фолбэк на 'data': вызывающий код решает, что делать (сейчас —
+ * 400, см. index.php).
+ */
+function request_context(array $get, array $post): ?string
+{
+    $raw = (string) ($post['_context'] ?? $get['_context'] ?? 'data');
+    return in_array($raw, REQUEST_CONTEXTS, true) ? $raw : null;
+}
+
 function field_parse(string $field_name): array
 {
     $parsed = [
