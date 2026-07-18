@@ -192,6 +192,7 @@ function labels_dispatch(PgSql\Connection $db_connection): void
 .save-all:hover{background:#dde}
 </style>';
     $nav = '<a class="home-link" href="index.php">← Домой</a>'
+         . ' · <a class="home-link" href="index.php?_context=configurator">⚙ Конфигуратор</a>'
          . ($valid_selected ? ' · <a class="home-link" href="index.php?_context=labels">← К списку таблиц</a>' : '');
     echo render_admin_page_open('Подписи и словари', $nav, $extra_head);
     echo render_admin_flash($flash !== null ? render_escape($flash[1]) : null, ($flash[0] ?? '') === 'ok');
