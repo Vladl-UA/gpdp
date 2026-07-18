@@ -996,7 +996,7 @@ $flash_ok = ($_GET['_ok'] ?? '1') === '1';
 echo render_admin_page_open(
     'Конфигуратор GPDP',
     '<a class="home-link" href="index.php">← Домой</a> · '
-    . '<a class="home-link" href="labels.php">Подписи и словари</a>'
+    . '<a class="home-link" href="index.php?_context=labels">Подписи и словари</a>'
 );
 
 // Диагностика структуры (журнал 07-11): при заходе считаем расхождения
@@ -1220,13 +1220,13 @@ if ($caction === 'diagnose') {
 render_admin_page_close();
 }
 
-// 2026-07-17: guard «запущен напрямую или подключён библиотекой» —
-// тот же приём, что `if __name__ == '__main__':` в Python. Закрывает
-// соединение вызывающий (кто открыл — тот и закрывает), не сама
-// функция: index.php (стадия 5) тоже вызывает configurator_dispatch()
-// и должен сам закрыть то, что сам открыл, без дублирования.
+// 2026-07-17 (обновлено): теперь чистая библиотека — никакой логики
+// диспетчера при прямом обращении, только редирект на верный адрес
+// (Влад: «должны были быть просто библиотеками», переходная
+// подстраховка сняла себя за ненадобностью — стадии 5-6 подтвердили,
+// что index.php справляется сам). Старая закладка/прямой URL получает
+// осмысленный redirect, не тихую пустую страницу.
 if (basename((string) ($_SERVER['SCRIPT_FILENAME'] ?? '')) === basename(__FILE__)) {
-    $db_connection = admin_db_connect();
-    configurator_dispatch($db_connection);
-    db_close($db_connection);
+    header('Location: index.php?_context=configurator');
+    exit;
 }

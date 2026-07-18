@@ -112,8 +112,8 @@ if (!$table_requested || $request_action === 'home') {
 
     echo render_admin_page_open(
         'GPDP',
-        '<a class="home-link" href="configurator.php">⚙ Конфигуратор</a> · '
-        . '<a class="home-link" href="labels.php">🏷 Подписи и словари</a>'
+        '<a class="home-link" href="?_context=configurator">⚙ Конфигуратор</a> · '
+        . '<a class="home-link" href="?_context=labels">🏷 Подписи и словари</a>'
     );
     echo '<h2>Главные таблицы</h2><ul>';
     foreach ($root_candidates as $t_name => $t_label) {

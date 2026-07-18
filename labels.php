@@ -192,7 +192,7 @@ function labels_dispatch(PgSql\Connection $db_connection): void
 .save-all:hover{background:#dde}
 </style>';
     $nav = '<a class="home-link" href="index.php">← Домой</a>'
-         . ($valid_selected ? ' · <a class="home-link" href="labels.php">← К списку таблиц</a>' : '');
+         . ($valid_selected ? ' · <a class="home-link" href="index.php?_context=labels">← К списку таблиц</a>' : '');
     echo render_admin_page_open('Подписи и словари', $nav, $extra_head);
     echo render_admin_flash($flash !== null ? render_escape($flash[1]) : null, ($flash[0] ?? '') === 'ok');
 
@@ -222,12 +222,12 @@ function labels_dispatch(PgSql\Connection $db_connection): void
     render_admin_page_close();
 }
 
-// 2026-07-17: guard «запущен напрямую или подключён библиотекой» —
-// тот же приём, что уже применён в configurator.php. index.php этот
-// файл не подключает вовсе (стадии 5-6 не начаты) — guard всегда
-// истинен на практике, подготовка на будущее, не тихая заглушка.
+// 2026-07-17 (обновлено): теперь чистая библиотека — никакой логики
+// диспетчера при прямом обращении, только редирект на верный адрес
+// (Влад: «должны были быть просто библиотеками», переходная
+// подстраховка сняла себя за ненадобностью — стадии 5-6 подтвердили,
+// что index.php справляется сам).
 if (basename((string) ($_SERVER['SCRIPT_FILENAME'] ?? '')) === basename(__FILE__)) {
-    $db_connection = admin_db_connect();
-    labels_dispatch($db_connection);
-    db_close($db_connection);
+    header('Location: index.php?_context=labels');
+    exit;
 }
