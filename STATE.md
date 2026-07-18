@@ -944,13 +944,32 @@ render | PRG-redirect.
    добавилось, JS-кнопки подстановки токенов дали верные `{int_num}`/
    `{voc_mr}`/`{links_colors}`) → удаление → диагностика чистая до и
    после. Смоук не тронут (не проверяет конфигуратор впрямую).
-4. **То же для `labels.php`** (стадии 2-3 повторяются, объём меньше —
-   288 строк против 1493): `labels_dispatch(...)`,
-   `render_labels_directory()`/`render_labels_editor()`. Функции
-   `labels_registry_id`/`labels_save_label` — переименовать в
-   `model_label_registry_id`/`model_label_save` при переносе (Chat:
-   подписи — часть model/presentation-слоя, не отдельное приложение,
-   имя должно отражать это).
+4. **[СДЕЛАНО 2026-07-17] `labels.php` — та же обработка, что
+   `configurator.php`.** `require_once`, `labels_dispatch(PgSql\
+   Connection $db_connection): void`, guard «запущен напрямую» в конце
+   файла (тот же приём). `labels_registry_id`/`labels_save_label` →
+   `model_label_registry_id`/`model_label_save` (Chat: подписи — часть
+   model/presentation-слоя, не отдельное приложение; внешних ссылок на
+   старые имена не было, проверено `grep`). Локальный `h()` убран —
+   дословный дубль `render_escape()` (тот же `htmlspecialchars($s,
+   ENT_QUOTES, 'UTF-8')`), заменён на него везде. HTML — в
+   `render_labels_directory()`/`render_labels_editor()`, ноль `echo` с
+   тегами в `labels.php`. Побочная находка по пути:
+   `render_configurator_page_close()` (стадия 3) переименована в
+   `render_admin_page_close()` — была общая функция под
+   «конфигураторским» именем, теперь у неё два вызывающих (`labels.php`
+   тоже), имя обобщено вслед за `render_admin_page_open()`, который уже
+   называется так. **Живая проверка**: обе ступени (каталог таблиц,
+   форма правки) → сохранение подписи таблицы (заголовок сменился
+   верно) → добавление значения словаря (`voc_material`, id=10) →
+   удаление того же значения → подпись возвращена к исходной (не
+   оставлять побочный след в боевых данных); заодно `configurator.php`
+   проверен на регрессию (переименованная общая функция) — «Расхождений
+   нет». Смоук 73/73 (не проверяет `labels.php` впрямую, но `render.php`
+   менялся существенно — прогнан как sanity-check). Заодно поправлены
+   устаревшие формулировки «стадии 2-4 не начаты» → «стадия 5 не
+   начата» в `index.php`/`smoke_test.php` (были правдой на момент
+   написания стадии 1, устарели после стадий 2-4 тем же днём).
 5. **`index.php` — условная загрузка библиотек по `_context`,
    единый канал рендера.** `match($context)`: `configurator` →
    `require_once 'configurator.php'; configurator_dispatch(...)`;
