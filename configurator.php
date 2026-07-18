@@ -1218,15 +1218,15 @@ if ($caction === 'diagnose') {
 }
 
 render_admin_page_close();
-db_close($db_connection);
 }
 
 // 2026-07-17: guard «запущен напрямую или подключён библиотекой» —
-// тот же приём, что `if __name__ == '__main__':` в Python. Пока
-// (стадия 2 из дорожной карты, стадии 3-5 не начаты) index.php этот
-// файл не подключает вовсе — guard всегда истинен на практике,
-// подготовка на будущее, не тихая заглушка.
+// тот же приём, что `if __name__ == '__main__':` в Python. Закрывает
+// соединение вызывающий (кто открыл — тот и закрывает), не сама
+// функция: index.php (стадия 5) тоже вызывает configurator_dispatch()
+// и должен сам закрыть то, что сам открыл, без дублирования.
 if (basename((string) ($_SERVER['SCRIPT_FILENAME'] ?? '')) === basename(__FILE__)) {
     $db_connection = admin_db_connect();
     configurator_dispatch($db_connection);
+    db_close($db_connection);
 }
