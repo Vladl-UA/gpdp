@@ -28,13 +28,12 @@ error_reporting(E_ALL);
  * составные сущности (date и подобные) — появятся отдельными решениями.
  */
 
-require 'config.php';
-require 'db.php';
-require 'core.php';
-require 'helpers.php';
-require 'render.php';
+require_once 'config.php';
+require_once 'db.php';
+require_once 'core.php';
+require_once 'helpers.php';
+require_once 'render.php';
 
-$db_connection = admin_db_connect();
 
 // --- (auth: контур не утверждён — см. STATE.md; серьёзный периметр --------
 //      прав по таблицам заявлен как обязательное будущее требование) ------
@@ -888,6 +887,18 @@ function configurator_drop_field(PgSql\Connection $db_connection, string $table,
 // Разбор запроса
 // ============================================================================
 
+/**
+ * Диспетчер конфигуратора — вся структурная логика v0 одним входом.
+ * 2026-07-17 (STATE.md «Позже», дорожная карта единого входа,
+ * стадия 2): вынесено из верхнего уровня файла в функцию, чтобы
+ * файл мог служить и самостоятельным скриптом (см. guard в конце
+ * файла — «если запущен напрямую»), и библиотекой, вызываемой из
+ * index.php по _context (стадия 5, ещё не начата). $application
+ * не параметр — берётся из config() внутри, тот же источник,
+ * что был раньше, поведение не меняется.
+ */
+function configurator_dispatch(PgSql\Connection $db_connection): void
+{
 $caction = (string) ($_POST['_action'] ?? $_GET['_action'] ?? 'list');
 $application = config()['application'];
 
@@ -1491,3 +1502,14 @@ if ($caction === 'diagnose') {
 
 echo '</body></html>';
 db_close($db_connection);
+}
+
+// 2026-07-17: guard «запущен напрямую или подключён библиотекой» —
+// тот же приём, что `if __name__ == '__main__':` в Python. Пока
+// (стадия 2 из дорожной карты, стадии 3-5 не начаты) index.php этот
+// файл не подключает вовсе — guard всегда истинен на практике,
+// подготовка на будущее, не тихая заглушка.
+if (basename((string) ($_SERVER['SCRIPT_FILENAME'] ?? '')) === basename(__FILE__)) {
+    $db_connection = admin_db_connect();
+    configurator_dispatch($db_connection);
+}
