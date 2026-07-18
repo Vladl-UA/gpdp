@@ -37,6 +37,7 @@ const ENTITY_RESERVED_IDS = [
     'ent', 'sys', 'rel', 'adm', 'chk', 'fmt',          // классы функций
     'entity', 'field', 'snapshot', 'action', 'record',  // семейства ядра
     'lookup', 'render', 'config', 'core', 'index',      // слои и файлы
+    'configurator', 'labels', 'context',                // 2026-07-17: единый вход
 ];
 
 // Структурные элементы — идентичность, иерархия, связи. Не сущности,
