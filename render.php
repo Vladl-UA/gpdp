@@ -744,7 +744,7 @@ function render_configurator_page_open(?string $flash, bool $flash_ok, array $di
     }
 }
 
-function render_configurator_page_close(): void
+function render_admin_page_close(): void
 {
     echo '</body></html>';
 }
@@ -916,6 +916,111 @@ function render_configurator_directory(array $snapshot, array $referenced_as_dic
         'редактировать' => '?_action=edit&table={t}',
         'удалить'       => '?_action=delete_confirm&table={t}',
     ], ['referenced' => $referenced_as_dict]);
+}
+
+/**
+ * Стадия 4 дорожной карты единого входа (STATE.md «Позже», 2026-07-17):
+ * HTML редактора подписей — тем же принципом, что configurator.php
+ * стадией раньше. Логика (живое чтение структуры, POST/PRG) остаётся
+ * в labels.php, здесь только вывод.
+ */
+function render_labels_directory(array $snapshot_view): void
+{
+    echo '<h1>Подписи и словари</h1>';
+    echo '<p><em>Выберите таблицу — правка подписей её полей; у словарей '
+       . 'также значения.</em></p>';
+
+    // Тот же каталог таблиц, что в конфигураторе — «сверху одно и то
+    // же». Под капотом действие одно: выбрать таблицу для правки
+    // подписей. Системные (model_) не правятся здесь.
+    render_table_directory($snapshot_view, [
+        'править' => '?table={t}',
+    ], ['show_system' => false, 'reports_note' => 'Отчёты не созданы.']);
+}
+
+/**
+ * Форма правки подписей выбранной таблицы + (для словарей) правка
+ * значений. $dict_rows — уже прочитанные record_list() строки (пусто,
+ * если не словарь) — данные читает labels.php, здесь только укладка.
+ */
+function render_labels_editor(
+    string $selected,
+    array $t_schema,
+    array $t_labels,
+    array $presentation,
+    bool $is_dict,
+    array $dict_rows
+): void {
+    $t_full_lbl = (string) ($t_labels['data_full'] ?? '');
+
+    echo '<h1>' . render_escape($t_full_lbl !== '' ? $t_full_lbl : $selected)
+       . ' <span class="badge">' . render_escape($selected) . '</span></h1>';
+
+    echo '<form method="post" class="edit-form">';
+    echo '<input type="hidden" name="_action" value="save_all">';
+    echo '<input type="hidden" name="table" value="' . render_escape($selected) . '">';
+
+    echo '<fieldset><legend>Подпись таблицы</legend>';
+    echo '<div class="field-row"><span style="min-width:110px">кратко:</span>'
+       . '<input type="text" name="t_short" value="' . render_escape((string) ($t_labels['data_short'] ?? '')) . '" style="flex:1"></div>';
+    echo '<div class="field-row"><span style="min-width:110px">полностью:</span>'
+       . '<input type="text" name="t_full" value="' . render_escape($t_full_lbl) . '" style="flex:1"></div>';
+    echo '<div class="field-row"><span style="min-width:110px">шаблон объекта:</span>'
+       . '<input type="text" name="t_template" value="' . render_escape((string) ($t_labels['data_label_template'] ?? '')) . '" style="flex:1"></div>';
+    echo '</fieldset>';
+
+    echo '<fieldset><legend>Подписи полей</legend>';
+    echo '<table class="data-list"><tr><th>поле</th><th>кратко</th><th>полностью</th></tr>';
+    foreach ($t_schema['fields'] as $f_name => $f_schema) {
+        if (($f_schema['kind'] ?? '') === 'structural') {
+            continue;
+        }
+        $f_labels = $presentation['labels']['field'][$selected][$f_name] ?? [];
+        $key = render_escape($f_name);
+        echo '<tr><td><code>' . $key . '</code></td>'
+           . '<td><input type="text" name="f_short[' . $key . ']" value="'
+           . render_escape((string) ($f_labels['data_short'] ?? '')) . '" style="width:95%"></td>'
+           . '<td><input type="text" name="f_full[' . $key . ']" value="'
+           . render_escape((string) ($f_labels['data_full'] ?? '')) . '" style="width:95%"></td></tr>';
+    }
+    echo '</table></fieldset>';
+
+    echo '<button type="submit" class="save-all">Сохранить всё</button>';
+    echo '</form>';
+
+    if ($is_dict) {
+        echo '<h2>Значения</h2><div class="edit-form">';
+
+        if ($dict_rows !== []) {
+            echo '<table class="data-list"><tr><th>id</th><th>значение</th><th></th></tr>';
+            foreach ($dict_rows as $row) {
+                $rid  = (int) $row['id'];
+                $name = (string) ($row['data_name'] ?? '');
+                echo '<tr><td>' . $rid . '</td>'
+                   . '<td><form method="post" style="display:flex;gap:6px;margin:0">'
+                   . '<input type="hidden" name="_action" value="dict_edit">'
+                   . '<input type="hidden" name="table" value="' . render_escape($selected) . '">'
+                   . '<input type="hidden" name="id" value="' . $rid . '">'
+                   . '<input type="text" name="data_name" value="' . render_escape($name) . '" style="flex:1">'
+                   . '<button type="submit" class="act" title="сохранить">✓</button></form></td>'
+                   . '<td><form method="post" style="margin:0" onsubmit="return confirm(\'Удалить значение?\')">'
+                   . '<input type="hidden" name="_action" value="dict_delete">'
+                   . '<input type="hidden" name="table" value="' . render_escape($selected) . '">'
+                   . '<input type="hidden" name="id" value="' . $rid . '">'
+                   . '<button type="submit" class="act act-danger" title="удалить">×</button></form></td></tr>';
+            }
+            echo '</table>';
+        } else {
+            echo '<p><em>пусто</em></p>';
+        }
+
+        echo '<form method="post" style="display:flex;gap:6px;margin-top:6px">'
+           . '<input type="hidden" name="_action" value="dict_add">'
+           . '<input type="hidden" name="table" value="' . render_escape($selected) . '">'
+           . '<input type="text" name="data_name" placeholder="новое значение" style="flex:1">'
+           . '<button type="submit" class="act" title="добавить">+ добавить</button></form>';
+        echo '</div>';
+    }
 }
 
 function render_table_directory(array $snapshot, array $actions, array $opts = []): void

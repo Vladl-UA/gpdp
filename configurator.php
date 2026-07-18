@@ -1217,7 +1217,7 @@ if ($caction === 'diagnose') {
     render_configurator_directory($snapshot, $referenced_as_dict);
 }
 
-render_configurator_page_close();
+render_admin_page_close();
 db_close($db_connection);
 }
 
