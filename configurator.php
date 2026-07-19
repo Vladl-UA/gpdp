@@ -1090,11 +1090,14 @@ if ($caction === 'diagnose') {
 
 } elseif ($caction === 'new_table') {
 
-    $type_options = '';
+    // 2026-07-19: здесь собирается СПИСОК, тег <option> строит render.php
+    // (§3, §12). Экранирование — тоже забота рендера, не эта.
+    $type_items = [];
     foreach (entities() as $entity_id => $passport) {
-        $label = render_escape((string) ($passport['label'] ?? $entity_id));
-        $type_options .= '<option value="' . render_escape($entity_id) . '">'
-                       . render_escape($entity_id) . ' — ' . $label . '</option>';
+        $type_items[] = [
+            'value' => $entity_id,
+            'label' => $entity_id . ' — ' . (string) ($passport['label'] ?? $entity_id),
+        ];
     }
 
     // Существующие словари уровня 0: таблицы voc_* с полем data_name.
@@ -1103,7 +1106,7 @@ if ($caction === 'diagnose') {
     $live_structure    = snapshot_build_structure($db_connection);
     $live_presentation = snapshot_build_presentation($db_connection);
     $available_dicts   = [];
-    $dict_options      = '<option value="">— выберите словарь —</option>';
+    $dict_items        = [['value' => '', 'label' => '— выберите словарь —']];
 
     foreach ($live_structure['tables'] as $t_name => $t_schema) {
         if (!str_starts_with($t_name, 'voc_') || !isset($t_schema['fields']['data_name'])) {
@@ -1115,8 +1118,7 @@ if ($caction === 'diagnose') {
         $full      = (string) ($t_labels['data_full'] ?? $t_name);
 
         $available_dicts[$name_part] = ['short' => $short, 'full' => $full];
-        $dict_options .= '<option value="' . render_escape($name_part) . '">'
-                       . render_escape($full) . ' (' . render_escape($t_name) . ')</option>';
+        $dict_items[] = ['value' => $name_part, 'label' => "$full ($t_name)"];
     }
     $dict_labels_json = json_encode($available_dicts, JSON_UNESCAPED_UNICODE);
 
@@ -1126,24 +1128,22 @@ if ($caction === 'diagnose') {
     // шаблоном подписи, без data_name) движок понимает, но этот список —
     // сознательно суженный v0-фильтр для удобного выбора, не полный
     // охват движка.
-    $link_target_options = '<option value="">— выберите цель —</option>';
+    $link_target_items = [['value' => '', 'label' => '— выберите цель —']];
     foreach ($live_structure['tables'] as $t_name => $t_schema) {
         if (!isset($t_schema['fields']['data_name'])) {
             continue;
         }
         $t_labels = $live_presentation['labels']['table'][$t_name] ?? [];
         $t_full   = (string) ($t_labels['data_full'] ?? $t_name);
-        $link_target_options .= '<option value="' . render_escape($t_name) . '">'
-                              . render_escape($t_full) . ' (' . render_escape($t_name) . ')</option>';
+        $link_target_items[] = ['value' => $t_name, 'label' => "$t_full ($t_name)"];
     }
 
     // Родители для режима "Зависимая таблица" — ВСЕ живые таблицы
     // (включая словари: контекстные таблицы могут подчиняться и им).
     // model_-таблицы структурный сканер уже исключил.
-    $parent_options = '<option value="">— выберите родителя —</option>';
+    $parent_items = [['value' => '', 'label' => '— выберите родителя —']];
     foreach (array_keys($live_structure['tables']) as $t_name) {
-        $parent_options .= '<option value="' . render_escape($t_name) . '">'
-                         . render_escape($t_name) . '</option>';
+        $parent_items[] = ['value' => $t_name, 'label' => $t_name];
     }
 
     // 2026-07-17: словарь-представление — источник (любая таблица с
@@ -1169,8 +1169,8 @@ if ($caction === 'diagnose') {
     $view_source_bul_fields_json = json_encode($view_source_bul_fields, JSON_UNESCAPED_UNICODE);
 
     render_configurator_new_table(
-        $type_options, $parent_options, $link_target_options,
-        $dict_options, $dict_labels_json, $view_source_bul_fields_json
+        $type_items, $parent_items, $link_target_items,
+        $dict_items, $dict_labels_json, $view_source_bul_fields_json
     );
 
 } elseif ($caction === 'edit') {
@@ -1206,14 +1206,15 @@ if ($caction === 'diagnose') {
         }
 
         // --- добавить поле: одна строка, та же механика, что при создании ---
-        $type_options = '';
+        $type_items = [];
         foreach (entities() as $entity_id => $passport) {
-            $label = render_escape((string) ($passport['label'] ?? $entity_id));
-            $type_options .= '<option value="' . render_escape($entity_id) . '">'
-                           . render_escape($entity_id) . ' — ' . $label . '</option>';
+            $type_items[] = [
+                'value' => $entity_id,
+                'label' => $entity_id . ' — ' . (string) ($passport['label'] ?? $entity_id),
+            ];
         }
         $available_dicts = [];
-        $dict_options    = '<option value="">— выберите словарь —</option>';
+        $dict_items      = [['value' => '', 'label' => '— выберите словарь —']];
         foreach ($live_structure['tables'] as $t_name => $ts) {
             if (!str_starts_with($t_name, 'voc_') || !isset($ts['fields']['data_name'])) {
                 continue;
@@ -1224,23 +1225,23 @@ if ($caction === 'diagnose') {
                 'short' => (string) ($tl['data_short'] ?? $t_name),
                 'full'  => (string) ($tl['data_full'] ?? $t_name),
             ];
-            $dict_options .= '<option value="' . render_escape($name_part) . '">'
-                           . render_escape($available_dicts[$name_part]['full'])
-                           . ' (' . render_escape($t_name) . ')</option>';
+            $dict_items[] = [
+                'value' => $name_part,
+                'label' => $available_dicts[$name_part]['full'] . " ($t_name)",
+            ];
         }
         $dict_labels_json = json_encode($available_dicts, JSON_UNESCAPED_UNICODE);
 
         // Цели для link_ — тот же критерий, что при создании таблицы
         // (любая таблица с data_name, не только voc_*).
-        $link_target_options = '<option value="">— выберите цель —</option>';
+        $link_target_items = [['value' => '', 'label' => '— выберите цель —']];
         foreach ($live_structure['tables'] as $t_name => $ts) {
             if (!isset($ts['fields']['data_name'])) {
                 continue;
             }
-            $tl = $live_presentation['labels']['table'][$t_name] ?? [];
-            $link_target_options .= '<option value="' . render_escape($t_name) . '">'
-                                   . render_escape((string) ($tl['data_full'] ?? $t_name))
-                                   . ' (' . render_escape($t_name) . ')</option>';
+            $tl     = $live_presentation['labels']['table'][$t_name] ?? [];
+            $t_full = (string) ($tl['data_full'] ?? $t_name);
+            $link_target_items[] = ['value' => $t_name, 'label' => "$t_full ($t_name)"];
         }
 
         // calc_: подсказка переменных — ТОЛЬКО entity-поля ЭТОЙ таблицы
@@ -1258,7 +1259,7 @@ if ($caction === 'diagnose') {
 
         render_configurator_edit_table(
             $table, $t_full, $t_schema, $live_presentation, $data_counts,
-            $type_options, $dict_options, $link_target_options,
+            $type_items, $dict_items, $link_target_items,
             $dict_labels_json, $formula_fields_json
         );
     }

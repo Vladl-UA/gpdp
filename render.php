@@ -127,6 +127,32 @@ function render_value(array $result): string
     return render_escape((string) $value);
 }
 
+/**
+ * Список вариантов → HTML `<option>`. Единственное место в проекте, где
+ * рождается этот тег (§3, §12). 2026-07-19: до этого конфигуратор
+ * собирал `<option>` сам, двенадцатью местами, и передавал в рендер уже
+ * свёрстанную строку — тег рождался вне своего слоя. Здесь тег строится
+ * из СПИСКА, как это и делал обычный путь данных.
+ *
+ * $items — список ['value' => .., 'label' => ..]; «— выберите … —»
+ * передаётся первым элементом с пустым value, отдельного параметра под
+ * placeholder не нужно. $current — скаляр (одиночный выбор) или массив
+ * (множественный, links_): правило отметки разное, форма вызова одна.
+ */
+function render_options(array $items, mixed $current = null): string
+{
+    $html = '';
+    foreach ($items as $item) {
+        $value    = render_escape((string) $item['value']);
+        $label    = render_escape((string) $item['label']);
+        $selected = is_array($current)
+            ? in_array($item['value'], $current, true)
+            : ($current !== null && $item['value'] === $current);
+        $html .= '<option value="' . $value . '"' . ($selected ? ' selected' : '') . '>' . $label . '</option>';
+    }
+    return $html;
+}
+
 /** Элемент формы с подписью. */
 function render_form_element(array $result): string
 {
@@ -193,24 +219,12 @@ function render_choice(array $result): string
     // сентинеле отфильтровывается на стороне validate (links_handler).
     if (($result['widget'] ?? 'select') === 'select_multiple') {
         $selected_ids = is_array($current) ? $current : [];
-        $options = '';
-        foreach ($result['options'] ?? [] as $option) {
-            $value    = render_escape((string) $option['value']);
-            $label    = render_escape((string) $option['label']);
-            $selected = in_array($option['value'], $selected_ids, true) ? ' selected' : '';
-            $options .= "<option value=\"$value\"$selected>$label</option>";
-        }
+        $options      = render_options($result['options'] ?? [], $selected_ids);
         return "<input type=\"hidden\" name=\"{$name}[]\" value=\"\">"
              . "<select name=\"{$name}[]\" multiple>$options</select>";
     }
 
-    $options = '';
-    foreach ($result['options'] ?? [] as $option) {
-        $value    = render_escape((string) $option['value']);
-        $label    = render_escape((string) $option['label']);
-        $selected = $option['value'] === $current ? ' selected' : '';
-        $options .= "<option value=\"$value\"$selected>$label</option>";
-    }
+    $options = render_options($result['options'] ?? [], $current);
 
     return "<select name=\"$name\">$options</select>";
 }
@@ -607,13 +621,18 @@ function render_schema_card(array $view, array $actions = [], string $badge = ''
  */
 
 function render_configurator_new_table(
-    string $type_options,
-    string $parent_options,
-    string $link_target_options,
-    string $dict_options,
+    array $type_items,
+    array $parent_items,
+    array $link_target_items,
+    array $dict_items,
     string $dict_labels_json,
     string $view_source_bul_fields_json
 ): void {
+    $type_options        = render_options($type_items);
+    $parent_options      = render_options($parent_items);
+    $link_target_options = render_options($link_target_items);
+    $dict_options        = render_options($dict_items);
+
     echo <<<HTML
     <h2>Новая таблица</h2>
     <form method="post" action="?_context=configurator&_action=create_table" id="create-form">
@@ -794,12 +813,16 @@ function render_configurator_edit_table(
     array $t_schema,
     array $live_presentation,
     array $data_counts,
-    string $type_options,
-    string $dict_options,
-    string $link_target_options,
+    array $type_items,
+    array $dict_items,
+    array $link_target_items,
     string $dict_labels_json,
     string $formula_fields_json
 ): void {
+    $type_options        = render_options($type_items);
+    $dict_options        = render_options($dict_items);
+    $link_target_options = render_options($link_target_items);
+
     $tbl_esc = render_escape($table);
     echo '<h2>Поля таблицы: ' . render_escape($t_full)
        . ' <span class="badge">' . $tbl_esc . '</span></h2>';
