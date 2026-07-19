@@ -643,7 +643,8 @@ function configurator_create_table(PgSql\Connection $db_connection, array $spec,
         $reg = configurator_register_element($db_connection, 'table', null, $table, $spec['table_short'], $spec['table_full']);
         if (!$reg['ok']) {
             return ['ok' => false, 'errors' => [
-                "Таблица $table создана в БД, но не зарегистрирована: " . implode('; ', $reg['errors']),
+                "Таблица $table не создана — реестр отверг регистрацию, изменение откачено целиком: "
+                . implode('; ', $reg['errors']),
             ]];
         }
 
@@ -654,7 +655,7 @@ function configurator_create_table(PgSql\Connection $db_connection, array $spec,
             );
             if (!$field_reg['ok']) {
                 return ['ok' => false, 'errors' => [
-                    "Таблица $table создана, но поле {$field['column']} не зарегистрировано: "
+                    "Таблица $table не создана — не зарегистрировано поле {$field['column']}, изменение откачено целиком: "
                     . implode('; ', $field_reg['errors']),
                 ]];
             }
@@ -701,7 +702,8 @@ function configurator_create_view(PgSql\Connection $db_connection, array $spec, 
         $reg = configurator_register_element($db_connection, 'table', null, $view, $spec['table_short'], $spec['table_full']);
         if (!$reg['ok']) {
             return ['ok' => false, 'errors' => [
-                "Представление $view создано в БД, но не зарегистрировано: " . implode('; ', $reg['errors']),
+                "Представление $view не создано — реестр отверг регистрацию, изменение откачено целиком: "
+                . implode('; ', $reg['errors']),
             ]];
         }
         // data_name — та же самая регистрация, что делает voc_simple для
@@ -711,7 +713,7 @@ function configurator_create_view(PgSql\Connection $db_connection, array $spec, 
         $data_name_reg = configurator_register_element($db_connection, 'field', $view, 'data_name', 'Имя', 'Наименование');
         if (!$data_name_reg['ok']) {
             return ['ok' => false, 'errors' => [
-                "Представление $view зарегистрировано, но поле data_name — нет: "
+                "Представление $view не создано — не зарегистрировано поле data_name, изменение откачено целиком: "
                 . implode('; ', $data_name_reg['errors']),
             ]];
         }
@@ -893,7 +895,7 @@ function configurator_add_field(PgSql\Connection $db_connection, string $table, 
         );
         if (!$field_reg['ok']) {
             return ['ok' => false, 'errors' => [
-                "Поле {$field['column']} добавлено в БД, но не зарегистрировано: "
+                "Поле {$field['column']} не добавлено — реестр отверг регистрацию, изменение откачено целиком: "
                 . implode('; ', $field_reg['errors']),
             ]];
         }
