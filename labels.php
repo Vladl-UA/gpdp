@@ -189,7 +189,7 @@ function labels_dispatch(PgSql\Connection $db_connection): void
     if ($valid_selected) {
         echo render_link_line('index.php?_context=labels', '← К списку таблиц', 'home-link');
     }
-    echo render_admin_flash($flash !== null ? render_escape($flash[1]) : null, ($flash[0] ?? '') === 'ok');
+    echo render_admin_flash($flash[1] ?? null, ($flash[0] ?? '') === 'ok');
 
     // -----------------------------------------------------------------------
     // Ступень 1 — выбор таблицы (три группы)

@@ -520,6 +520,9 @@ check('массив (links_): отмечены оба варианта',
     substr_count(render_options($opt_items, [1, 2]), 'selected') === 2);
 check('подпись экранируется, разметка из данных не рождается',
     str_contains(render_options($opt_items), 'Второй &amp; &lt;b&gt;'));
+check('флеш экранирует сам, а не надеется на вызывающего',
+    str_contains(render_admin_flash('<script>alert(1)</script>', true), '&lt;script&gt;')
+    && !str_contains(render_admin_flash('<script>alert(1)</script>', true), '<script>'));
 check('конфигуратор больше не собирает option сам (§3, §12)',
     preg_match('/<option/', (string) file_get_contents(__DIR__ . '/configurator.php')) === 0
     || substr_count((string) file_get_contents(__DIR__ . '/configurator.php'), '<option value=') === 0);

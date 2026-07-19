@@ -1083,7 +1083,7 @@ if ($caction === 'alter_drop_field' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // --- отрисовка -----------------------------------------------------------
 
-$flash    = isset($_GET['_msg']) ? render_escape((string) $_GET['_msg']) : null;
+$flash    = isset($_GET['_msg']) ? (string) $_GET['_msg'] : null; // экранирует render_admin_flash()
 $flash_ok = ($_GET['_ok'] ?? '1') === '1';
 
 echo render_admin_page_open('Конфигуратор GPDP', 'configurator');

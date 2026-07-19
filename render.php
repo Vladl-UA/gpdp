@@ -100,15 +100,22 @@ function render_admin_page_open(string $title, string $current_context, string $
 
 /**
  * Блок флеш-сообщения. null — пустая строка (ничего не выводится).
- * Экранирование — на вызывающем: часть страниц кладёт в флеш уже
- * экранированный текст (configurator), часть — сырой (labels).
+ *
+ * 2026-07-19: экранирование переехало СЮДА. Раньше контракт возлагал
+ * его на вызывающего, и оба вызывающих его действительно делали — то
+ * есть дыры не было. Опасен был сам контракт: текст флеша приходит из
+ * `$_GET['_msg']` после PRG-редиректа, то есть управляем запросом, а
+ * обязанность экранировать лежала на стороне, которую легко забыть при
+ * добавлении третьего вызывающего. Теперь забыть нечего.
  */
 function render_admin_flash(?string $message, bool $ok): string
 {
     if ($message === null || $message === '') {
         return '';
     }
-    return '<div class="flash ' . ($ok ? 'flash-ok' : 'flash-err') . '">' . $message . '</div>';
+
+    return '<div class="flash ' . ($ok ? 'flash-ok' : 'flash-err') . '">'
+         . render_escape($message) . '</div>';
 }
 
 function render_escape(string $text): string
@@ -405,13 +412,17 @@ function render_reparent_form(array $view): string
         $html .= '<input type="hidden" name="' . render_escape((string) $name)
                . '" value="' . render_escape((string) $value) . '">';
     }
-    $html .= '<p><label>Новый родитель: <select name="_new_parent_id">';
+    // 2026-07-19: собственный цикл сборки <option> сведён к render_options()
+    // — четвёртая копия, не замеченная при правке того же дня. Ключи
+    // candidates приходят из БД строками, id в заготовке — int, поэтому
+    // приводим явно: render_options сравнивает строго.
+    $candidate_items = [];
     foreach ($view['candidates'] as $parent_id => $label) {
-        $selected = $parent_id === $view['current_parent_id'] ? ' selected' : '';
-        $html .= '<option value="' . (int) $parent_id . '"' . $selected . '>'
-               . render_escape($label) . '</option>';
+        $candidate_items[] = ['value' => (int) $parent_id, 'label' => (string) $label];
     }
-    $html .= '</select></label></p>';
+    $html .= '<p><label>Новый родитель: <select name="_new_parent_id">'
+           . render_options($candidate_items, (int) $view['current_parent_id'])
+           . '</select></label></p>';
     $html .= '<p><input type="submit" value="Сменить родителя"></p></form>';
 
     return $html;
