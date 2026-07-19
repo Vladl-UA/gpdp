@@ -456,6 +456,15 @@ function configurator_with_lock(PgSql\Connection $db_connection, string $reason,
  * дословно четыре раза (create_table — дважды: таблица и поле;
  * adopt_field; adopt_table).
  */
+/**
+ * 2026-07-18 (ревизия Chat, подтверждено): раньше возвращала голый
+ * `int`, не проверяя результат НИ ОДНОЙ из двух вставок — при отказе
+ * первой (`model_registry`) вторая (`model_labels`) писала бы
+ * `dep_model_registry = 0`, и функция всё равно вернула бы «успешный»
+ * id. Тот же принцип честного результата, что уже был у
+ * `configurator_register_link` в этом же файле — просто не был сюда
+ * распространён вовремя.
+ */
 function configurator_register_element(
     PgSql\Connection $db_connection,
     string $kind,
@@ -463,7 +472,7 @@ function configurator_register_element(
     string $element,
     string $short,
     string $full
-): int {
+): array {
     $reg = db_execute(
         $db_connection,
         'INSERT INTO ' . MODEL_REGISTRY_TABLE
@@ -471,15 +480,21 @@ function configurator_register_element(
         'sss',
         [$kind, $owner, $element]
     );
+    if (!$reg['ok']) {
+        return ['ok' => false, 'id' => null, 'errors' => ['реестр: ' . $reg['error']]];
+    }
 
-    db_execute(
+    $label = db_execute(
         $db_connection,
         'INSERT INTO ' . MODEL_LABELS_TABLE . ' (dep_model_registry, data_short, data_full) VALUES (?, ?, ?)',
         'iss',
         [$reg['id'], $short, $full]
     );
+    if (!$label['ok']) {
+        return ['ok' => false, 'id' => (int) $reg['id'], 'errors' => ['подпись: ' . $label['error']]];
+    }
 
-    return (int) $reg['id'];
+    return ['ok' => true, 'id' => (int) $reg['id'], 'errors' => []];
 }
 
 /**
@@ -548,13 +563,24 @@ function configurator_create_table(PgSql\Connection $db_connection, array $spec,
         }
 
         // Регистрация таблицы в реестре + подпись.
-        configurator_register_element($db_connection, 'table', null, $table, $spec['table_short'], $spec['table_full']);
+        $reg = configurator_register_element($db_connection, 'table', null, $table, $spec['table_short'], $spec['table_full']);
+        if (!$reg['ok']) {
+            return ['ok' => false, 'errors' => [
+                "Таблица $table создана в БД, но не зарегистрирована: " . implode('; ', $reg['errors']),
+            ]];
+        }
 
         // Регистрация каждого предметного поля (id — структурный, без записи).
         foreach ($spec['fields'] as $field) {
-            configurator_register_element(
+            $field_reg = configurator_register_element(
                 $db_connection, 'field', $table, $field['column'], $field['short'], $field['full']
             );
+            if (!$field_reg['ok']) {
+                return ['ok' => false, 'errors' => [
+                    "Таблица $table создана, но поле {$field['column']} не зарегистрировано: "
+                    . implode('; ', $field_reg['errors']),
+                ]];
+            }
 
             if (($field['link_target'] ?? null) !== null) {
                 $link = configurator_register_link($db_connection, $field['column'], $field['link_target']);
@@ -609,12 +635,23 @@ function configurator_create_view(PgSql\Connection $db_connection, array $spec, 
             return ['ok' => false, 'errors' => ['DDL: ' . $create['error']]];
         }
 
-        configurator_register_element($db_connection, 'table', null, $view, $spec['table_short'], $spec['table_full']);
+        $reg = configurator_register_element($db_connection, 'table', null, $view, $spec['table_short'], $spec['table_full']);
+        if (!$reg['ok']) {
+            return ['ok' => false, 'errors' => [
+                "Представление $view создано в БД, но не зарегистрировано: " . implode('; ', $reg['errors']),
+            ]];
+        }
         // data_name — та же самая регистрация, что делает voc_simple для
         // синтетического поля своего словаря (короткая/полная подпись
         // "Имя"/"Наименование"). Без этого шага поле оставалось сиротой
         // (найдено живьём диагностикой сразу после первого создания).
-        configurator_register_element($db_connection, 'field', $view, 'data_name', 'Имя', 'Наименование');
+        $data_name_reg = configurator_register_element($db_connection, 'field', $view, 'data_name', 'Имя', 'Наименование');
+        if (!$data_name_reg['ok']) {
+            return ['ok' => false, 'errors' => [
+                "Представление $view зарегистрировано, но поле data_name — нет: "
+                . implode('; ', $data_name_reg['errors']),
+            ]];
+        }
 
         $snapshot = snapshot_build($db_connection, $application);
         if ($snapshot === null) {
@@ -705,7 +742,10 @@ function configurator_adopt_field(PgSql\Connection $db_connection, string $table
         }
 
         // Дефолтная подпись = имя поля; осмысленную человек правит в labels.
-        configurator_register_element($db_connection, 'field', $table, $field, $field, $field);
+        $reg = configurator_register_element($db_connection, 'field', $table, $field, $field, $field);
+        if (!$reg['ok']) {
+            return ['ok' => false, 'errors' => ["Поле $table.$field не зарегистрировано: " . implode('; ', $reg['errors'])]];
+        }
 
         return configurator_refresh($db_connection, $application);
     });
@@ -719,7 +759,10 @@ function configurator_adopt_table(PgSql\Connection $db_connection, string $table
         if (!isset($live['tables'][$table])) {
             return ['ok' => false, 'errors' => ["Таблица $table не существует."]];
         }
-        configurator_register_element($db_connection, 'table', null, $table, $table, $table);
+        $reg = configurator_register_element($db_connection, 'table', null, $table, $table, $table);
+        if (!$reg['ok']) {
+            return ['ok' => false, 'errors' => ["Таблица $table не зарегистрирована: " . implode('; ', $reg['errors'])]];
+        }
 
         return configurator_refresh($db_connection, $application);
     });
@@ -814,9 +857,16 @@ function configurator_add_field(PgSql\Connection $db_connection, string $table, 
             return ['ok' => false, 'errors' => ['DDL: ' . $alter['error']]];
         }
 
-        $field_id = configurator_register_element(
+        $field_reg = configurator_register_element(
             $db_connection, 'field', $table, $field['column'], $field['short'], $field['full']
         );
+        if (!$field_reg['ok']) {
+            return ['ok' => false, 'errors' => [
+                "Поле {$field['column']} добавлено в БД, но не зарегистрировано: "
+                . implode('; ', $field_reg['errors']),
+            ]];
+        }
+        $field_id = $field_reg['id'];
 
         if (($field['link_target'] ?? null) !== null) {
             $link = configurator_register_link($db_connection, $field['column'], $field['link_target']);
