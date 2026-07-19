@@ -49,7 +49,58 @@ function check(string $name, bool $ok, string $details = ''): void
     }
 }
 
-echo "=== 1. Snapshot: bootstrap (state/) ===\n";
+echo "=== 0. Транзакция: примитивы db.php (2026-07-19) ===\n";
+// Своя изолированная таблица, к модели отношения не имеет — как и
+// фикстуры остальных секций, живёт только внутри этой проверки.
+db_execute($db_connection, 'DROP TABLE IF EXISTS tx_smoke');
+db_execute($db_connection, 'CREATE TABLE tx_smoke (id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY, data_name VARCHAR(64))');
+
+$tx = db_transaction_begin($db_connection);
+check('BEGIN даёт честный результат', ($tx['ok'] ?? false) === true, $tx['error'] ?? '');
+
+db_execute($db_connection, "INSERT INTO tx_smoke (data_name) VALUES ('внутри транзакции')");
+db_execute($db_connection, 'CREATE TABLE tx_smoke_child (id INTEGER)');
+
+// Свойство, на котором держится порядок структурной операции
+// (configurator_with_lock): снапшот собирается ДО коммита, значит
+// интроспекция обязана видеть собственный незакоммиченный DDL.
+$seen = db_select(
+    $db_connection,
+    "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'tx_smoke_child'"
+);
+check('незакоммиченный DDL виден собственной интроспекции', count($seen) === 1);
+
+$tx = db_transaction_rollback($db_connection);
+check('ROLLBACK даёт честный результат', ($tx['ok'] ?? false) === true, $tx['error'] ?? '');
+check('после отката строки нет', db_select($db_connection, 'SELECT id FROM tx_smoke') === []);
+check(
+    'после отката созданной таблицы нет',
+    db_select(
+        $db_connection,
+        "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'tx_smoke_child'"
+    ) === []
+);
+
+db_transaction_begin($db_connection);
+db_execute($db_connection, "INSERT INTO tx_smoke (data_name) VALUES ('закоммичено')");
+$tx = db_transaction_commit($db_connection);
+check('COMMIT даёт честный результат', ($tx['ok'] ?? false) === true, $tx['error'] ?? '');
+$tx_rows = db_select($db_connection, 'SELECT data_name FROM tx_smoke');
+check('после коммита строка на месте', count($tx_rows) === 1 && $tx_rows[0]['data_name'] === 'закоммичено');
+
+// Отказ внутри транзакции: db_execute честно сообщает об ошибке, а
+// откат после неё проходит — это и есть путь, которым идёт
+// configurator_with_lock при провале тела операции.
+db_transaction_begin($db_connection);
+$bad = db_execute($db_connection, 'INSERT INTO tx_smoke (нет_такой_колонки) VALUES (1)');
+check('ошибочный запрос: ok=false и текст причины', ($bad['ok'] ?? true) === false && ($bad['error'] ?? '') !== '');
+$tx = db_transaction_rollback($db_connection);
+check('ROLLBACK после ошибки проходит', ($tx['ok'] ?? false) === true, $tx['error'] ?? '');
+check('данные после отката не пострадали', count(db_select($db_connection, 'SELECT id FROM tx_smoke')) === 1);
+
+db_execute($db_connection, 'DROP TABLE tx_smoke');
+
+echo "\n=== 1. Snapshot: bootstrap (state/) ===\n";
 $snapshot = snapshot_init($db_connection, config()['application']);
 check('snapshot построен', $snapshot !== null, (string) snapshot_last_error());
 check('файл лежит в state/', str_contains(config()['paths']['snapshot'], '/state/')

@@ -436,13 +436,90 @@ function configurator_register_formula(PgSql\Connection $db_connection, int $reg
  * другой структурной операцией»; смысл тот же, различие не несло сведений
  * пользователю).
  */
-function configurator_with_lock(PgSql\Connection $db_connection, string $reason, callable $body): array
-{
+/**
+ * Каркас структурной операции. 2026-07-19: к файловому локу добавлена
+ * настоящая транзакция БД и наведён порядок публикации снапшота.
+ *
+ * §17 объявляет цепочку `lock → DDL → реестр → rebuild → validate →
+ * unlock` ЕДИНОЙ структурной операцией, §8 держит инвариант «факт не
+ * живёт только в снапшоте». До этой правки атомарности не было вовсе:
+ * файловый лок разводит писателей во времени, но не откатывает
+ * наполовину сделанное. Отказ реестра после прошедшего DDL оставлял
+ * таблицу, о которой система не знает, — состояние, которое сам код
+ * честно называл «требуется ручной разбор».
+ *
+ * Порядок, и почему именно такой:
+ *
+ *   BEGIN
+ *     тело (DDL + реестр)
+ *     snapshot_build()      — интроспекция ВНУТРИ транзакции
+ *   любой отказ → ROLLBACK, файл снапшота не тронут вовсе
+ *   COMMIT
+ *   snapshot_save()         — публикация файла только после COMMIT
+ *
+ * Ключевое свойство, на котором держится порядок: Postgres выполняет
+ * DDL в транзакции, и information_schema/pg_index внутри той же
+ * транзакции видят собственные незакоммиченные CREATE TABLE/VIEW
+ * (проверено живьём, см. докблок db_transaction_begin). Поэтому
+ * снапшот можно собрать ДО коммита — и не публиковать его, если
+ * коммит не состоится.
+ *
+ * Файл снапшота транзакцией БД не откатывается — отсюда и требование
+ * писать его последним. Остаточное состояние после правки ровно одно:
+ * «БД согласована, файл старый». Оно безопасно и штатно — снапшот
+ * восстановим удалением (§8), ручного разбора не требует.
+ *
+ * Пересборка снапшота переехала СЮДА из тел операций (раньше девять
+ * копий: три дословных хвоста в create_table/create_view/delete_table
+ * плюс шесть вызовов configurator_refresh) — не ради красоты, а
+ * потому что правильный порядок «собрать до коммита, записать после»
+ * невыразим, пока тело владеет и сборкой, и публикацией. Тело теперь
+ * отвечает только за DDL и реестр.
+ */
+function configurator_with_lock(
+    PgSql\Connection $db_connection,
+    string $reason,
+    callable $body,
+    array $application
+): array {
     if (!snapshot_lock_acquire('configurator', $reason)) {
         return ['ok' => false, 'errors' => ['Схема заблокирована другой операцией.']];
     }
     try {
-        return $body();
+        $begin = db_transaction_begin($db_connection);
+        if (!$begin['ok']) {
+            return ['ok' => false, 'errors' => ['Не удалось открыть транзакцию: ' . $begin['error']]];
+        }
+
+        $result = $body();
+        if (!($result['ok'] ?? false)) {
+            // Причина отказа уже в $result — своё сообщение об откате
+            // не добавляем: первая причина важнее вторичной.
+            db_transaction_rollback($db_connection);
+            return $result;
+        }
+
+        $snapshot = snapshot_build($db_connection, $application);
+        if ($snapshot === null) {
+            db_transaction_rollback($db_connection);
+            return ['ok' => false, 'errors' => [
+                'Изменение отменено целиком: snapshot не собрался — ' . (snapshot_last_error() ?? '?'),
+            ]];
+        }
+
+        $commit = db_transaction_commit($db_connection);
+        if (!$commit['ok']) {
+            return ['ok' => false, 'errors' => ['Изменение отменено: ' . $commit['error']]];
+        }
+
+        if (!snapshot_save($snapshot)) {
+            return ['ok' => false, 'errors' => [
+                'Изменение применено к БД, но файл snapshot не записан (права на state/?). '
+                . 'Данные согласованы; достаточно удалить state/snapshot.php — он пересоберётся сам (§8).',
+            ]];
+        }
+
+        return $result;
     } finally {
         snapshot_lock_release('configurator');
     }
@@ -524,7 +601,7 @@ function configurator_is_managed(PgSql\Connection $db_connection, string $kind, 
 
 function configurator_create_table(PgSql\Connection $db_connection, array $spec, array $application): array
 {
-    return configurator_with_lock($db_connection, 'Создание таблицы: ' . $spec['table'], function () use ($db_connection, $spec, $application): array {
+    return configurator_with_lock($db_connection, 'Создание таблицы: ' . $spec['table'], function () use ($db_connection, $spec): array {
         $columns_sql = [];
         if ($spec['has_id']) {
             // 2026-07-16: Postgres — GENERATED ALWAYS AS IDENTITY вместо
@@ -592,22 +669,8 @@ function configurator_create_table(PgSql\Connection $db_connection, array $spec,
             }
         }
 
-        // Пересборка тем же примитивом, что использует холодный старт,
-        // но БЕЗ повторного захвата лока (мы уже внутри него) —
-        // snapshot_build() сам по себе лок не трогает.
-        $snapshot = snapshot_build($db_connection, $application);
-        if ($snapshot === null) {
-            return ['ok' => false, 'errors' => [
-                'Таблица создана, но snapshot не собрался: ' . (snapshot_last_error() ?? '?')
-                . '. Структура БД и реестр в рассинхроне — требуется ручной разбор.',
-            ]];
-        }
-        if (!snapshot_save($snapshot)) {
-            return ['ok' => false, 'errors' => ['Snapshot собран, но не сохранён (см. права на state/).']];
-        }
-
         return ['ok' => true, 'errors' => []];
-    });
+    }, $application);
 }
 
 /**
@@ -623,7 +686,7 @@ function configurator_create_table(PgSql\Connection $db_connection, array $spec,
  */
 function configurator_create_view(PgSql\Connection $db_connection, array $spec, array $application): array
 {
-    return configurator_with_lock($db_connection, 'Создание представления: ' . $spec['view'], function () use ($db_connection, $spec, $application): array {
+    return configurator_with_lock($db_connection, 'Создание представления: ' . $spec['view'], function () use ($db_connection, $spec): array {
         $view          = $spec['view'];
         $source        = $spec['source'];
         $filter_column = $spec['filter_column'];
@@ -653,24 +716,13 @@ function configurator_create_view(PgSql\Connection $db_connection, array $spec, 
             ]];
         }
 
-        $snapshot = snapshot_build($db_connection, $application);
-        if ($snapshot === null) {
-            return ['ok' => false, 'errors' => [
-                'Представление создано, но snapshot не собрался: ' . (snapshot_last_error() ?? '?')
-                . '. Структура БД и реестр в рассинхроне — требуется ручной разбор.',
-            ]];
-        }
-        if (!snapshot_save($snapshot)) {
-            return ['ok' => false, 'errors' => ['Snapshot собран, но не сохранён (см. права на state/).']];
-        }
-
         return ['ok' => true, 'errors' => []];
-    });
+    }, $application);
 }
 
 function configurator_delete_table(PgSql\Connection $db_connection, string $table, array $application): array
 {
-    return configurator_with_lock($db_connection, 'Удаление таблицы: ' . $table, function () use ($db_connection, $table, $application): array {
+    return configurator_with_lock($db_connection, 'Удаление таблицы: ' . $table, function () use ($db_connection, $table): array {
         // model_labels чистится каскадом FK (ON DELETE CASCADE, §17).
         db_execute(
             $db_connection,
@@ -694,16 +746,8 @@ function configurator_delete_table(PgSql\Connection $db_connection, string $tabl
             return ['ok' => false, 'errors' => ['DDL: ' . $drop['error']]];
         }
 
-        $snapshot = snapshot_build($db_connection, $application);
-        if ($snapshot === null) {
-            return ['ok' => false, 'errors' => ['Таблица удалена, но snapshot не собрался: ' . (snapshot_last_error() ?? '?')]];
-        }
-        if (!snapshot_save($snapshot)) {
-            return ['ok' => false, 'errors' => ['Snapshot собран, но не сохранён.']];
-        }
-
         return ['ok' => true, 'errors' => []];
-    });
+    }, $application);
 }
 
 // ============================================================================
@@ -714,23 +758,10 @@ function configurator_delete_table(PgSql\Connection $db_connection, string $tabl
 // не снимок экрана.
 // ============================================================================
 
-/** Общий хвост: пересобрать снапшот после правки реестра. */
-function configurator_refresh(PgSql\Connection $db_connection, array $application): array
-{
-    $snapshot = snapshot_build($db_connection, $application);
-    if ($snapshot === null) {
-        return ['ok' => false, 'errors' => ['Реестр изменён, но snapshot не собрался: ' . (snapshot_last_error() ?? '?')]];
-    }
-    if (!snapshot_save($snapshot)) {
-        return ['ok' => false, 'errors' => ['Snapshot собран, но не сохранён.']];
-    }
-    return ['ok' => true, 'errors' => []];
-}
-
 /** Взять поле-сироту под управление: строка реестра + дефолтная подпись. */
 function configurator_adopt_field(PgSql\Connection $db_connection, string $table, string $field, array $application): array
 {
-    return configurator_with_lock($db_connection, "Регистрация поля: $table.$field", function () use ($db_connection, $table, $field, $application): array {
+    return configurator_with_lock($db_connection, "Регистрация поля: $table.$field", function () use ($db_connection, $table, $field): array {
         $live = snapshot_build_structure($db_connection);
         $fschema = $live['tables'][$table]['fields'][$field] ?? null;
         if ($fschema === null || ($fschema['kind'] ?? '') !== 'entity_field') {
@@ -747,14 +778,14 @@ function configurator_adopt_field(PgSql\Connection $db_connection, string $table
             return ['ok' => false, 'errors' => ["Поле $table.$field не зарегистрировано: " . implode('; ', $reg['errors'])]];
         }
 
-        return configurator_refresh($db_connection, $application);
-    });
+        return ['ok' => true, 'errors' => []];
+    }, $application);
 }
 
 /** Взять таблицу-сироту под управление: строка реестра + дефолтная подпись. */
 function configurator_adopt_table(PgSql\Connection $db_connection, string $table, array $application): array
 {
-    return configurator_with_lock($db_connection, "Регистрация таблицы: $table", function () use ($db_connection, $table, $application): array {
+    return configurator_with_lock($db_connection, "Регистрация таблицы: $table", function () use ($db_connection, $table): array {
         $live = snapshot_build_structure($db_connection);
         if (!isset($live['tables'][$table])) {
             return ['ok' => false, 'errors' => ["Таблица $table не существует."]];
@@ -764,21 +795,21 @@ function configurator_adopt_table(PgSql\Connection $db_connection, string $table
             return ['ok' => false, 'errors' => ["Таблица $table не зарегистрирована: " . implode('; ', $reg['errors'])]];
         }
 
-        return configurator_refresh($db_connection, $application);
-    });
+        return ['ok' => true, 'errors' => []];
+    }, $application);
 }
 
 /** Убрать строку реестра по id (призрак или лишний дубль). Подпись —
  *  каскадом FK (ON DELETE CASCADE, §17). */
 function configurator_drop_registry_row(PgSql\Connection $db_connection, int $id, array $application): array
 {
-    return configurator_with_lock($db_connection, "Удаление записи реестра: #$id", function () use ($db_connection, $id, $application): array {
+    return configurator_with_lock($db_connection, "Удаление записи реестра: #$id", function () use ($db_connection, $id): array {
         $outcome = db_execute($db_connection, 'DELETE FROM ' . MODEL_REGISTRY_TABLE . ' WHERE id = ?', 'i', [$id]);
         if ($outcome['affected_rows'] === 0) {
             return ['ok' => false, 'errors' => ["Записи реестра #$id нет (уже убрана?)."]];
         }
-        return configurator_refresh($db_connection, $application);
-    });
+        return ['ok' => true, 'errors' => []];
+    }, $application);
 }
 
 /** Удалить поле-сироту ИЗ БД (единственное, что трогает данные — с
@@ -786,7 +817,7 @@ function configurator_drop_registry_row(PgSql\Connection $db_connection, int $id
  *  действительно вне реестра (иначе это управляемое поле — не сюда). */
 function configurator_drop_column(PgSql\Connection $db_connection, string $table, string $field, array $application): array
 {
-    return configurator_with_lock($db_connection, "Удаление колонки: $table.$field", function () use ($db_connection, $table, $field, $application): array {
+    return configurator_with_lock($db_connection, "Удаление колонки: $table.$field", function () use ($db_connection, $table, $field): array {
         $live = snapshot_build_structure($db_connection);
         $fschema = $live['tables'][$table]['fields'][$field] ?? null;
         if ($fschema === null || ($fschema['kind'] ?? '') !== 'entity_field') {
@@ -800,8 +831,8 @@ function configurator_drop_column(PgSql\Connection $db_connection, string $table
         if (!$drop['ok']) {
             return ['ok' => false, 'errors' => ['DDL: ' . $drop['error']]];
         }
-        return configurator_refresh($db_connection, $application);
-    });
+        return ['ok' => true, 'errors' => []];
+    }, $application);
 }
 
 // ============================================================================
@@ -822,7 +853,7 @@ function configurator_drop_column(PgSql\Connection $db_connection, string $table
  */
 function configurator_add_field(PgSql\Connection $db_connection, string $table, array $field_input, array $application): array
 {
-    return configurator_with_lock($db_connection, "Добавление поля в $table", function () use ($db_connection, $table, $field_input, $application): array {
+    return configurator_with_lock($db_connection, "Добавление поля в $table", function () use ($db_connection, $table, $field_input): array {
         $live = snapshot_build_structure($db_connection);
         if (!isset($live['tables'][$table])) {
             return ['ok' => false, 'errors' => ["Таблица $table не существует."]];
@@ -886,8 +917,8 @@ function configurator_add_field(PgSql\Connection $db_connection, string $table, 
             }
         }
 
-        return configurator_refresh($db_connection, $application);
-    });
+        return ['ok' => true, 'errors' => []];
+    }, $application);
 }
 
 /**
@@ -899,7 +930,7 @@ function configurator_add_field(PgSql\Connection $db_connection, string $table, 
  */
 function configurator_drop_field(PgSql\Connection $db_connection, string $table, string $field, bool $force, array $application): array
 {
-    return configurator_with_lock($db_connection, "Удаление поля $table.$field", function () use ($db_connection, $table, $field, $force, $application): array {
+    return configurator_with_lock($db_connection, "Удаление поля $table.$field", function () use ($db_connection, $table, $field, $force): array {
         $live = snapshot_build_structure($db_connection);
         $fschema = $live['tables'][$table]['fields'][$field] ?? null;
         if ($fschema === null) {
@@ -929,8 +960,8 @@ function configurator_drop_field(PgSql\Connection $db_connection, string $table,
         db_execute($db_connection, 'DELETE FROM ' . MODEL_REGISTRY_TABLE
             . " WHERE data_kind='field' AND data_owner=? AND data_element=?", 'ss', [$table, $field]);
 
-        return configurator_refresh($db_connection, $application);
-    });
+        return ['ok' => true, 'errors' => []];
+    }, $application);
 }
 
 // ============================================================================
