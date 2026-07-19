@@ -185,13 +185,7 @@ function labels_dispatch(PgSql\Connection $db_connection): void
         && isset($structure['tables'][$selected])
         && !str_starts_with($selected, $SYS_PREFIX);
 
-    $extra_head = '<style>
-.edit-form{max-width:50%}
-.edit-form tr:nth-child(even) td{background:#ececec}
-.save-all{margin-top:12px;padding:6px 18px;background:#eef;border:1px solid #99c;border-radius:4px;cursor:pointer}
-.save-all:hover{background:#dde}
-</style>';
-    echo render_admin_page_open('Подписи и словари', 'labels', $extra_head);
+    echo render_admin_page_open('Подписи и словари', 'labels');
     if ($valid_selected) {
         echo '<p><a class="home-link" href="index.php?_context=labels">← К списку таблиц</a></p>';
     }

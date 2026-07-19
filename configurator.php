@@ -1116,7 +1116,7 @@ if ($caction === 'diagnose') {
         if ($entity_fields !== []) {
             $parts = [];
             foreach ($entity_fields as $f) {
-                $parts[] = 'COUNT(`' . $f . '`) AS `' . $f . '`';
+                $parts[] = 'COUNT(' . $f . ') AS ' . $f;
             }
             $rows = db_select($db_connection, 'SELECT ' . implode(', ', $parts) . ' FROM ' . $table . '');
             $data_counts = $rows[0] ?? [];

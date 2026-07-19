@@ -22,6 +22,12 @@ fieldset{margin-bottom:.5em}
 .field-row{display:flex;gap:8px;align-items:center;margin-bottom:6px}
 .field-row select,.field-row input{padding:4px}
 .home-link{display:inline-block;margin-bottom:1em}
+/* 2026-07-18 (ревизия Chat — HTML/CSS не в том слое): перенесено из
+   labels.php, где жило собственным <style>-блоком в extra_head. */
+.edit-form{max-width:50%}
+.edit-form tr:nth-child(even) td{background:#ececec}
+.save-all{margin-top:12px;padding:6px 18px;background:#eef;border:1px solid #99c;border-radius:4px;cursor:pointer}
+.save-all:hover{background:#dde}
 /* 2026-07-18: системное меню — три контура (data/configurator/labels),
    источник REQUEST_CONTEXTS (core.php). Оформление сейчас нарочно
    простое — строка ссылок; когда дойдёт очередь до самого вида,
