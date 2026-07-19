@@ -931,11 +931,59 @@ function render_configurator_edit_table(
     HTML;
 }
 
+/**
+ * Длительность в секундах → человеческая строка. Презентация, поэтому
+ * живёт здесь: ядро хранит `started_at` числом, «висит 4 минуты» —
+ * это уже способ сказать, а не факт.
+ */
+function render_duration(int $seconds): string
+{
+    if ($seconds < 60) {
+        return $seconds . ' с';
+    }
+    if ($seconds < 3600) {
+        return intdiv($seconds, 60) . ' мин ' . ($seconds % 60) . ' с';
+    }
+    if ($seconds < 86400) {
+        return intdiv($seconds, 3600) . ' ч ' . intdiv($seconds % 3600, 60) . ' мин';
+    }
+
+    return intdiv($seconds, 86400) . ' сут ' . intdiv($seconds % 86400, 3600) . ' ч';
+}
+
+/**
+ * Блок состояния лока для страницы диагностики. Показывает КТО поставил,
+ * ЗАЧЕМ и СКОЛЬКО висит — последнее раньше просто не читалось никем,
+ * хотя `started_at` в файл пишется с самого начала.
+ */
+function render_lock_state(?array $lock): string
+{
+    if ($lock === null) {
+        return '<h3>Блокировка схемы</h3><p>Лок не стоит — структурные операции доступны.</p>';
+    }
+
+    $source = render_escape((string) ($lock['source'] ?? '?'));
+    $reason = render_escape((string) ($lock['reason'] ?? '?'));
+    $age    = isset($lock['started_at'])
+        ? render_duration(max(0, time() - (int) $lock['started_at']))
+        : 'неизвестно (в файле нет метки времени)';
+
+    return '<h3>Блокировка схемы</h3>'
+        . '<p>Схема заблокирована. Источник: <b>' . $source . '</b>. Причина: ' . $reason . '.'
+        . ' Держится: <b>' . render_escape($age) . '</b>.</p>'
+        . '<p>Если операция давно закончилась, а лок остался — это осиротевший файл '
+        . 'после аварийного завершения. Снятие пересоберёт и проверит модель прежде, '
+        . 'чем удалить файл; если модель не в порядке, лок останется на месте.</p>'
+        . '<form method="post" action="?_context=configurator&_action=release_lock">'
+        . '<button type="submit">Снять лок с проверкой модели</button></form>';
+}
+
 function render_configurator_diagnose(array $diag): void
 {
     echo '<h2>Состояние модели</h2>';
     echo '<p><a href="?_context=configurator&_action=list">← К таблицам</a></p>';
     echo render_model_diagnosis($diag);
+    echo render_lock_state(snapshot_lock_read());
 }
 
 function render_configurator_delete_confirm(string $table): void

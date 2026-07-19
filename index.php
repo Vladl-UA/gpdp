@@ -64,8 +64,13 @@ if ($snapshot === null) {
     http_response_code(503);
     $lock = snapshot_lock_read();
     if ($lock !== null) {
+        $age = isset($lock['started_at'])
+            ? render_duration(max(0, time() - (int) $lock['started_at']))
+            : 'неизвестно';
         exit('Модель недоступна: схема заблокирована (source: '
-        . ($lock['source'] ?? '?') . '). Причина: ' . ($lock['reason'] ?? '?'));
+        . ($lock['source'] ?? '?') . '). Причина: ' . ($lock['reason'] ?? '?')
+        . '. Держится: ' . $age
+        . '. Если операция давно закончилась — «Состояние модели» в конфигураторе снимет лок с проверкой.');
     }
     exit('Модель недоступна. '
     . (snapshot_last_error() ?? 'Причина не зафиксирована — проверьте права на state/.'));

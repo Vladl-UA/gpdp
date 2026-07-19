@@ -562,6 +562,37 @@ check('под lock snapshot_init → null', snapshot_init($db_connection) === nu
 check('под lock refresh отступает', snapshot_refresh_presentation($db_connection) === false);
 snapshot_lock_release('manual');
 
+echo "\n=== 8а. Зависший lock: диагностика и честное снятие (2026-07-19) ===\n";
+// Порядок «действие → сбор → восстановление → check» (журнал 07-03):
+// check() делает exit(1), поэтому состояние лока восстанавливается ДО
+// проверок — иначе провал одной строки оставит лок висеть навсегда.
+check('нет лока: снимать нечего, и это не ошибка',
+    (snapshot_lock_release_stale($db_connection, config()['application'])['ok'] ?? false) === true);
+
+snapshot_lock_acquire('manual', 'имитация зависшей операции');
+$stale_lock   = snapshot_lock_read();
+$stale_result = snapshot_lock_release_stale($db_connection, config()['application']);
+$lock_after   = snapshot_lock_read();
+if ($lock_after !== null) {
+    unlink(config()['paths']['lock']);
+}
+check('в файле лока есть метка времени (её и показываем человеку)',
+    isset($stale_lock['started_at']) && is_int($stale_lock['started_at']));
+check('снятие сработало и объяснило себя',
+    ($stale_result['ok'] ?? false) === true && ($stale_result['message'] ?? '') !== '');
+check('файл лока после снятия исчез', $lock_after === null);
+check('снапшот пережил снятие (пересобран перед удалением файла)', snapshot_load() !== null);
+
+check('возраст: секунды', render_duration(59) === '59 с');
+check('возраст: минуты', render_duration(125) === '2 мин 5 с');
+check('возраст: часы', render_duration(4000) === '1 ч 6 мин');
+check('возраст: сутки', render_duration(90000) === '1 сут 1 ч');
+check('блок состояния без лока не предлагает ничего снимать',
+    !str_contains(render_lock_state(null), 'Снять лок'));
+check('блок состояния с локом показывает источник, причину и возраст',
+    str_contains(render_lock_state(['source' => 'manual', 'reason' => 'проба', 'started_at' => time() - 125]), 'manual')
+    && str_contains(render_lock_state(['source' => 'manual', 'reason' => 'проба', 'started_at' => time() - 125]), '2 мин'));
+
 echo "\n=== 9. Жизненный цикл index.php (HTTP) ===\n";
 // Контракт «дирижёр не пишет SQL»: в исходнике индекса нет ни SQL-глаголов,
 // ни формирования/исполнения запросов — только connect/charset/close.

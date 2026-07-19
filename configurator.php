@@ -1017,6 +1017,16 @@ if ($caction === 'delete_table' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
+// Снятие зависшего лока. Отдельно от $repair_actions: те чинят модель
+// внутри лока, а этот снимает сам лок и потому НЕ может идти через
+// configurator_with_lock() — захватить лок, чтобы его отпустить, нельзя.
+if ($caction === 'release_lock' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $outcome = snapshot_lock_release_stale($db_connection, $application);
+    header('Location: ?_context=configurator&_action=diagnose&_msg='
+        . rawurlencode($outcome['message']) . '&_ok=' . ($outcome['ok'] ? '1' : '0'));
+    exit;
+}
+
 // Починка структуры (кнопки раздела «Состояние модели»). Все → redirect
 // обратно в diagnose (PRG), чтобы человек сразу видел обновлённое
 // состояние (расхождение ушло или осталось с причиной).
