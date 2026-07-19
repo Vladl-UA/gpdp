@@ -502,6 +502,28 @@ foreach ([$label_row['data_full'] ?? '', $label_row['data_short'] ?? ''] as $lab
 check('renderer собрал select с подписью из model_labels',
     $label_seen && str_contains($html, 'selected>Приобское'));
 
+echo "\n=== 6а. render_options: единственный источник тега <option> (2026-07-19) ===\n";
+// Ветка множественного выбора (links_) не покрывалась смоуком вовсе и
+// в живой модели сейчас нет ни одного links_-поля — проверяется здесь
+// напрямую, функция чистая и БД не требует.
+$opt_items = [
+    ['value' => '',  'label' => '— выберите —'],
+    ['value' => 1,   'label' => 'Первый'],
+    ['value' => 2,   'label' => 'Второй & <b>'],
+];
+check('без выбора: ни одного selected',
+    substr_count(render_options($opt_items), 'selected') === 0);
+check('скаляр: отмечен ровно один вариант',
+    substr_count(render_options($opt_items, 2), 'selected') === 1
+    && str_contains(render_options($opt_items, 2), '<option value="2" selected>'));
+check('массив (links_): отмечены оба варианта',
+    substr_count(render_options($opt_items, [1, 2]), 'selected') === 2);
+check('подпись экранируется, разметка из данных не рождается',
+    str_contains(render_options($opt_items), 'Второй &amp; &lt;b&gt;'));
+check('конфигуратор больше не собирает <option> сам (§3, §12)',
+    preg_match('/<option/', (string) file_get_contents(__DIR__ . '/configurator.php')) === 0
+    || substr_count((string) file_get_contents(__DIR__ . '/configurator.php'), '<option value=') === 0);
+
 echo "\n=== 7. Lookup-кэш (N+1, теперь в helpers) ===\n";
 // 2026-07-16: SHOW SESSION STATUS LIKE 'Questions' — не Postgres, замена
 // на собственный счётчик db.php (db_query_count()), см. докблок в db.php.
