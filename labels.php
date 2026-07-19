@@ -187,7 +187,7 @@ function labels_dispatch(PgSql\Connection $db_connection): void
 
     echo render_admin_page_open('Подписи и словари', 'labels');
     if ($valid_selected) {
-        echo '<p><a class="home-link" href="index.php?_context=labels">← К списку таблиц</a></p>';
+        echo render_link_line('index.php?_context=labels', '← К списку таблиц', 'home-link');
     }
     echo render_admin_flash($flash !== null ? render_escape($flash[1]) : null, ($flash[0] ?? '') === 'ok');
 

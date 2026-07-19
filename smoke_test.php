@@ -600,6 +600,25 @@ $index_source = (string) file_get_contents(__DIR__ . '/index.php');
 check('в index.php нет SQL и pg_query/pg_query_params',
     preg_match('/pg_query_params|pg_query\(|SELECT |INSERT |UPDATE |DELETE /', $index_source) === 0);
 
+// 2026-07-19, стадия 5: сторож на весь проект, а не на один файл.
+// Тег рождается только в render.php (§3, §12) — проверка статическая,
+// потому что нарушение вносится одной строкой в любом файле и живьём
+// себя ничем не выдаёт: страница выглядит правильно ровно до того дня,
+// когда представление понадобится показать иначе.
+$html_births = [];
+foreach (glob(__DIR__ . '/*.php') ?: [] as $php_file) {
+    $short = basename($php_file);
+    if ($short === 'render.php' || $short === 'smoke_test.php') {
+        continue; // рендер — законный источник; смоук сам не выводит страниц
+    }
+    $src = (string) file_get_contents($php_file);
+    if (preg_match('/echo\s*[\'"]<|<<<HTML/', $src) === 1) {
+        $html_births[] = $short;
+    }
+}
+check('HTML рождается только в render.php (§3, §12)',
+    $html_births === [], implode(', ', $html_births));
+
 // Встроенный сервер PHP; проходим цикл: view → new → save (PRG) → view.
 // _table=main — обязателен явно: без него index.php показывает домашнюю
 // страницу «Главные таблицы» (условие !$table_requested в дирижёре),

@@ -932,6 +932,68 @@ function render_configurator_edit_table(
 }
 
 /**
+ * Стадия 5 дорожной карты единого входа (2026-07-19): HTML контура
+ * данных переезжает сюда — `index.php` был последней точкой входа,
+ * которая рождала теги сама (тринадцать мест из двадцати `echo`).
+ * Стадии 3 и 4 закрыли конфигуратор и подписи тем же приёмом.
+ *
+ * Повод не абстрактный: весь предстоящий рост слоя представления —
+ * карточка объекта, табличные сущности, отчёты — идёт именно в этот
+ * контур, и каждая новая сущность добавляла бы свои `echo` туда, где
+ * их быть не должно.
+ */
+
+/** Заголовок раздела страницы. Отдельно от `render_admin_page_open()`:
+ *  та отвечает за оболочку и системное меню, эта — за содержимое. */
+function render_page_heading(string $title): string
+{
+    return '<h2>' . render_escape($title) . '</h2>';
+}
+
+/** Одиночная ссылка отдельной строкой («Отмена», «Добавить запись»,
+ *  «Назад к форме»). Четыре потребителя в контуре данных — не абстракция
+ *  впрок (§15.8), а ровно та строка, что повторялась четырежды. */
+function render_link_line(string $href, string $label, string $class = ''): string
+{
+    $cls = $class === '' ? '' : ' class="' . render_escape($class) . '"';
+
+    return '<p><a' . $cls . ' href="' . render_escape($href) . '">' . render_escape($label) . '</a></p>';
+}
+
+/** Домашняя страница контура данных: список корневых таблиц.
+ *  $items — [имя таблицы => подпись], уже отобранные и отсортированные
+ *  вызывающим (критерий «главная таблица» — его забота, не рендера). */
+function render_data_home(array $items): string
+{
+    $html = '<h2>Главные таблицы</h2><ul>';
+    foreach ($items as $table => $label) {
+        $html .= '<li><a href="?_table=' . rawurlencode((string) $table) . '&_action=view">'
+               . render_escape((string) $label) . '</a></li>';
+    }
+
+    return $html . '</ul>';
+}
+
+/** Отказ записи (422): перечень причин + возврат к форме. Причины
+ *  приходят готовым списком строк от record_save/record_delete. */
+function render_save_errors(array $errors): string
+{
+    $html = '<h3>Запись не выполнена</h3><ul>';
+    foreach ($errors as $error) {
+        $html .= '<li>' . render_escape((string) $error) . '</li>';
+    }
+
+    return $html . '</ul><p><a href="javascript:history.back()">Назад к форме</a></p>';
+}
+
+/** Строка «В составе: <родитель>» над формой ребёнка — контекст
+ *  привязки, подтверждённой графом до вызова. */
+function render_parent_context(string $parent_label): string
+{
+    return '<p>В составе: <b>' . render_escape($parent_label) . '</b></p>';
+}
+
+/**
  * Длительность в секундах → человеческая строка. Презентация, поэтому
  * живёт здесь: ядро хранит `started_at` числом, «висит 4 минуты» —
  * это уже способ сказать, а не факт.

@@ -116,12 +116,8 @@ if (!$table_requested || $request_action === 'home') {
     asort($root_candidates, SORT_NATURAL | SORT_FLAG_CASE);
 
     echo render_admin_page_open('GPDP', 'data');
-    echo '<h2>Главные таблицы</h2><ul>';
-    foreach ($root_candidates as $t_name => $t_label) {
-        echo '<li><a href="?_table=' . rawurlencode($t_name) . '&_action=view">'
-            . render_escape($t_label) . '</a></li>';
-    }
-    echo '</ul></body></html>';
+    echo render_data_home($root_candidates);
+    render_admin_page_close();
     db_close($db_connection);
     exit;
 }
@@ -199,11 +195,7 @@ if (in_array($request_action, ['save_new', 'save_edit', 'delete', 'save_reparent
     }
 
     http_response_code(422);
-    echo '<h3>Запись не выполнена</h3><ul>';
-    foreach ($outcome['errors'] as $error) {
-        echo '<li>' . render_escape($error) . '</li>';
-    }
-    echo '</ul><p><a href="javascript:history.back()">Назад к форме</a></p>';
+    echo render_save_errors($outcome['errors']);
     exit;
 }
 
@@ -225,14 +217,12 @@ if ($request_action === 'reparent') {
         exit("Смена родителя недоступна для '$task_table'#$request_id");
     }
 
-    $table_title = render_escape(
-        (string) ($snapshot['presentation']['labels']['table'][$task_table]['data_full'] ?? $task_table)
-    );
+    $table_title = (string) ($snapshot['presentation']['labels']['table'][$task_table]['data_full'] ?? $task_table);
     echo render_admin_page_open($table_title, 'data');
-    echo "<h2>Смена родителя: $table_title</h2>";
+    echo render_page_heading("Смена родителя: $table_title");
     echo render_reparent_form($view);
-    echo "<p><a href=\"?_table=$task_table&_action=view&_id=$request_id\">Отмена</a></p>";
-    echo '</body></html>';
+    echo render_link_line("?_table=$task_table&_action=view&_id=$request_id", 'Отмена');
+    render_admin_page_close();
     db_close($db_connection);
     exit;
 }
@@ -244,12 +234,10 @@ if ($mode === null) {
     exit('Неизвестное действие');
 }
 
-$table_title = render_escape(
-    (string) ($snapshot['presentation']['labels']['table'][$task_table]['data_full'] ?? $task_table)
-);
+$table_title = (string) ($snapshot['presentation']['labels']['table'][$task_table]['data_full'] ?? $task_table);
 
 echo render_admin_page_open($table_title, 'data');
-echo "<h2>$table_title</h2>";
+echo render_page_heading($table_title);
 
 // --- 6. конвейер + рендер ---------------------------------------------------------
 
@@ -263,7 +251,7 @@ if ($mode === 'read' && $request_id === 0) {
         'edit_href'   => "?_table=$task_table&_action=edit&_id={id}",
         'delete_href' => "?_table=$task_table&_action=delete&_id={id}",
     ]);
-    echo "<p><a href=\"?_table=$task_table&_action=new\">Добавить запись</a></p>";
+    echo render_link_line("?_table=$task_table&_action=new", 'Добавить запись');
 }
 
 if ($mode === 'read' && $request_id > 0) {
@@ -307,9 +295,7 @@ if ($mode === 'new' || $mode === 'edit') {
         }
     }
     if ($parent_ok) {
-        echo '<p>В составе: <b>'
-            . render_escape(record_label($db_connection, $snapshot, $parent_table, $parent_id))
-            . '</b></p>';
+        echo render_parent_context(record_label($db_connection, $snapshot, $parent_table, $parent_id));
     }
 
     // Технические скрытые поля формы (PRG): действие, таблица, id для
@@ -346,9 +332,9 @@ if ($mode === 'new' || $mode === 'edit') {
         $parent_ok       => '?_table=' . rawurlencode($parent_table) . "&_action=view&_id=$parent_id",
         default          => "?_table=$task_table&_action=view",
     };
-    echo "<p><a href=\"$cancel_href\">Отмена</a></p>";
+    echo render_link_line($cancel_href, 'Отмена');
 }
 
 // --- 7. завершение -----------------------------------------------------------------
-echo '</body></html>';
+render_admin_page_close();
 db_close($db_connection);
