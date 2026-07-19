@@ -502,7 +502,7 @@ foreach ([$label_row['data_full'] ?? '', $label_row['data_short'] ?? ''] as $lab
 check('renderer собрал select с подписью из model_labels',
     $label_seen && str_contains($html, 'selected>Приобское'));
 
-echo "\n=== 6а. render_options: единственный источник тега <option> (2026-07-19) ===\n";
+echo "\n=== 6а. render_options: единственный источник тега option (2026-07-19) ===\n";
 // Ветка множественного выбора (links_) не покрывалась смоуком вовсе и
 // в живой модели сейчас нет ни одного links_-поля — проверяется здесь
 // напрямую, функция чистая и БД не требует.
@@ -520,7 +520,7 @@ check('массив (links_): отмечены оба варианта',
     substr_count(render_options($opt_items, [1, 2]), 'selected') === 2);
 check('подпись экранируется, разметка из данных не рождается',
     str_contains(render_options($opt_items), 'Второй &amp; &lt;b&gt;'));
-check('конфигуратор больше не собирает <option> сам (§3, §12)',
+check('конфигуратор больше не собирает option сам (§3, §12)',
     preg_match('/<option/', (string) file_get_contents(__DIR__ . '/configurator.php')) === 0
     || substr_count((string) file_get_contents(__DIR__ . '/configurator.php'), '<option value=') === 0);
 
