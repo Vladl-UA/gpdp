@@ -51,26 +51,12 @@ function ent_data(): array
 
 function data_handler(array $data, string $mode): array
 {
-    $field = $data['field'];
-
     if ($mode === 'read') {
-        return [
-            'type'   => 'value',
-            'name'   => $field['raw'],
-            'value'  => (string) ($data['value'] ?? ''),
-            'subscr' => $field['subscr'],
-        ];
+        return entity_read_value($data);
     }
 
     if ($mode === 'new' || $mode === 'edit') {
-        return [
-            'type'   => 'input',
-            'widget' => 'text',
-            'name'   => $field['raw'],
-            'value'  => $mode === 'new' ? '' : (string) ($data['value'] ?? ''),
-            'subscr' => $field['subscr'],
-            'meta'   => [],
-        ];
+        return entity_input($data, $mode, 'text');
     }
 
     if ($mode === 'validate') {
@@ -81,7 +67,7 @@ function data_handler(array $data, string $mode): array
         ];
     }
 
-    return ['type' => 'error', 'errors' => ["Неподдерживаемый режим '$mode'"]];
+    return entity_unsupported_mode($mode);
 }
 
 // ============================================================
@@ -175,7 +161,7 @@ function voc_handler(array $data, string $mode): array
         return ['valid' => true, 'value' => $value, 'errors' => []];
     }
 
-    return ['type' => 'error', 'errors' => ["Неподдерживаемый режим '$mode'"]];
+    return entity_unsupported_mode($mode);
 }
 
 // ============================================================
@@ -215,26 +201,12 @@ function ent_ltext(): array
 
 function ltext_handler(array $data, string $mode): array
 {
-    $field = $data['field'];
-
     if ($mode === 'read') {
-        return [
-            'type'   => 'value',
-            'name'   => $field['raw'],
-            'value'  => (string) ($data['value'] ?? ''),
-            'subscr' => $field['subscr'],
-        ];
+        return entity_read_value($data);
     }
 
     if ($mode === 'new' || $mode === 'edit') {
-        return [
-            'type'   => 'input',
-            'widget' => 'textarea',
-            'name'   => $field['raw'],
-            'value'  => $mode === 'new' ? '' : (string) ($data['value'] ?? ''),
-            'subscr' => $field['subscr'],
-            'meta'   => [],
-        ];
+        return entity_input($data, $mode, 'textarea');
     }
 
     if ($mode === 'validate') {
@@ -245,7 +217,7 @@ function ltext_handler(array $data, string $mode): array
         ];
     }
 
-    return ['type' => 'error', 'errors' => ["Неподдерживаемый режим '$mode'"]];
+    return entity_unsupported_mode($mode);
 }
 
 // ============================================================
@@ -290,26 +262,12 @@ function ent_footnote(): array
 
 function footnote_handler(array $data, string $mode): array
 {
-    $field = $data['field'];
-
     if ($mode === 'read') {
-        return [
-            'type'   => 'value',
-            'name'   => $field['raw'],
-            'value'  => (string) ($data['value'] ?? ''),
-            'subscr' => $field['subscr'],
-        ];
+        return entity_read_value($data);
     }
 
     if ($mode === 'new' || $mode === 'edit') {
-        return [
-            'type'   => 'input',
-            'widget' => 'text',
-            'name'   => $field['raw'],
-            'value'  => $mode === 'new' ? '' : (string) ($data['value'] ?? ''),
-            'subscr' => $field['subscr'],
-            'meta'   => ['maxlength' => FOOTNOTE_MAX_LENGTH],
-        ];
+        return entity_input($data, $mode, 'text', ['maxlength' => FOOTNOTE_MAX_LENGTH]);
     }
 
     if ($mode === 'validate') {
@@ -326,7 +284,7 @@ function footnote_handler(array $data, string $mode): array
         return ['valid' => true, 'value' => $value, 'errors' => []];
     }
 
-    return ['type' => 'error', 'errors' => ["Неподдерживаемый режим '$mode'"]];
+    return entity_unsupported_mode($mode);
 }
 // ============================================================
 // date — календарная дата. Единственное нативное значение
@@ -368,23 +326,11 @@ function date_handler(array $data, string $mode): array
     $field = $data['field'];
 
     if ($mode === 'read') {
-        return [
-            'type'   => 'value',
-            'name'   => $field['raw'],
-            'value'  => (string) ($data['value'] ?? ''),
-            'subscr' => $field['subscr'],
-        ];
+        return entity_read_value($data);
     }
 
     if ($mode === 'new' || $mode === 'edit') {
-        return [
-            'type'   => 'input',
-            'widget' => 'date',
-            'name'   => $field['raw'],
-            'value'  => $mode === 'new' ? '' : (string) ($data['value'] ?? ''),
-            'subscr' => $field['subscr'],
-            'meta'   => [],
-        ];
+        return entity_input($data, $mode, 'date');
     }
 
     if ($mode === 'validate') {
@@ -396,11 +342,9 @@ function date_handler(array $data, string $mode): array
         // (field_data берёт её из реальной БД), не дефолт паспорта:
         // паспортный nullable — только подсказка конфигуратору при
         // создании колонки, а не источник истины в рантайме.
-        if ($value === '') {
-            $nullable = (bool) ($field['schema']['nullable'] ?? true);
-            return $nullable
-            ? ['valid' => true, 'value' => null, 'errors' => []]
-            : ['valid' => false, 'value' => null, 'errors' => ['Поле обязательно']];
+        $empty = entity_nullable_empty($field, $value);
+        if ($empty !== null) {
+            return $empty;
         }
 
         if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value, $m)) {
@@ -413,7 +357,7 @@ function date_handler(array $data, string $mode): array
         return ['valid' => true, 'value' => $value, 'errors' => []];
     }
 
-    return ['type' => 'error', 'errors' => ["Неподдерживаемый режим '$mode'"]];
+    return entity_unsupported_mode($mode);
 }
 
 // ============================================================
@@ -462,33 +406,19 @@ function year_handler(array $data, string $mode): array
     $field = $data['field'];
 
     if ($mode === 'read') {
-        return [
-            'type'   => 'value',
-            'name'   => $field['raw'],
-            'value'  => (string) ($data['value'] ?? ''),
-            'subscr' => $field['subscr'],
-        ];
+        return entity_read_value($data);
     }
 
     if ($mode === 'new' || $mode === 'edit') {
-        return [
-            'type'   => 'input',
-            'widget' => 'number',
-            'name'   => $field['raw'],
-            'value'  => $mode === 'new' ? '' : (string) ($data['value'] ?? ''),
-            'subscr' => $field['subscr'],
-            'meta'   => [],
-        ];
+        return entity_input($data, $mode, 'number');
     }
 
     if ($mode === 'validate') {
         $raw = trim((string) ($data['value'] ?? ''));
 
-        if ($raw === '') {
-            $nullable = (bool) ($field['schema']['nullable'] ?? true);
-            return $nullable
-            ? ['valid' => true, 'value' => null, 'errors' => []]
-            : ['valid' => false, 'value' => null, 'errors' => ['Поле обязательно']];
+        $empty = entity_nullable_empty($field, $raw);
+        if ($empty !== null) {
+            return $empty;
         }
 
         if (!preg_match('/^-?\d{1,5}$/', $raw)) {
@@ -502,7 +432,7 @@ function year_handler(array $data, string $mode): array
         return ['valid' => true, 'value' => $value, 'errors' => []];
     }
 
-    return ['type' => 'error', 'errors' => ["Неподдерживаемый режим '$mode'"]];
+    return entity_unsupported_mode($mode);
 }
 
 // ============================================================
@@ -549,17 +479,16 @@ function time_handler(array $data, string $mode): array
     $field = $data['field'];
 
     if ($mode === 'read') {
-        return [
-            'type'   => 'value',
-            'name'   => $field['raw'],
-            'value'  => (string) ($data['value'] ?? ''),
-            'subscr' => $field['subscr'],
-        ];
+        return entity_read_value($data);
     }
 
     if ($mode === 'new' || $mode === 'edit') {
         $value = $mode === 'new' ? '' : (string) ($data['value'] ?? '');
-        // HH:MM:SS из БД → HH:MM для виджета без step="1".
+        // HH:MM:SS из БД → HH:MM для виджета без step="1". Своя
+        // предобработка значения — единственная причина, почему эта
+        // ветка не сведена к entity_input() (в отличие от соседних
+        // date/year/int/dec_handler): entity_input() берёт значение из
+        // $data сама, а здесь нужно значение уже усечённое.
         if (preg_match('/^(\d{2}:\d{2}):\d{2}$/', $value, $m)) {
             $value = $m[1];
         }
@@ -577,11 +506,9 @@ function time_handler(array $data, string $mode): array
     if ($mode === 'validate') {
         $value = trim((string) ($data['value'] ?? ''));
 
-        if ($value === '') {
-            $nullable = (bool) ($field['schema']['nullable'] ?? true);
-            return $nullable
-            ? ['valid' => true, 'value' => null, 'errors' => []]
-            : ['valid' => false, 'value' => null, 'errors' => ['Поле обязательно']];
+        $empty = entity_nullable_empty($field, $value);
+        if ($empty !== null) {
+            return $empty;
         }
 
         if (!preg_match('/^([01]\d|2[0-3]):([0-5]\d)$/', $value)) {
@@ -592,7 +519,7 @@ function time_handler(array $data, string $mode): array
         return ['valid' => true, 'value' => $value . ':00', 'errors' => []];
     }
 
-    return ['type' => 'error', 'errors' => ["Неподдерживаемый режим '$mode'"]];
+    return entity_unsupported_mode($mode);
 }
 // ============================================================
 // int — целое число. Родной widget уже существует ('number',
@@ -631,33 +558,19 @@ function int_handler(array $data, string $mode): array
     $field = $data['field'];
 
     if ($mode === 'read') {
-        return [
-            'type'   => 'value',
-            'name'   => $field['raw'],
-            'value'  => (string) ($data['value'] ?? ''),
-            'subscr' => $field['subscr'],
-        ];
+        return entity_read_value($data);
     }
 
     if ($mode === 'new' || $mode === 'edit') {
-        return [
-            'type'   => 'input',
-            'widget' => 'number',
-            'name'   => $field['raw'],
-            'value'  => $mode === 'new' ? '' : (string) ($data['value'] ?? ''),
-            'subscr' => $field['subscr'],
-            'meta'   => [],
-        ];
+        return entity_input($data, $mode, 'number');
     }
 
     if ($mode === 'validate') {
         $raw = trim((string) ($data['value'] ?? ''));
 
-        if ($raw === '') {
-            $nullable = (bool) ($field['schema']['nullable'] ?? true);
-            return $nullable
-            ? ['valid' => true, 'value' => null, 'errors' => []]
-            : ['valid' => false, 'value' => null, 'errors' => ['Поле обязательно']];
+        $empty = entity_nullable_empty($field, $raw);
+        if ($empty !== null) {
+            return $empty;
         }
 
         // Точка/запятая — явная ошибка, не молчаливое усечение до целого:
@@ -669,7 +582,7 @@ function int_handler(array $data, string $mode): array
         return ['valid' => true, 'value' => (int) $raw, 'errors' => []];
     }
 
-    return ['type' => 'error', 'errors' => ["Неподдерживаемый режим '$mode'"]];
+    return entity_unsupported_mode($mode);
 }
 
 // ============================================================
@@ -758,7 +671,7 @@ function bul_handler(array $data, string $mode): array
         return ['valid' => true, 'value' => $raw === '1' ? 1 : 0, 'errors' => []];
     }
 
-    return ['type' => 'error', 'errors' => ["Неподдерживаемый режим '$mode'"]];
+    return entity_unsupported_mode($mode);
 }
 
 // ============================================================
@@ -806,36 +719,22 @@ function dec_handler(array $data, string $mode): array
     $field = $data['field'];
 
     if ($mode === 'read') {
-        return [
-            'type'   => 'value',
-            'name'   => $field['raw'],
-            'value'  => (string) ($data['value'] ?? ''),
-            'subscr' => $field['subscr'],
-        ];
+        return entity_read_value($data);
     }
 
     if ($mode === 'new' || $mode === 'edit') {
-        return [
-            'type'   => 'input',
-            'widget' => 'number',
-            'name'   => $field['raw'],
-            'value'  => $mode === 'new' ? '' : (string) ($data['value'] ?? ''),
-            'subscr' => $field['subscr'],
-            // Браузерный <input type=number> без step считает поле
-            // целочисленным и режет дробные значения на границе
-            // ("введите 1 или 2"). DECIMAL — дробный по определению.
-            'meta'   => ['step' => 'any'],
-        ];
+        // Браузерный <input type=number> без step считает поле
+        // целочисленным и режет дробные значения на границе
+        // ("введите 1 или 2"). DECIMAL — дробный по определению.
+        return entity_input($data, $mode, 'number', ['step' => 'any']);
     }
 
     if ($mode === 'validate') {
         $raw = trim((string) ($data['value'] ?? ''));
 
-        if ($raw === '') {
-            $nullable = (bool) ($field['schema']['nullable'] ?? true);
-            return $nullable
-            ? ['valid' => true, 'value' => null, 'errors' => []]
-            : ['valid' => false, 'value' => null, 'errors' => ['Поле обязательно']];
+        $empty = entity_nullable_empty($field, $raw);
+        if ($empty !== null) {
+            return $empty;
         }
 
         if (!preg_match('/^-?\d+(\.\d+)?$/', $raw)) {
@@ -847,7 +746,7 @@ function dec_handler(array $data, string $mode): array
         return ['valid' => true, 'value' => $raw, 'errors' => []];
     }
 
-    return ['type' => 'error', 'errors' => ["Неподдерживаемый режим '$mode'"]];
+    return entity_unsupported_mode($mode);
 }
 // ============================================================
 // calc — вычисляемое поле, шаг 2 архивного плана (STATE.md «Позже»,
@@ -957,7 +856,7 @@ function calc_handler(array $data, string $mode): ?array
     }
 
     if ($mode !== 'read') {
-        return ['type' => 'error', 'errors' => ["Неподдерживаемый режим '$mode'"]];
+        return entity_unsupported_mode($mode);
     }
 
     $formula = $field['formula'] ?? null;
@@ -1151,7 +1050,7 @@ function links_handler(array $data, string $mode): array
         return ['valid' => true, 'value' => links_array_build($ids), 'errors' => []];
     }
 
-    return ['type' => 'error', 'errors' => ["Неподдерживаемый режим '$mode'"]];
+    return entity_unsupported_mode($mode);
 }
 
 function ent_links(): array

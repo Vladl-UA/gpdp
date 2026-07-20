@@ -8,8 +8,11 @@ declare(strict_types=1);
  * обработчики сущностей (entities.php). Ядро сюда не заглядывает.
  * helpers не знают ничего про request и про index.
  *
- * Семейства: lookup_* (словарные выборки), в будущем form_*, sql_*
- * (например date_parts_assemble уедет в семейство сущности date_*).
+ * Семейства: lookup_* (словарные выборки), entity_* (общие кирпичи
+ * простых entity-хендлеров — read/input/nullable-check/error, вынесены
+ * 2026-07-20 из дословных повторов в entities.php, обзор Chat), в
+ * будущем form_*, sql_* (например date_parts_assemble уедет в
+ * семейство сущности date_*).
  */
 
 /**
@@ -172,4 +175,84 @@ function lookup_id_by_label(PgSql\Connection $db_connection, array $dict, string
     }
 
     return ['ok' => true, 'id' => $matches[0], 'error' => ''];
+}
+
+// ============================================================================
+// entity_* — общие кирпичи простых entity-хендлеров (entities.php).
+// Вынесены 2026-07-20 (Влад, по следам обзора Chat: «дублирование
+// внутри entities.php», data_handler/ltext_handler почти дословно
+// совпадали) — ровно то, что буквально повторялось в data/ltext/
+// footnote/date/year/time/int/dec, ни строкой больше. НЕ универсальная
+// фабрика паспортов/валидаторов (предостережение самого обзора Chat):
+// типовая валидация (формат даты, диапазон года, целое без дробной
+// части, разделитель дробного) остаётся собственным кодом каждого
+// хендлера — только она и делает сущности разными. voc_handler и
+// bul_handler эти кирпичи не зовут вовсе: у них другой смысл read
+// (резолв через словарь / текст «Да»/«Нет») и другой виджет ввода —
+// совпадение было бы случайным, не общим правилом.
+// ============================================================================
+
+/**
+ * Общий "read": значение как есть, строкой. Тот же кусок был в восьми
+ * хендлерах дословно.
+ */
+function entity_read_value(array $data): array
+{
+    $field = $data['field'];
+    return [
+        'type'   => 'value',
+        'name'   => $field['raw'],
+        'value'  => (string) ($data['value'] ?? ''),
+        'subscr' => $field['subscr'],
+    ];
+}
+
+/**
+ * Общий "new"/"edit": текстовый ввод простого виджета (text/textarea/
+ * date/number/...). $widget/$meta решает вызывающий хендлер — это и
+ * есть единственное, чем различались data_handler/ltext_handler
+ * (только widget) и footnote_handler/dec_handler (только meta).
+ * Хендлеры, которым нужно предобработать значение перед показом
+ * (time_handler — HH:MM:SS → HH:MM) или построить нетривиальный
+ * виджет (voc_handler — список options, bul_handler — чекбокс с особым
+ * value), эту функцию не зовут — не натягивается без искажения смысла.
+ */
+function entity_input(array $data, string $mode, string $widget, array $meta = []): array
+{
+    $field = $data['field'];
+    return [
+        'type'   => 'input',
+        'widget' => $widget,
+        'name'   => $field['raw'],
+        'value'  => $mode === 'new' ? '' : (string) ($data['value'] ?? ''),
+        'subscr' => $field['subscr'],
+        'meta'   => $meta,
+    ];
+}
+
+/**
+ * Общая развилка "validate" для nullable-полей: пустой ввод — не
+ * ошибка формата, а вопрос "обязательно ли поле" по ЖИВОЙ схеме
+ * колонки (не паспортному дефолту умолчания, а факту из БД — см.
+ * комментарии на местах в date/year/time/int/dec_handler, сохранены).
+ * null — ввод НЕ пустой, разбор продолжает сам хендлер своей типовой
+ * проверкой; формат даты, диапазон года, «целое без дробной части»,
+ * разделитель дробного — разные и по правилу, и по тексту ошибки,
+ * сюда осознанно не собраны (предостережение обзора Chat).
+ */
+function entity_nullable_empty(array $field, string $raw): ?array
+{
+    if ($raw !== '') {
+        return null;
+    }
+    $nullable = (bool) ($field['schema']['nullable'] ?? true);
+    return $nullable
+        ? ['valid' => true, 'value' => null, 'errors' => []]
+        : ['valid' => false, 'value' => null, 'errors' => ['Поле обязательно']];
+}
+
+/** Общий ответ на неизвестный режим — одна и та же форма во всех хендлерах. */
+function entity_unsupported_mode(string $mode): array
+{
+    return ['type' => 'error', 'errors' => ["Неподдерживаемый режим '$mode'"]];
 }
