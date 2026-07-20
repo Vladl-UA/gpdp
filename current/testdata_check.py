@@ -178,8 +178,25 @@ def check(path, do_fix):
                 if a is not None and b is not None:
                     if a <= b:
                         errors.append(f'{where}: интервал {a}–{b}, ожидалось от > до')
-                    elif not (200 <= a - b <= 900):
-                        errors.append(f'{where}: интервал {a}–{b}, протяжённость {a-b:.0f} вне 200…900')
+                    # 2026-07-20: проверки на протяжённость интервала НЕТ
+                    # сознательно. Правило «200…900» было выведено из
+                    # одной реальной скважины с двумя ступенями и делёными
+                    # интервалами; у одноступенчатой скважины интервал
+                    # идёт от забоя до УСЦ и законно бывает длиннее тысячи
+                    # метров. Проверять надо не длину, а то, что имеет
+                    # смысл всегда: порядок глубин, попадание в ствол и
+                    # отсутствие перекрытий.
+                    depth = num(well.get('dec_depth'))
+                    if depth is not None and a > depth:
+                        errors.append(f'{where}: интервал начинается на {a}, глубже забоя {depth}')
+            spans = sorted(
+                (num(iv.get('dec_depth_to')), num(iv.get('dec_depth_from')))
+                for iv in s.get('cementing_interval', [])
+                if num(iv.get('dec_depth_to')) is not None and num(iv.get('dec_depth_from')) is not None
+            )
+            for (lo1, hi1), (lo2, hi2) in zip(spans, spans[1:]):
+                if lo2 < hi1:
+                    errors.append(f'{where}: интервалы {hi1}–{lo1} и {hi2}–{lo2} перекрываются')
 
         for h in horizons:
             a, b = num(h.get('dec_depth_from')), num(h.get('dec_depth_to'))

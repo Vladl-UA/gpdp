@@ -1,0 +1,1227 @@
+{
+"well": [
+{
+"int_number": "301",
+"date_done": "2023-04-12",
+"voc_mr": "Самотлорская",
+"voc_enterprise": "ООО \"Интер-Ойл\"",
+"voc_subsoiluser": "ЗАО \"Самара-Нафта\"",
+"dec_depth": "3100",
+"dec_temp": "85",
+"dec_diam_col": "146",
+"dec_diam_prev_col": "245",
+"dec_depth_prev_col": "1200",
+"dec_depth_usc": "2000",
+"voc_usc": "МСЦ-146",
+"voc_technolog": "Назаров",
+"voc_status": "Завершена",
+"ltext_remark": "Осложнений при спуске не выявлено",
+"cementing_stage": [
+{
+"int_stage_number": "1",
+"dec_pressure_work": "14",
+"dec_pressure_stop": "18",
+"cementing_interval": [
+{
+"dec_depth_from": "3100",
+"dec_depth_to": "2500",
+"voc_material": "ОТМ-3",
+"dec_amount": "22",
+"dec_volume_plan": "18",
+"dec_volume_fact": "18.5",
+"dec_density_plan": "1.85",
+"dec_density_fact": "1.87",
+"cementing_buffer": [
+{
+"dec_volume": "2",
+"voc_composition": "МБП-С",
+"dec_weight": "80"
+}
+],
+"material_test": [
+{
+"dec_water_cement_ratio": "0.45",
+"dec_spreadability": "220",
+"dec_temp_static": "75",
+"dec_temp_dynamic": "65",
+"dec_pressure": "300",
+"dec_thickening_time": "140",
+"data_setting_start": "4-15",
+"data_setting_end": "5-30",
+"dec_strength_bending": "4.5",
+"dec_strength_compress": "8.5",
+"dec_linear_expansion": "12",
+"dec_water_separation": "1.5",
+"dec_fluid_loss": "120"
+}
+],
+"akc_by_material": [
+{
+"dec_partial_casing_m": "150",
+"dec_partial_rock_m": "120",
+"dec_partial_casing_pct": "40.5",
+"dec_partial_rock_pct": "35.0",
+"dec_rigid_casing_m": "250",
+"dec_rigid_rock_m": "280"
+}
+]
+}
+],
+"cementing_reper": [
+{
+"dec_volume": "3",
+"dec_density": "1.45",
+"cementing_reper_component": [
+{
+"voc_component": "КМЦ"
+},
+{
+"voc_component": "ПЦТ-G-CC-1",
+"dec_amount": "0.5"
+}
+]
+}
+]
+},
+{
+"int_stage_number": "2",
+"dec_pressure_work": "12",
+"dec_pressure_stop": "15",
+"cementing_interval": [
+{
+"dec_depth_from": "2500",
+"dec_depth_to": "1800",
+"voc_material": "РТМ-75",
+"dec_amount": "15",
+"dec_volume_plan": "14",
+"dec_volume_fact": "13.2",
+"dec_density_plan": "1.55",
+"dec_density_fact": "1.54",
+"cementing_buffer": [
+{
+"dec_volume": "3",
+"voc_composition": "Буфер водный",
+"dec_weight": "50"
+},
+{
+"dec_volume": "1",
+"voc_composition": "НТФ",
+"dec_weight": "15"
+}
+],
+"material_test": [
+{
+"dec_water_cement_ratio": "0.60",
+"dec_spreadability": "240",
+"dec_temp_static": "55",
+"dec_temp_dynamic": "48",
+"dec_pressure": "280",
+"dec_thickening_time": "190",
+"data_setting_start": "6-10",
+"data_setting_end": "8-45",
+"dec_strength_bending": "3.0",
+"dec_strength_compress": "5.5",
+"dec_water_separation": "2.1",
+"dec_fluid_loss": "250"
+}
+],
+"akc_by_material": [
+{
+"dec_partial_casing_m": "80",
+"dec_partial_rock_m": "95",
+"dec_partial_casing_pct": "25.0",
+"dec_partial_rock_pct": "30.0",
+"dec_rigid_casing_m": "350",
+"dec_rigid_rock_m": "320"
+}
+]
+}
+]
+}
+],
+"productive_horizon": [
+{
+"data_formation": "АС12(2)",
+"dec_depth_from": "3050",
+"dec_depth_to": "3010",
+"voc_fluid_type": "нефть",
+"bul_peretok": "0",
+"akc_by_horizon": [
+{
+"dec_partial_casing_m": "5",
+"dec_partial_rock_m": "3",
+"dec_partial_casing_pct": "12.0",
+"dec_partial_rock_pct": "10.0",
+"dec_rigid_casing_m": "35",
+"dec_rigid_rock_m": "37"
+}
+]
+},
+{
+"data_formation": "ЮС1(1)",
+"dec_depth_from": "2800",
+"dec_depth_to": "2780",
+"voc_fluid_type": "нефть+вода",
+"bul_peretok": "1",
+"akc_by_horizon": [
+{
+"dec_partial_casing_m": "8",
+"dec_partial_rock_m": "10",
+"dec_partial_casing_pct": "35.0",
+"dec_partial_rock_pct": "40.0",
+"dec_rigid_casing_m": "12",
+"dec_rigid_rock_m": "10"
+}
+]
+}
+]
+},
+{
+"int_number": "302",
+"date_done": "2022-11-20",
+"voc_mr": "Приобская",
+"voc_enterprise": "ООО \"Бурнефтесервис\"",
+"voc_subsoiluser": "АО \"Приобскнефть\"",
+"dec_depth": "2850",
+"dec_temp": "75",
+"dec_diam_col": "168",
+"dec_diam_prev_col": "245",
+"dec_depth_prev_col": "950",
+"dec_depth_usc": "1650",
+"voc_usc": "МСЦ-168",
+"voc_technolog": "Ковалёв",
+"voc_status": "Завершена",
+"cementing_stage": [
+{
+"int_stage_number": "1",
+"dec_pressure_work": "16",
+"dec_pressure_stop": "20",
+"cementing_interval": [
+{
+"dec_depth_from": "2850",
+"dec_depth_to": "1650",
+"voc_material": "ПЦТ I-G-CC-1",
+"dec_amount": "30",
+"dec_volume_plan": "25",
+"dec_volume_fact": "25.5",
+"dec_density_plan": "1.90",
+"dec_density_fact": "1.89",
+"cementing_buffer": [
+{
+"dec_volume": "4",
+"voc_composition": "МБП-М",
+"dec_weight": "120"
+}
+],
+"material_test": [
+{
+"dec_water_cement_ratio": "0.44",
+"dec_spreadability": "210",
+"dec_temp_static": "65",
+"dec_temp_dynamic": "58",
+"dec_pressure": "350",
+"dec_thickening_time": "120",
+"data_setting_start": "3-30",
+"data_setting_end": "4-45",
+"dec_strength_bending": "5.5",
+"dec_strength_compress": "10.0",
+"dec_linear_expansion": "8",
+"dec_water_separation": "0.8",
+"dec_fluid_loss": "90"
+}
+],
+"akc_by_material": [
+{
+"dec_partial_casing_m": "210",
+"dec_partial_rock_m": "190",
+"dec_partial_casing_pct": "20.5",
+"dec_partial_rock_pct": "18.0",
+"dec_rigid_casing_m": "450",
+"dec_rigid_rock_m": "480"
+}
+]
+}
+]
+}
+],
+"productive_horizon": [
+{
+"data_formation": "АС11",
+"dec_depth_from": "2700",
+"dec_depth_to": "2680",
+"voc_fluid_type": "нефть",
+"bul_peretok": "0",
+"akc_by_horizon": [
+{
+"dec_partial_casing_m": "2",
+"dec_partial_rock_m": "1",
+"dec_partial_casing_pct": "10.0",
+"dec_partial_rock_pct": "5.0",
+"dec_rigid_casing_m": "18",
+"dec_rigid_rock_m": "19"
+}
+]
+},
+{
+"data_formation": "БС8",
+"dec_depth_from": "2500",
+"dec_depth_to": "2460",
+"voc_fluid_type": "нефть+газ",
+"bul_peretok": "0",
+"akc_by_horizon": [
+{
+"dec_partial_casing_m": "5",
+"dec_partial_rock_m": "4",
+"dec_partial_casing_pct": "15.0",
+"dec_partial_rock_pct": "12.0",
+"dec_rigid_casing_m": "35",
+"dec_rigid_rock_m": "36"
+}
+]
+}
+]
+},
+{
+"int_number": "303",
+"date_done": "2024-02-15",
+"voc_mr": "Ватьеганская",
+"voc_enterprise": "АО \"Сибирская буровая компания\"",
+"voc_subsoiluser": "ООО \"Ватьеганнефть\"",
+"dec_depth": "4000",
+"dec_temp": "105",
+"dec_diam_col": "140",
+"dec_diam_prev_col": "219",
+"dec_depth_prev_col": "2200",
+"dec_depth_usc": "2800",
+"voc_usc": "УСЦ-140",
+"voc_technolog": "Шаймиев",
+"voc_status": "Завершена",
+"cementing_stage": [
+{
+"int_stage_number": "1",
+"dec_pressure_work": "18",
+"dec_pressure_stop": "22",
+"cementing_interval": [
+{
+"dec_depth_from": "4000",
+"dec_depth_to": "3100",
+"voc_material": "ЦТРО-1",
+"dec_amount": "28",
+"dec_volume_plan": "22",
+"dec_volume_fact": "21.0",
+"dec_density_plan": "1.92",
+"dec_density_fact": "1.91",
+"cementing_buffer": [
+{
+"dec_volume": "3",
+"voc_composition": "МБП-СМ",
+"dec_weight": "150"
+}
+],
+"material_test": [
+{
+"dec_water_cement_ratio": "0.38",
+"dec_spreadability": "230",
+"dec_temp_static": "88",
+"dec_temp_dynamic": "70",
+"dec_pressure": "420",
+"dec_thickening_time": "180",
+"data_setting_start": "5-00",
+"data_setting_end": "7-15",
+"dec_strength_bending": "6.0",
+"dec_strength_compress": "12.5",
+"dec_water_separation": "0.5",
+"dec_fluid_loss": "65"
+}
+],
+"akc_by_material": [
+{
+"dec_partial_casing_m": "110",
+"dec_partial_rock_m": "100",
+"dec_partial_casing_pct": "15.0",
+"dec_partial_rock_pct": "12.0",
+"dec_rigid_casing_m": "600",
+"dec_rigid_rock_m": "580"
+}
+]
+}
+],
+"cementing_reper": [
+{
+"dec_volume": "2.5",
+"dec_density": "1.35",
+"cementing_reper_component": [
+{
+"voc_component": "Полицем"
+},
+{
+"voc_component": "НТФ",
+"dec_amount": "0.2"
+},
+{
+"voc_component": "CFL-110",
+"dec_amount": "0.15"
+}
+]
+}
+]
+},
+{
+"int_stage_number": "2",
+"dec_pressure_work": "14",
+"dec_pressure_stop": "18",
+"cementing_interval": [
+{
+"dec_depth_from": "3100",
+"dec_depth_to": "2200",
+"voc_material": "ОТМ-5",
+"dec_amount": "20",
+"dec_volume_plan": "16",
+"dec_volume_fact": "16.8",
+"dec_density_plan": "1.75",
+"dec_density_fact": "1.74",
+"cementing_buffer": [
+{
+"dec_volume": "2",
+"voc_composition": "Буфер водный",
+"dec_weight": "40"
+}
+],
+"material_test": [
+{
+"dec_water_cement_ratio": "0.50",
+"dec_spreadability": "215",
+"dec_temp_static": "70",
+"dec_temp_dynamic": "60",
+"dec_pressure": "300",
+"dec_thickening_time": "160",
+"data_setting_start": "4-45",
+"data_setting_end": "6-30",
+"dec_strength_bending": "4.0",
+"dec_strength_compress": "7.5",
+"dec_linear_expansion": "15",
+"dec_water_separation": "1.8",
+"dec_fluid_loss": "180"
+}
+],
+"akc_by_material": [
+{
+"dec_partial_casing_m": "180",
+"dec_partial_rock_m": "160",
+"dec_partial_casing_pct": "25.0",
+"dec_partial_rock_pct": "22.0",
+"dec_rigid_casing_m": "400",
+"dec_rigid_rock_m": "410"
+}
+]
+}
+]
+}
+],
+"productive_horizon": [
+{
+"data_formation": "ЮС1(1)",
+"dec_depth_from": "3850",
+"dec_depth_to": "3800",
+"voc_fluid_type": "нефть+газ",
+"bul_peretok": "0",
+"akc_by_horizon": [
+{
+"dec_partial_casing_m": "4",
+"dec_partial_rock_m": "5",
+"dec_partial_casing_pct": "8.0",
+"dec_partial_rock_pct": "10.0",
+"dec_rigid_casing_m": "46",
+"dec_rigid_rock_m": "45"
+}
+]
+},
+{
+"data_formation": "БС8",
+"dec_depth_from": "3600",
+"dec_depth_to": "3580",
+"voc_fluid_type": "нефть",
+"bul_peretok": "1",
+"akc_by_horizon": [
+{
+"dec_partial_casing_m": "10",
+"dec_partial_rock_m": "12",
+"dec_partial_casing_pct": "50.0",
+"dec_partial_rock_pct": "60.0",
+"dec_rigid_casing_m": "10",
+"dec_rigid_rock_m": "8"
+}
+]
+},
+{
+"data_formation": "АС11",
+"dec_depth_from": "3300",
+"dec_depth_to": "3280",
+"voc_fluid_type": "нефть+вода",
+"bul_peretok": "1",
+"akc_by_horizon": [
+{
+"dec_partial_casing_m": "8",
+"dec_partial_rock_m": "7",
+"dec_partial_casing_pct": "40.0",
+"dec_partial_rock_pct": "35.0",
+"dec_rigid_casing_m": "12",
+"dec_rigid_rock_m": "13"
+}
+]
+}
+]
+},
+{
+"int_number": "304",
+"date_done": "2021-09-08",
+"voc_mr": "Тевлинско-Русскинская",
+"voc_enterprise": "ООО \"ГеоБурСервис\"",
+"voc_subsoiluser": "ПАО \"Севернефтегаз\"",
+"dec_depth": "2400",
+"dec_temp": "65",
+"dec_diam_col": "168",
+"dec_diam_prev_col": "245",
+"dec_depth_prev_col": "900",
+"dec_depth_usc": "1500",
+"voc_usc": "МСЦ-168",
+"voc_technolog": "Ерохин",
+"voc_status": "Завершена",
+"cementing_stage": [
+{
+"int_stage_number": "1",
+"dec_pressure_work": "11",
+"dec_pressure_stop": "15",
+"cementing_interval": [
+{
+"dec_depth_from": "2400",
+"dec_depth_to": "1800",
+"voc_material": "ПЦТ III-Об 5-100",
+"dec_amount": "14",
+"dec_volume_plan": "12",
+"dec_volume_fact": "12.5",
+"dec_density_plan": "1.45",
+"dec_density_fact": "1.48",
+"cementing_buffer": [
+{
+"dec_volume": "2",
+"voc_composition": "КССБ",
+"dec_weight": "30"
+}
+],
+"material_test": [
+{
+"dec_water_cement_ratio": "0.75",
+"dec_spreadability": "250",
+"dec_temp_static": "60",
+"dec_temp_dynamic": "52",
+"dec_pressure": "260",
+"dec_thickening_time": "220",
+"data_setting_start": "7-10",
+"data_setting_end": "10-20",
+"dec_strength_bending": "2.5",
+"dec_strength_compress": "4.5",
+"dec_water_separation": "3.0",
+"dec_fluid_loss": "800"
+}
+],
+"akc_by_material": [
+{
+"dec_partial_casing_m": "150",
+"dec_partial_rock_m": "140",
+"dec_partial_casing_pct": "35.0",
+"dec_partial_rock_pct": "30.0",
+"dec_rigid_casing_m": "250",
+"dec_rigid_rock_m": "260"
+}
+]
+}
+]
+}
+],
+"productive_horizon": [
+{
+"data_formation": "БС8",
+"dec_depth_from": "2300",
+"dec_depth_to": "2280",
+"voc_fluid_type": "нефть",
+"bul_peretok": "0",
+"akc_by_horizon": [
+{
+"dec_partial_casing_m": "2",
+"dec_partial_rock_m": "3",
+"dec_partial_casing_pct": "10.0",
+"dec_partial_rock_pct": "15.0",
+"dec_rigid_casing_m": "18",
+"dec_rigid_rock_m": "17"
+}
+]
+},
+{
+"data_formation": "АС12(2)",
+"dec_depth_from": "2100",
+"dec_depth_to": "2080",
+"voc_fluid_type": "нефть",
+"bul_peretok": "0",
+"akc_by_horizon": [
+{
+"dec_partial_casing_m": "1",
+"dec_partial_rock_m": "1",
+"dec_partial_casing_pct": "5.0",
+"dec_partial_rock_pct": "5.0",
+"dec_rigid_casing_m": "19",
+"dec_rigid_rock_m": "19"
+}
+]
+}
+]
+},
+{
+"int_number": "305",
+"date_done": "2025-01-30",
+"voc_mr": "Южно-Ягунская",
+"voc_enterprise": "ООО \"Западбурнефть\"",
+"voc_subsoiluser": "ООО \"Ватьеганнефть\"",
+"dec_depth": "2900",
+"dec_temp": "78",
+"dec_diam_col": "146",
+"dec_diam_prev_col": "245",
+"dec_depth_prev_col": "1100",
+"dec_depth_usc": "1900",
+"voc_usc": "МСЦ-146",
+"voc_technolog": "Назаров",
+"voc_status": "Завершена",
+"ltext_remark": "Тестовый прогон на новом оборудовании",
+"cementing_stage": [
+{
+"int_stage_number": "1",
+"dec_pressure_work": "13",
+"dec_pressure_stop": "17",
+"cementing_interval": [
+{
+"dec_depth_from": "2900",
+"dec_depth_to": "2400",
+"voc_material": "ОТМ-7",
+"dec_amount": "18",
+"dec_volume_plan": "15",
+"dec_volume_fact": "14.5",
+"dec_density_plan": "1.70",
+"dec_density_fact": "1.69",
+"cementing_buffer": [
+{
+"dec_volume": "3",
+"voc_composition": "МБП-С",
+"dec_weight": "60"
+}
+],
+"material_test": [
+{
+"dec_water_cement_ratio": "0.55",
+"dec_spreadability": "225",
+"dec_temp_static": "70",
+"dec_temp_dynamic": "60",
+"dec_pressure": "310",
+"dec_thickening_time": "150",
+"data_setting_start": "4-20",
+"data_setting_end": "6-10",
+"dec_strength_bending": "4.2",
+"dec_strength_compress": "8.0",
+"dec_water_separation": "1.4",
+"dec_fluid_loss": "200"
+}
+],
+"akc_by_material": [
+{
+"dec_partial_casing_m": "100",
+"dec_partial_rock_m": "80",
+"dec_partial_casing_pct": "20.0",
+"dec_partial_rock_pct": "16.0",
+"dec_rigid_casing_m": "350",
+"dec_rigid_rock_m": "370"
+}
+]
+}
+]
+},
+{
+"int_stage_number": "2",
+"dec_pressure_work": "10",
+"dec_pressure_stop": "14",
+"cementing_interval": [
+{
+"dec_depth_from": "2400",
+"dec_depth_to": "1800",
+"voc_material": "РТМ-100",
+"dec_amount": "20",
+"dec_volume_plan": "18",
+"dec_volume_fact": "19.0",
+"dec_density_plan": "1.65",
+"dec_density_fact": "1.63",
+"cementing_buffer": [
+{
+"dec_volume": "4",
+"voc_composition": "МБП-М",
+"dec_weight": "80"
+},
+{
+"dec_volume": "1.5",
+"voc_composition": "КССБ",
+"dec_weight": "25"
+}
+],
+"material_test": [
+{
+"dec_water_cement_ratio": "0.58",
+"dec_spreadability": "235",
+"dec_temp_static": "65",
+"dec_temp_dynamic": "55",
+"dec_pressure": "290",
+"dec_thickening_time": "170",
+"data_setting_start": "5-30",
+"data_setting_end": "7-45",
+"dec_strength_bending": "3.8",
+"dec_strength_compress": "7.0",
+"dec_linear_expansion": "10",
+"dec_water_separation": "1.9",
+"dec_fluid_loss": "350"
+}
+],
+"akc_by_material": [
+{
+"dec_partial_casing_m": "150",
+"dec_partial_rock_m": "140",
+"dec_partial_casing_pct": "25.0",
+"dec_partial_rock_pct": "23.0",
+"dec_rigid_casing_m": "400",
+"dec_rigid_rock_m": "410"
+}
+]
+}
+],
+"cementing_reper": [
+{
+"dec_volume": "4",
+"dec_density": "1.50",
+"cementing_reper_component": [
+{
+"voc_component": "Бентонит"
+},
+{
+"voc_component": "Гипан",
+"dec_amount": "0.4"
+}
+]
+}
+]
+}
+],
+"productive_horizon": [
+{
+"data_formation": "АС11",
+"dec_depth_from": "2850",
+"dec_depth_to": "2820",
+"voc_fluid_type": "нефть",
+"bul_peretok": "0",
+"akc_by_horizon": [
+{
+"dec_partial_casing_m": "3",
+"dec_partial_rock_m": "2",
+"dec_partial_casing_pct": "10.0",
+"dec_partial_rock_pct": "6.0",
+"dec_rigid_casing_m": "27",
+"dec_rigid_rock_m": "28"
+}
+]
+},
+{
+"data_formation": "БС8",
+"dec_depth_from": "2700",
+"dec_depth_to": "2650",
+"voc_fluid_type": "нефть+вода",
+"bul_peretok": "0",
+"akc_by_horizon": [
+{
+"dec_partial_casing_m": "10",
+"dec_partial_rock_m": "12",
+"dec_partial_casing_pct": "20.0",
+"dec_partial_rock_pct": "24.0",
+"dec_rigid_casing_m": "40",
+"dec_rigid_rock_m": "38"
+}
+]
+}
+]
+},
+{
+"int_number": "306",
+"date_done": "2023-11-05",
+"voc_mr": "Повховская",
+"voc_enterprise": "ООО \"Интер-Ойл\"",
+"voc_subsoiluser": "ЗАО \"Самара-Нафта\"",
+"dec_depth": "3500",
+"dec_temp": "95",
+"dec_diam_col": "146",
+"dec_diam_prev_col": "245",
+"dec_depth_prev_col": "1400",
+"dec_depth_usc": "2300",
+"voc_usc": "МСЦ-146",
+"voc_technolog": "Бельский",
+"voc_status": "Завершена",
+"cementing_stage": [
+{
+"int_stage_number": "1",
+"dec_pressure_work": "17",
+"dec_pressure_stop": "20",
+"cementing_interval": [
+{
+"dec_depth_from": "3500",
+"dec_depth_to": "2800",
+"voc_material": "ЦТРО-1",
+"dec_amount": "25",
+"dec_volume_plan": "20",
+"dec_volume_fact": "20.5",
+"dec_density_plan": "1.88",
+"dec_density_fact": "1.90",
+"cementing_buffer": [
+{
+"dec_volume": "3.5",
+"voc_composition": "МБП-СМ",
+"dec_weight": "110"
+}
+],
+"material_test": [
+{
+"dec_water_cement_ratio": "0.40",
+"dec_spreadability": "225",
+"dec_temp_static": "85",
+"dec_temp_dynamic": "68",
+"dec_pressure": "380",
+"dec_thickening_time": "155",
+"data_setting_start": "4-10",
+"data_setting_end": "5-50",
+"dec_strength_bending": "5.2",
+"dec_strength_compress": "11.0",
+"dec_linear_expansion": "14",
+"dec_water_separation": "1.0",
+"dec_fluid_loss": "110"
+}
+],
+"akc_by_material": [
+{
+"dec_partial_casing_m": "120",
+"dec_partial_rock_m": "110",
+"dec_partial_casing_pct": "17.0",
+"dec_partial_rock_pct": "15.5",
+"dec_rigid_casing_m": "500",
+"dec_rigid_rock_m": "510"
+}
+]
+}
+]
+}
+],
+"productive_horizon": [
+{
+"data_formation": "ЮС1(1)",
+"dec_depth_from": "3400",
+"dec_depth_to": "3350",
+"voc_fluid_type": "нефть",
+"bul_peretok": "0",
+"akc_by_horizon": [
+{
+"dec_partial_casing_m": "5",
+"dec_partial_rock_m": "5",
+"dec_partial_casing_pct": "10.0",
+"dec_partial_rock_pct": "10.0",
+"dec_rigid_casing_m": "45",
+"dec_rigid_rock_m": "45"
+}
+]
+},
+{
+"data_formation": "БС8",
+"dec_depth_from": "3100",
+"dec_depth_to": "3060",
+"voc_fluid_type": "нефть+вода",
+"bul_peretok": "0",
+"akc_by_horizon": [
+{
+"dec_partial_casing_m": "8",
+"dec_partial_rock_m": "7",
+"dec_partial_casing_pct": "20.0",
+"dec_partial_rock_pct": "17.5",
+"dec_rigid_casing_m": "32",
+"dec_rigid_rock_m": "33"
+}
+]
+},
+{
+"data_formation": "АС11",
+"dec_depth_from": "2900",
+"dec_depth_to": "2880",
+"voc_fluid_type": "нефть+газ",
+"bul_peretok": "0",
+"akc_by_horizon": [
+{
+"dec_partial_casing_m": "2",
+"dec_partial_rock_m": "1",
+"dec_partial_casing_pct": "10.0",
+"dec_partial_rock_pct": "5.0",
+"dec_rigid_casing_m": "18",
+"dec_rigid_rock_m": "19"
+}
+]
+}
+]
+},
+{
+"int_number": "307",
+"date_done": "2020-07-22",
+"voc_mr": "Мамуринская",
+"voc_enterprise": "ООО \"Бурнефтесервис\"",
+"voc_subsoiluser": "ЗАО \"Самара-Нафта\"",
+"dec_depth": "2100",
+"dec_temp": "55",
+"dec_diam_col": "178",
+"dec_diam_prev_col": "245",
+"dec_depth_prev_col": "950",
+"dec_depth_usc": "1200",
+"voc_usc": "МСЦ-178",
+"voc_technolog": "Назаров",
+"voc_status": "Завершена",
+"cementing_stage": [
+{
+"int_stage_number": "1",
+"dec_pressure_work": "9",
+"dec_pressure_stop": "12",
+"cementing_interval": [
+{
+"dec_depth_from": "2100",
+"dec_depth_to": "1500",
+"voc_material": "ОТМ-3",
+"dec_amount": "12",
+"dec_volume_plan": "10",
+"dec_volume_fact": "10.5",
+"dec_density_plan": "1.78",
+"dec_density_fact": "1.79",
+"cementing_buffer": [
+{
+"dec_volume": "1.5",
+"voc_composition": "МБП-М",
+"dec_weight": "40"
+}
+],
+"material_test": [
+{
+"dec_water_cement_ratio": "0.48",
+"dec_spreadability": "210",
+"dec_temp_static": "55",
+"dec_temp_dynamic": "48",
+"dec_pressure": "270",
+"dec_thickening_time": "130",
+"data_setting_start": "3-50",
+"data_setting_end": "5-10",
+"dec_strength_bending": "3.5",
+"dec_strength_compress": "6.0",
+"dec_water_separation": "1.2",
+"dec_fluid_loss": "140"
+}
+],
+"akc_by_material": [
+{
+"dec_partial_casing_m": "90",
+"dec_partial_rock_m": "100",
+"dec_partial_casing_pct": "15.0",
+"dec_partial_rock_pct": "16.5",
+"dec_rigid_casing_m": "400",
+"dec_rigid_rock_m": "390"
+}
+]
+}
+]
+}
+],
+"productive_horizon": [
+{
+"data_formation": "АС11",
+"dec_depth_from": "2050",
+"dec_depth_to": "2020",
+"voc_fluid_type": "нефть",
+"bul_peretok": "0",
+"akc_by_horizon": [
+{
+"dec_partial_casing_m": "5",
+"dec_partial_rock_m": "4",
+"dec_partial_casing_pct": "16.5",
+"dec_partial_rock_pct": "13.0",
+"dec_rigid_casing_m": "25",
+"dec_rigid_rock_m": "26"
+}
+]
+},
+{
+"data_formation": "АС12(2)",
+"dec_depth_from": "1800",
+"dec_depth_to": "1780",
+"voc_fluid_type": "нефть",
+"bul_peretok": "0",
+"akc_by_horizon": [
+{
+"dec_partial_casing_m": "2",
+"dec_partial_rock_m": "2",
+"dec_partial_casing_pct": "10.0",
+"dec_partial_rock_pct": "10.0",
+"dec_rigid_casing_m": "18",
+"dec_rigid_rock_m": "18"
+}
+]
+}
+]
+},
+{
+"int_number": "308",
+"date_done": "2026-06-15",
+"voc_mr": "Самотлорская",
+"voc_enterprise": "ООО \"Западбурнефть\"",
+"voc_subsoiluser": "ЗАО \"Самара-Нафта\"",
+"dec_depth": "3000",
+"dec_temp": "80",
+"dec_diam_col": "146",
+"dec_diam_prev_col": "245",
+"dec_depth_prev_col": "1050",
+"dec_depth_usc": "1800",
+"voc_usc": "МСЦ-146",
+"voc_technolog": "Шаймиев",
+"voc_status": "В работе",
+"ltext_remark": "Ожидание проведения АКЦ",
+"cementing_stage": [
+{
+"int_stage_number": "1",
+"dec_pressure_work": "14",
+"dec_pressure_stop": "18",
+"cementing_interval": [
+{
+"dec_depth_from": "3000",
+"dec_depth_to": "2300",
+"voc_material": "РТМ-75",
+"dec_amount": "20",
+"dec_volume_plan": "16",
+"dec_volume_fact": "16.8",
+"dec_density_plan": "1.68",
+"dec_density_fact": "1.70",
+"cementing_buffer": [
+{
+"dec_volume": "2.5",
+"voc_composition": "Буфер водный",
+"dec_weight": "55"
+}
+],
+"material_test": [
+{
+"dec_water_cement_ratio": "0.52",
+"dec_spreadability": "230",
+"dec_temp_static": "75",
+"dec_temp_dynamic": "65",
+"dec_pressure": "300",
+"dec_thickening_time": "155",
+"data_setting_start": "4-45",
+"data_setting_end": "6-15",
+"dec_strength_bending": "4.1",
+"dec_strength_compress": "7.8",
+"dec_linear_expansion": "11",
+"dec_water_separation": "1.7",
+"dec_fluid_loss": "190"
+}
+]
+}
+]
+},
+{
+"int_stage_number": "2",
+"dec_pressure_work": "12",
+"dec_pressure_stop": "15",
+"cementing_interval": [
+{
+"dec_depth_from": "2300",
+"dec_depth_to": "1800",
+"voc_material": "ОТМ-3",
+"dec_amount": "14",
+"dec_volume_plan": "11",
+"dec_volume_fact": "11.5",
+"dec_density_plan": "1.80",
+"dec_density_fact": "1.78",
+"cementing_buffer": [
+{
+"dec_volume": "3",
+"voc_composition": "НТФ",
+"dec_weight": "70"
+}
+],
+"material_test": [
+{
+"dec_water_cement_ratio": "0.45",
+"dec_spreadability": "220",
+"dec_temp_static": "60",
+"dec_temp_dynamic": "50",
+"dec_pressure": "280",
+"dec_thickening_time": "140",
+"data_setting_start": "3-50",
+"data_setting_end": "5-30",
+"dec_strength_bending": "4.8",
+"dec_strength_compress": "9.0",
+"dec_water_separation": "1.0",
+"dec_fluid_loss": "130"
+}
+]
+}
+],
+"cementing_reper": [
+{
+"dec_volume": "3",
+"dec_density": "1.40",
+"cementing_reper_component": [
+{
+"voc_component": "КМЦ"
+},
+{
+"voc_component": "Сульфацелл",
+"dec_amount": "0.25"
+}
+]
+}
+]
+}
+],
+"productive_horizon": [
+{
+"data_formation": "АС11",
+"dec_depth_from": "2900",
+"dec_depth_to": "2850",
+"voc_fluid_type": "нефть",
+"bul_peretok": "0"
+},
+{
+"data_formation": "БС8",
+"dec_depth_from": "2600",
+"dec_depth_to": "2580",
+"voc_fluid_type": "нефть+газ",
+"bul_peretok": "0"
+}
+]
+},
+{
+"int_number": "309",
+"date_done": "2025-10-10",
+"voc_mr": "Приобская",
+"voc_enterprise": "ООО \"ГеоБурСервис\"",
+"voc_subsoiluser": "АО \"Приобскнефть\"",
+"dec_depth": "2700",
+"dec_temp": "70",
+"dec_diam_col": "168",
+"dec_diam_prev_col": "245",
+"dec_depth_prev_col": "1000",
+"dec_depth_usc": "1500",
+"voc_usc": "МСЦ-168",
+"voc_technolog": "Назаров",
+"voc_status": "В работе",
+"cementing_stage": [
+{
+"int_stage_number": "1",
+"dec_pressure_work": "15",
+"dec_pressure_stop": "18",
+"cementing_interval": [
+{
+"dec_depth_from": "2700",
+"dec_depth_to": "1800",
+"voc_material": "ПЦТ I-G-CC-1",
+"dec_amount": "26",
+"dec_volume_plan": "21",
+"dec_volume_fact": "20.5",
+"dec_density_plan": "1.89",
+"dec_density_fact": "1.90",
+"cementing_buffer": [
+{
+"dec_volume": "4",
+"voc_composition": "МБП-М",
+"dec_weight": "130"
+}
+],
+"material_test": [
+{
+"dec_water_cement_ratio": "0.42",
+"dec_spreadability": "215",
+"dec_temp_static": "68",
+"dec_temp_dynamic": "58",
+"dec_pressure": "340",
+"dec_thickening_time": "130",
+"data_setting_start": "3-45",
+"data_setting_end": "5-00",
+"dec_strength_bending": "5.0",
+"dec_strength_compress": "9.5",
+"dec_linear_expansion": "9",
+"dec_water_separation": "0.9",
+"dec_fluid_loss": "100"
+}
+]
+}
+]
+}
+],
+"productive_horizon": [
+{
+"data_formation": "АС11",
+"dec_depth_from": "2600",
+"dec_depth_to": "2580",
+"voc_fluid_type": "нефть",
+"bul_peretok": "0"
+},
+{
+"data_formation": "АС12(2)",
+"dec_depth_from": "2400",
+"dec_depth_to": "2360",
+"voc_fluid_type": "нефть+вода",
+"bul_peretok": "0"
+}
+]
+},
+{
+"int_number": "310",
+"date_done": "2026-11-25",
+"voc_mr": "Ватьеганская",
+"voc_enterprise": "АО \"Сибирская буровая компания\"",
+"voc_subsoiluser": "ООО \"Ватьеганнефть\"",
+"dec_depth": "3800",
+"dec_temp": "100",
+"dec_diam_col": "140",
+"dec_diam_prev_col": "219",
+"dec_depth_prev_col": "2100",
+"dec_depth_usc": "2600",
+"voc_usc": "УСЦ-140",
+"voc_technolog": "Ерохин",
+"voc_status": "Запланирована",
+"productive_horizon": [
+{
+"data_formation": "ЮС1(1)",
+"dec_depth_from": "3700",
+"dec_depth_to": "3660",
+"voc_fluid_type": "нефть",
+"bul_peretok": "0"
+},
+{
+"data_formation": "БС8",
+"dec_depth_from": "3400",
+"dec_depth_to": "3380",
+"voc_fluid_type": "нефть",
+"bul_peretok": "0"
+},
+{
+"data_formation": "АС11",
+"dec_depth_from": "3200",
+"dec_depth_to": "3180",
+"voc_fluid_type": "нефть+вода",
+"bul_peretok": "0"
+}
+]
+}
+]
+}
