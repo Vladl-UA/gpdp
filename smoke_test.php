@@ -622,6 +622,24 @@ foreach (glob(__DIR__ . '/*.php') ?: [] as $php_file) {
 check('HTML рождается только в render.php (§3, §12)',
     $html_births === [], implode(', ', $html_births));
 
+// 2026-07-20: тем же приёмом — сторож на обход слоя БД. Сырой pg_* вне
+// db.php вносится одной строкой и живьём себя не выдаёт: запрос
+// работает, просто мимо счётчика, мимо плейсхолдеров и мимо честного
+// результата. Ровно так пережили миграцию BEGIN/ROLLBACK в оптовой
+// загрузке и интроспекция схемы.
+$db_bypass = [];
+foreach (glob(__DIR__ . '/*.php') ?: [] as $php_file) {
+    $short = basename($php_file);
+    if ($short === 'db.php' || $short === 'smoke_test.php') {
+        continue;
+    }
+    $src = preg_replace('~/\*.*?\*/|//[^\n]*~s', '', (string) file_get_contents($php_file));
+    if (preg_match('/\bpg_(query|query_params|fetch_\w+|free_result)\s*\(/', (string) $src) === 1) {
+        $db_bypass[] = $short;
+    }
+}
+check('вызовы БД идут только через db.php', $db_bypass === [], implode(', ', $db_bypass));
+
 // Встроенный сервер PHP; проходим цикл: view → new → save (PRG) → view.
 // _table=main — обязателен явно: без него index.php показывает домашнюю
 // страницу «Главные таблицы» (условие !$table_requested в дирижёре),

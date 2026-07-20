@@ -457,9 +457,20 @@ function snapshot_build_structure(PgSql\Connection $db_connection): array
     $unknown_fields = [];
 
     // 2026-07-16: Postgres, information_schema вместо SHOW TABLES/COLUMNS
-    // (журнал STATE.md «Сейчас» п.9). Остаётся единственным местом вне
-    // db.php по прежней причине — интроспекция схемы, другой формат
-    // возврата (докблок db.php).
+    // (журнал STATE.md «Сейчас» п.9).
+    //
+    // 2026-07-20: переведено на db_select(). Здесь долго стояло
+    // исключение «единственное место вне db.php — интроспекция схемы,
+    // другой формат возврата». Под MySQL это была правда: SHOW TABLES /
+    // SHOW COLUMNS возвращали не то, что обычный SELECT. После переезда
+    // на Postgres это обычные SELECT из information_schema, и db_select
+    // отдаёт ровно тот assoc-массив, который нужен циклам. Обоснование
+    // исключения истекло при миграции, а само исключение пережило её,
+    // потому что никто не перечитал причину. Отказ запроса теперь даёт
+    // пустой список вместо громкой ошибки — но fail-fast сохранён на
+    // прежнем месте: snapshot_validate() отвергает структуру с нулём
+    // таблиц, то есть пустая интроспекция валит сборку, а не проходит
+    // молча.
     //
     // 2026-07-16 (продолжение): table_type IN ('BASE TABLE','VIEW') —
     // раньше pg_catalog.pg_tables видел только настоящие таблицы,
@@ -470,15 +481,15 @@ function snapshot_build_structure(PgSql\Connection $db_connection): array
     // недостающим звеном была именно эта интроспекция. object_type
     // сохраняется в структуре для будущего использования там, где
     // разница всё же важна (DROP TABLE vs DROP VIEW при удалении).
-    $tables_result = pg_query(
+    $table_rows = db_select(
         $db_connection,
         "SELECT table_name, table_type FROM information_schema.tables "
         . "WHERE table_schema = 'public' AND table_type IN ('BASE TABLE', 'VIEW') "
         . "ORDER BY table_name"
     );
-    while ($table_row = pg_fetch_row($tables_result)) {
-        $table_name  = $table_row[0];
-        $object_type = $table_row[1] === 'VIEW' ? 'view' : 'table';
+    foreach ($table_rows as $table_row) {
+        $table_name  = $table_row['table_name'];
+        $object_type = $table_row['table_type'] === 'VIEW' ? 'view' : 'table';
 
         // Служебные таблицы ядра (model_*) — не предметные данные,
         // классификации полей не подлежат вообще (см. константу выше).
@@ -490,25 +501,27 @@ function snapshot_build_structure(PgSql\Connection $db_connection): array
 
         // Первичный ключ таблицы — отдельным запросом (information_schema
         // не даёт "Key"-колонку одной строкой, как SHOW COLUMNS у MySQL).
-        $pk_result = pg_query_params(
+        $pk_rows = db_select(
             $db_connection,
             'SELECT a.attname FROM pg_index i '
             . 'JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey) '
-            . 'WHERE i.indrelid = $1::regclass AND i.indisprimary',
+            . 'WHERE i.indrelid = ?::regclass AND i.indisprimary',
+            's',
             [$table_name]
         );
         $pk_columns = [];
-        while ($pk_row = pg_fetch_row($pk_result)) {
-            $pk_columns[$pk_row[0]] = true;
+        foreach ($pk_rows as $pk_row) {
+            $pk_columns[$pk_row['attname']] = true;
         }
 
-        $columns_result = pg_query_params(
+        $column_rows = db_select(
             $db_connection,
             'SELECT column_name, data_type, is_nullable FROM information_schema.columns '
-            . 'WHERE table_schema = $1 AND table_name = $2 ORDER BY ordinal_position',
+            . 'WHERE table_schema = ? AND table_name = ? ORDER BY ordinal_position',
+            'ss',
             ['public', $table_name]
         );
-        while ($column_row = pg_fetch_assoc($columns_result)) {
+        foreach ($column_rows as $column_row) {
             $field_name = $column_row['column_name'];
             $parsed     = field_parse($field_name);
 
