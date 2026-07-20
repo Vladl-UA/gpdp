@@ -597,21 +597,34 @@ function configurator_register_element(
 
 /**
  * Уже под управлением реестра (активная строка, data_kind/owner/element
- * совпадают)? Было продублировано дословно дважды (adopt_field,
- * drop_column). `IS NOT DISTINCT FROM` вместо `=` — корректно сравнивает
- * NULL-владельца (таблица), не только непустого (поле), хотя оба текущих
+ * совпадают)? Честный результат ok/managed/error (обзор Chat 07-20,
+ * п.7, db_select_result вместо db_select) — это не косметика:
+ * configurator_drop_column() ниже использует именно эту проверку как
+ * ЕДИНСТВЕННЫЙ барьер перед DROP COLUMN управляемого поля (там нет
+ * отдельной проверки данных, как у configurator_drop_field) — сбой
+ * запроса, читавшийся раньше как managed=false, снимал бы этот барьер
+ * молча. При ok=false вызывающий обязан отказать операции, а не
+ * трактовать неизвестность как «не под управлением». Было
+ * продублировано дословно дважды (adopt_field, drop_column).
+ * `IS NOT DISTINCT FROM` вместо `=` — корректно сравнивает NULL-
+ * владельца (таблица), не только непустого (поле), хотя оба текущих
  * вызывающих места передают только непустой $owner.
  */
-function configurator_is_managed(PgSql\Connection $db_connection, string $kind, ?string $owner, string $element): bool
+function configurator_is_managed(PgSql\Connection $db_connection, string $kind, ?string $owner, string $element): array
 {
-    $rows = db_select(
+    $result = db_select_result(
         $db_connection,
         'SELECT id FROM ' . MODEL_REGISTRY_TABLE
         . ' WHERE data_kind = ? AND data_owner IS NOT DISTINCT FROM ? AND data_element = ? AND active = 1',
         'sss',
         [$kind, $owner, $element]
     );
-    return $rows !== [];
+
+    if (!$result['ok']) {
+        return ['ok' => false, 'managed' => null, 'error' => $result['error']];
+    }
+
+    return ['ok' => true, 'managed' => $result['rows'] !== [], 'error' => ''];
 }
 
 // ============================================================================
@@ -791,7 +804,11 @@ function configurator_adopt_field(PgSql\Connection $db_connection, string $table
             return ['ok' => false, 'errors' => ["Поле $table.$field не существует или структурное."]];
         }
         // Уже зарегистрировано? (могли починить между показом и нажатием)
-        if (configurator_is_managed($db_connection, 'field', $table, $field)) {
+        $managed = configurator_is_managed($db_connection, 'field', $table, $field);
+        if (!$managed['ok']) {
+            return ['ok' => false, 'errors' => ["Не удалось проверить реестр для $table.$field: {$managed['error']}"]];
+        }
+        if ($managed['managed']) {
             return ['ok' => false, 'errors' => ["Поле $table.$field уже под управлением."]];
         }
 
@@ -847,7 +864,16 @@ function configurator_drop_column(PgSql\Connection $db_connection, string $table
             return ['ok' => false, 'errors' => ["Поле $table.$field не существует или структурное — не удаляю."]];
         }
         // Защита: удаляем только сироту. Под управлением — не наш случай.
-        if (configurator_is_managed($db_connection, 'field', $table, $field)) {
+        // Единственный барьер перед DROP COLUMN здесь (в отличие от
+        // configurator_drop_field нет отдельной проверки данных) — при
+        // неудачной проверке отказываем, не считаем поле сиротой.
+        $managed = configurator_is_managed($db_connection, 'field', $table, $field);
+        if (!$managed['ok']) {
+            return ['ok' => false, 'errors' => [
+                "Не удалось проверить реестр для $table.$field: {$managed['error']} — удаление отклонено."
+            ]];
+        }
+        if ($managed['managed']) {
             return ['ok' => false, 'errors' => ["Поле $table.$field под управлением — удаление колонки под управлением здесь не делается."]];
         }
         $drop = db_execute($db_connection, 'ALTER TABLE ' . $table . ' DROP COLUMN ' . $field . '');
@@ -963,10 +989,23 @@ function configurator_drop_field(PgSql\Connection $db_connection, string $table,
             return ['ok' => false, 'errors' => ["$table.$field — структурное поле, не удаляется."]];
         }
 
-        // Проверка данных: есть ли непустые значения в колонке.
+        // Проверка данных: есть ли непустые значения в колонке. Честный
+        // контракт (db_select_result, не db_select) — это единственная
+        // защита от разрушительного DROP COLUMN без $force, и раньше
+        // сбой САМОГО запроса читался как "COUNT = 0" (?? 0 на пустом
+        // []), то есть снимал защиту молча вместо того, чтобы её
+        // сработать. Нашёл при разборе обзора Chat 2026-07-20 (п.7) —
+        // не сама находка Chat, а конкретное следствие того же класса
+        // ошибки на боевом пути.
         $cnt_sql = 'SELECT COUNT(*) AS c FROM ' . $table . ' WHERE ' . $field . ' IS NOT NULL';
-        $cnt_rows = db_select($db_connection, $cnt_sql);
-        $with_data = (int) ($cnt_rows[0]['c'] ?? 0);
+        $cnt_result = db_select_result($db_connection, $cnt_sql);
+        if (!$cnt_result['ok']) {
+            return ['ok' => false, 'errors' => [
+                "Не удалось проверить данные в $table.$field: {$cnt_result['error']}. "
+                . "Удаление отклонено — при неудачной проверке нельзя молча считать колонку пустой."
+            ]];
+        }
+        $with_data = (int) ($cnt_result['rows'][0]['c'] ?? 0);
         if ($with_data > 0 && !$force) {
             return ['ok' => false, 'errors' => [
                 "В поле $table.$field есть данные ($with_data значений). "

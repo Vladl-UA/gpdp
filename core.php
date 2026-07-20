@@ -1764,6 +1764,28 @@ function record_label(PgSql\Connection $db_connection, array $snapshot, string $
 }
 
 /**
+ * Зеркало record_label(), но по уже загруженной строке (helpers.php::
+ * lookup_label_from_row) — не читает исходную таблицу целиком ради
+ * одной подписи (обзор Chat 2026-07-20, п.2). Единственный сегодняшний
+ * потребитель — record_tree_from_row() ниже: карта объекта уже держит
+ * строку в руках, второй путь (record_label по id) читал бы ту же
+ * таблицу с нуля через lookup_labels(). Для мест, где строки НЕТ и
+ * нужен именно список по id (например record_parent_candidates —
+ * много подписей одной таблицы разом), record_label()/lookup_labels()
+ * остаются верным выбором: там полное кэширование таблицы — не потеря,
+ * а именно то, что нужно.
+ */
+function record_label_from_row(PgSql\Connection $db_connection, array $snapshot, string $table, array $row): string
+{
+    $dict = $snapshot['model']['dictionaries']['@' . $table] ?? null;
+    if ($dict === null) {
+        return '#' . (string) ($row['id'] ?? '?');
+    }
+
+    return lookup_label_from_row($db_connection, $dict, $row);
+}
+
+/**
  * Прямые дети записи по скомпилированному графу (model.relations).
  * Один запрос на дочернюю таблицу (WHERE dep_<parent> = id), никакого
  * перебора таблиц — граф уже собран сборкой снапшота. Нет связей →
@@ -1852,14 +1874,30 @@ function record_tree(PgSql\Connection $db_connection, array $snapshot, string $t
         return null;
     }
 
+    return record_tree_from_row($db_connection, $snapshot, $table, $row);
+}
+
+/**
+ * Тело record_tree() выше — принимает УЖЕ ЗАГРУЖЕННУЮ строку, не id.
+ * До этой правки (обзор Chat 2026-07-20, п.1) рекурсия звала
+ * record_tree($block['table'], $child_row['id']), а та немедленно
+ * делала SELECT * ... WHERE id = ? — притом что $child_row секундой
+ * раньше УЖЕ пришёл целиком из record_children() (WHERE $fk = ?).
+ * Дерево из 500 записей получало сотни заведомо лишних запросов, по
+ * одному на каждый узел каждого уровня. Разница только в этом: узел
+ * строится из данных, которые уже есть в руках, а не запрашивается
+ * заново — форма узла (ключи 'table'/'id'/'label'/… ) не изменилась
+ * ни на бит, смоук и render.php их не отличат.
+ */
+function record_tree_from_row(PgSql\Connection $db_connection, array $snapshot, string $table, array $row): array
+{
+    $id = (int) $row['id'];
+
     $children = [];
     foreach (record_children($db_connection, $snapshot, $table, $id) as $block) {
         $nodes = [];
         foreach ($block['rows'] as $child_row) {
-            $child_node = record_tree($db_connection, $snapshot, $block['table'], (int) $child_row['id']);
-            if ($child_node !== null) {
-                $nodes[] = $child_node;
-            }
+            $nodes[] = record_tree_from_row($db_connection, $snapshot, $block['table'], $child_row);
         }
         $children[] = [
             'table' => $block['table'],
@@ -1877,7 +1915,7 @@ function record_tree(PgSql\Connection $db_connection, array $snapshot, string $t
     return [
         'table'    => $table,
         'id'       => $id,
-        'label'    => record_label($db_connection, $snapshot, $table, $id),
+        'label'    => record_label_from_row($db_connection, $snapshot, $table, $row),
         // Признак «есть однозначная dep_-связь» — не сам родитель,
         // только флаг для рендера (STATE.md «Сейчас» п.5): показывать
         // ли ссылку «сменить родителя» у узла. Вычисление уже готово
@@ -2211,10 +2249,27 @@ function model_diagnose(PgSql\Connection $db_connection): array
     $sys       = defined('SYSTEM_TABLE_PREFIX') ? SYSTEM_TABLE_PREFIX : 'model_';
 
     // Сырые строки реестра (все active), без свёртки в map — чтобы
-    // увидеть дубли, которые map затирает.
+    // увидеть дубли, которые map затирает. Честный контракт
+    // (db_select_result, обзор Chat 2026-07-20 п.7): раньше сбой ИМЕННО
+    // этого запроса читался как «реестр пуст» и раздул бы диагностику
+    // ложными «сиротами» по каждой таблице и полю в базе — не тихая
+    // маскировка факта, а шумная неправда вместо неё, тоже плохо. При
+    // сбое НЕ считаем сироты/призраки/дубли вовсе — посчитанное на
+    // пустом реестре хуже, чем явно не посчитанное.
     $sql = 'SELECT id, data_kind, data_owner, data_element FROM '
          . MODEL_REGISTRY_TABLE . ' WHERE active = 1';
-    $reg_rows = db_select($db_connection, $sql);
+    $reg_result = db_select_result($db_connection, $sql);
+    if (!$reg_result['ok']) {
+        return [
+            'orphan_fields'  => [],
+            'orphan_tables'  => [],
+            'ghost_registry' => [],
+            'duplicates'     => [],
+            'clean'          => false,
+            'error'          => 'Чтение реестра модели не удалось: ' . $reg_result['error'],
+        ];
+    }
+    $reg_rows = $reg_result['rows'];
 
     // Индекс адресов реестра: адрес → список id (список, а не одно —
     // чтобы поймать дубли).
@@ -2292,5 +2347,6 @@ function model_diagnose(PgSql\Connection $db_connection): array
         'duplicates'     => $duplicates,
         'clean'          => $orphan_fields === [] && $orphan_tables === []
                           && $ghost_registry === [] && $duplicates === [],
+        'error'          => '',
     ];
 }

@@ -64,6 +64,33 @@ function admin_db_connect(): PgSql\Connection
  * $dict ОБЯЗАН быть доверенным: скомпилированная запись из пакета
  * field_data (снапшот), не из request.
  */
+/**
+ * Применение скомпилированного плана подписи (dict['plan']) к ОДНОЙ
+ * строке. Общее ядро для lookup_labels() (обходит все строки таблицы)
+ * и lookup_label_from_row() ниже (одна уже загруженная строка) — план
+ * один и тот же, разница только в том, откуда берётся $row. Вынесено,
+ * чтобы не заводить два места, разбирающих kind='literal'/'field'/
+ * 'dict' (§7 — не перепроверять/не переисполнять внутри трубы дважды).
+ */
+function lookup_label_apply_plan(PgSql\Connection $db_connection, array $plan, array $row): string
+{
+    $text = '';
+    foreach ($plan as $item) {
+        if ($item['kind'] === 'literal') {
+            $text .= $item['value'];
+            continue;
+        }
+        if ($item['kind'] === 'field') {
+            $text .= (string) ($row[$item['field']] ?? '');
+            continue;
+        }
+        // dict: значение поля — id в вложенном словаре; 0/пусто → ''
+        $ref = (int) ($row[$item['field']] ?? 0);
+        $text .= $ref === 0 ? '' : (string) (lookup_labels($db_connection, $item['dict'])[$ref] ?? '');
+    }
+    return $text;
+}
+
 function lookup_labels(PgSql\Connection $db_connection, array $dict): array
 {
     static $cache = [];
@@ -79,26 +106,34 @@ function lookup_labels(PgSql\Connection $db_connection, array $dict): array
     // а даёт тот же внешний результат, что и пустой словарь.
     $rows = db_select($db_connection, "SELECT * FROM $source");
     foreach ($rows as $row) {
-        $text = '';
-        foreach ($dict['plan'] as $item) {
-            if ($item['kind'] === 'literal') {
-                $text .= $item['value'];
-                continue;
-            }
-            if ($item['kind'] === 'field') {
-                $text .= (string) ($row[$item['field']] ?? '');
-                continue;
-            }
-            // dict: значение поля — id в вложенном словаре; 0/пусто → ''
-            $ref   = (int) ($row[$item['field']] ?? 0);
-            $text .= $ref === 0 ? '' : (string) (lookup_labels($db_connection, $item['dict'])[$ref] ?? '');
-        }
-        $labels[(int) $row['id']] = $text;
+        $labels[(int) $row['id']] = lookup_label_apply_plan($db_connection, $dict['plan'], $row);
     }
 
     asort($labels, SORT_NATURAL | SORT_FLAG_CASE);
 
     return $cache[$source] = $labels;
+}
+
+/**
+ * Подпись ОДНОЙ уже загруженной строки — без SELECT * по всей таблице
+ * (обзор Chat 2026-07-20, п.2). Потребитель — карта объекта
+ * (record_tree_from_row, core.php): запись уже прочитана однажды выше
+ * по стеку (record_children отдаёт rows целиком), второй раз читать
+ * ВСЮ таблицу ради подписи ЭТОЙ ОДНОЙ строки незачем. Вложенные
+ * словари (kind='dict' в плане) всё равно идут через lookup_labels()
+ * рекурсивно — там действительно нужен полный список вариантов ЧУЖОЙ
+ * таблицы (для будущего <select>, а не для этой одной строки), не
+ * подмена. Не отдельный язык подписи — та же lookup_label_apply_plan(),
+ * что и у lookup_labels(), просто без обхода источника.
+ *
+ * ВНИМАНИЕ вызывающему: $row обязана быть строкой ИМЕННО источника
+ * $dict['source_table'] — функция это не проверяет (симметрично
+ * lookup_labels(), которая тоже доверяет $dict как скомпилированному
+ * снапшотом факту, не request-вводу, см. её докблок выше).
+ */
+function lookup_label_from_row(PgSql\Connection $db_connection, array $dict, array $row): string
+{
+    return lookup_label_apply_plan($db_connection, $dict['plan'], $row);
 }
 
 /**

@@ -128,8 +128,11 @@ function db_query_count(int $delta = 0): int
  * различает «есть параметры» / «прямой запрос без подготовки».
  *
  * Возврат: массив строк (assoc), как раньше. Пустой массив — и «нет
- * строк», и «ошибка выполнения» — та же осознанная простота, что была
- * под mysqli (для причины ошибки нужен db_execute с его полем 'error').
+ * строк», и «ошибка выполнения» — сознательная простота по умолчанию
+ * (была под mysqli, сохранена для большинства мест, где оба исхода
+ * ведут к одному и тому же уместному поведению). Где различие важно —
+ * db_select_result() ниже, честный контракт ok/rows/error, тот же
+ * приём, что у db_execute() (обзор Chat 2026-07-20, п.7).
  */
 function db_select(PgSql\Connection $db_connection, string $sql, string $types = '', array $params = []): array
 {
@@ -144,6 +147,42 @@ function db_select(PgSql\Connection $db_connection, string $sql, string $types =
     }
 
     return pg_fetch_all($result, PGSQL_ASSOC) ?: [];
+}
+
+/**
+ * Зеркало db_select() с честным результатом: ok, rows, error — тот же
+ * контракт, что уже был у db_execute() (обзор Chat 2026-07-20, п.7).
+ * db_select() НЕ упраздняется и не становится обёрткой над этой
+ * функцией: для большинства экранных выборок «нет строк» и «запрос не
+ * выполнился» ведут к одному и тому же уместному поведению (пустой
+ * список), и заводить сюда явную проверку ok/error было бы обороной
+ * без потребителя (§13). db_select_result() — для мест, где сегодня
+ * ошибка запроса уже маскируется под содержательный факт модели:
+ * «записи нет» вместо «не проверено», «уже не под управлением» вместо
+ * «не удалось спросить», «в колонке нет данных» вместо «не посчитано»
+ * — переведены именно такие call site'ы (labels.php::
+ * model_label_registry_id, core.php::record_fetch/model_diagnose,
+ * configurator.php::configurator_is_managed/configurator_drop_field).
+ * Интроспекция схемы (snapshot_build_structure) сознательно НЕ
+ * переведена в этот же заход — у неё уже есть отдельный fail-fast
+ * (snapshot_validate отвергает структуру с нулём таблиц), контейнер
+ * сессии не даёт живьём проверить более глубокую правку там, риск
+ * трогать вслепую самый горячий путь bootstrap выше пользы здесь и
+ * сейчас — см. STATE.md.
+ */
+function db_select_result(PgSql\Connection $db_connection, string $sql, string $types = '', array $params = []): array
+{
+    db_query_count(1);
+
+    $result = $types === ''
+        ? @pg_query($db_connection, $sql)
+        : @pg_query_params($db_connection, db_placeholders($sql), $params);
+
+    if ($result === false) {
+        return ['ok' => false, 'rows' => [], 'error' => pg_last_error($db_connection)];
+    }
+
+    return ['ok' => true, 'rows' => pg_fetch_all($result, PGSQL_ASSOC) ?: [], 'error' => ''];
 }
 
 

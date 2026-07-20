@@ -37,22 +37,36 @@ require_once 'core.php';
 require_once 'helpers.php';
 require_once 'render.php';
 
-/** id строки реестра по адресу (kind, owner, element); null — адреса нет. */
-function model_label_registry_id(PgSql\Connection $db, string $kind, ?string $owner, string $element): ?int
+/**
+ * Адрес строки реестра (kind, owner, element) → честный результат:
+ * ok/id/error (обзор Chat 2026-07-20, п.7, db_select_result() вместо
+ * db_select()). Раньше «адреса нет» и «запрос не выполнился»
+ * неразличимо давали null, и save_all() (ниже) мог откатить транзакцию
+ * с ложной причиной «нет записи реестра для поля X» при обычном сбое
+ * запроса, а не при реальном рассинхроне формы с моделью. id=null при
+ * ok=true — легитимное отсутствие адреса (как и раньше); ok=false —
+ * запрос не выполнился, id тогда всегда null. Результат-массив, не
+ * исключение: в контуре обработки запроса исключений нет нигде
+ * (везде ok/errors), бросать здесь было бы чужеродно одному call site.
+ */
+function model_label_registry_id(PgSql\Connection $db, string $kind, ?string $owner, string $element): array
 {
     if ($owner === null) {
         $sql = 'SELECT id FROM ' . MODEL_REGISTRY_TABLE
              . ' WHERE data_kind = ? AND data_owner IS NULL AND data_element = ? AND active = 1';
-        $rows = db_select($db, $sql, 'ss', [$kind, $element]);
+        $result = db_select_result($db, $sql, 'ss', [$kind, $element]);
     } else {
         $sql = 'SELECT id FROM ' . MODEL_REGISTRY_TABLE
              . ' WHERE data_kind = ? AND data_owner = ? AND data_element = ? AND active = 1';
-        $rows = db_select($db, $sql, 'sss', [$kind, $owner, $element]);
+        $result = db_select_result($db, $sql, 'sss', [$kind, $owner, $element]);
     }
-    // Поведение при ошибке меняется явно: db_select() сводит ошибку к [],
-    // поэтому функция возвращает null так же, как при отсутствии адреса.
-    $row = $rows[0] ?? null;
-    return $row ? (int) $row['id'] : null;
+
+    if (!$result['ok']) {
+        return ['ok' => false, 'id' => null, 'error' => $result['error']];
+    }
+
+    $row = $result['rows'][0] ?? null;
+    return ['ok' => true, 'id' => $row ? (int) $row['id'] : null, 'error' => ''];
 }
 
 /** UPSERT подписи (1:1 с реестром). Пустые строки → NULL. */
@@ -100,10 +114,12 @@ function labels_dispatch(PgSql\Connection $db_connection): void
                 $saved = 0;
                 $fail_reason = null;
 
-                $t_id = model_label_registry_id($db_connection, 'table', null, $table);
-                if ($t_id !== null) {
+                $t_reg = model_label_registry_id($db_connection, 'table', null, $table);
+                if (!$t_reg['ok']) {
+                    $fail_reason = "проверка реестра для таблицы '$table' не удалась: {$t_reg['error']}";
+                } elseif ($t_reg['id'] !== null) {
                     if (model_label_save(
-                        $db_connection, $t_id,
+                        $db_connection, $t_reg['id'],
                         (string) ($_POST['t_short'] ?? ''),
                         (string) ($_POST['t_full'] ?? ''),
                         (string) ($_POST['t_template'] ?? '')
@@ -121,12 +137,16 @@ function labels_dispatch(PgSql\Connection $db_connection): void
                         break;
                     }
                     $element = (string) $element;
-                    $f_id = model_label_registry_id($db_connection, 'field', $table, $element);
-                    if ($f_id === null) {
+                    $f_reg = model_label_registry_id($db_connection, 'field', $table, $element);
+                    if (!$f_reg['ok']) {
+                        $fail_reason = "проверка реестра для поля '$element' не удалась: {$f_reg['error']}";
+                        break;
+                    }
+                    if ($f_reg['id'] === null) {
                         $fail_reason = "нет записи реестра для поля '$element'";
                         break;
                     }
-                    if (model_label_save($db_connection, $f_id, (string) $short, (string) ($f_full[$element] ?? ''), '')) {
+                    if (model_label_save($db_connection, $f_reg['id'], (string) $short, (string) ($f_full[$element] ?? ''), '')) {
                         $saved++;
                     } else {
                         $fail_reason = "подпись поля '$element'";

@@ -811,7 +811,10 @@ function render_configurator_page_open(?string $flash, bool $flash_ok, array $di
 {
     echo '<h1>Конфигуратор БД (v0)</h1>';
     echo render_admin_flash($flash, $flash_ok);
-    if (!($diag['clean'] ?? false) && $caction !== 'diagnose') {
+    if (($diag['error'] ?? '') !== '') {
+        $h = htmlspecialchars((string) $diag['error'], ENT_QUOTES, 'UTF-8');
+        echo '<div class="flash flash-err">Не удалось проверить состояние модели: ' . $h . '</div>';
+    } elseif (!($diag['clean'] ?? false) && $caction !== 'diagnose') {
         $n = count($diag['orphan_fields']) + count($diag['orphan_tables'])
            + count($diag['ghost_registry']) + count($diag['duplicates']);
         echo '<div class="flash flash-err">В структуре модели расхождений: ' . $n
@@ -1287,6 +1290,11 @@ function render_table_directory(array $snapshot, array $actions, array $opts = [
  */
 function render_model_diagnosis(array $diag): string
 {
+    if (($diag['error'] ?? '') !== '') {
+        $h = htmlspecialchars((string) $diag['error'], ENT_QUOTES, 'UTF-8');
+        return '<div class="flash flash-err">Не удалось проверить состояние модели: ' . $h . '</div>';
+    }
+
     if ($diag['clean'] ?? false) {
         return '<div class="flash flash-ok">Структура и реестр согласованы. Расхождений нет.</div>';
     }
