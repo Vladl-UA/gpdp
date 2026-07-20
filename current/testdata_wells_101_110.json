@@ -1,0 +1,2191 @@
+{
+  "well": [
+    {
+      "int_number": "101",
+      "date_done": "2021-12-13",
+      "voc_mr": "Тевлинско-Русскинская",
+      "voc_enterprise": "АО \"Сибирская буровая компания\"",
+      "voc_subsoiluser": "ЗАО \"Самара-Нафта\"",
+      "dec_depth": "2147",
+      "dec_temp": "73",
+      "dec_diam_col": "168",
+      "dec_diam_prev_col": "273",
+      "dec_depth_prev_col": "1449",
+      "dec_depth_usc": "1612",
+      "voc_usc": "МСЦ-168",
+      "voc_technolog": "Дорошенко",
+      "voc_status": "Завершена",
+      "productive_horizon": [
+        {
+          "data_formation": "ЮС12(2)",
+          "dec_depth_from": "2082",
+          "dec_depth_to": "2072",
+          "voc_fluid_type": "нефть+газ",
+          "bul_peretok": "0",
+          "akc_by_horizon": [
+            {
+              "dec_partial_casing_m": "177",
+              "dec_partial_rock_m": "376",
+              "dec_partial_casing_pct": "11.3",
+              "dec_partial_rock_pct": "61.5",
+              "dec_rigid_casing_m": "89",
+              "dec_rigid_rock_m": "586"
+            }
+          ]
+        },
+        {
+          "data_formation": "ЮС9",
+          "dec_depth_from": "1790",
+          "dec_depth_to": "1744",
+          "voc_fluid_type": "нефть+вода",
+          "bul_peretok": "0",
+          "akc_by_horizon": [
+            {
+              "dec_partial_casing_m": "183",
+              "dec_partial_rock_m": "458",
+              "dec_partial_casing_pct": "63.3",
+              "dec_partial_rock_pct": "39.4",
+              "dec_rigid_casing_m": "105",
+              "dec_rigid_rock_m": "112"
+            }
+          ]
+        },
+        {
+          "data_formation": "АС11(3)",
+          "dec_depth_from": "1658",
+          "dec_depth_to": "1617",
+          "voc_fluid_type": "нефть+вода",
+          "bul_peretok": "0",
+          "akc_by_horizon": [
+            {
+              "dec_partial_casing_m": "152",
+              "dec_partial_rock_m": "340",
+              "dec_partial_casing_pct": "88.4",
+              "dec_partial_rock_pct": "58.5",
+              "dec_rigid_casing_m": "524",
+              "dec_rigid_rock_m": "552"
+            }
+          ]
+        },
+        {
+          "data_formation": "ЮС11(3)",
+          "dec_depth_from": "1516",
+          "dec_depth_to": "1499",
+          "voc_fluid_type": "нефть+вода",
+          "bul_peretok": "0",
+          "akc_by_horizon": [
+            {
+              "dec_partial_casing_m": "211",
+              "dec_partial_rock_m": "16",
+              "dec_partial_casing_pct": "75.0",
+              "dec_partial_rock_pct": "48.5",
+              "dec_rigid_casing_m": "260",
+              "dec_rigid_rock_m": "512"
+            }
+          ]
+        }
+      ],
+      "cementing_stage": [
+        {
+          "int_stage_number": "1",
+          "dec_pressure_work": "9.4",
+          "dec_pressure_stop": "12.5",
+          "cementing_interval": [
+            {
+              "dec_depth_from": "2125",
+              "dec_depth_to": "1661",
+              "voc_material": "ПЦТ I-G-CC-1",
+              "dec_amount": "18.5",
+              "dec_volume_plan": "33.32",
+              "dec_volume_fact": "33.55",
+              "dec_density_plan": "1.8",
+              "dec_density_fact": "1.79",
+              "cementing_buffer": [
+                {
+                  "dec_volume": "3.6",
+                  "voc_composition": "КССБ",
+                  "dec_weight": "51"
+                }
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.85",
+                  "dec_spreadability": "250",
+                  "dec_temp_static": "74",
+                  "dec_temp_dynamic": "64",
+                  "dec_pressure": "317",
+                  "dec_thickening_time": "156",
+                  "data_setting_start": "2-31",
+                  "data_setting_end": "3-24",
+                  "dec_strength_bending": "6.0",
+                  "dec_strength_compress": "13.6",
+                  "dec_water_separation": "3.1",
+                  "dec_fluid_loss": "2255"
+                }
+              ],
+              "akc_by_material": [
+                {
+                  "dec_partial_casing_m": "202",
+                  "dec_partial_rock_m": "31",
+                  "dec_partial_casing_pct": "77.9",
+                  "dec_partial_rock_pct": "13.5",
+                  "dec_rigid_casing_m": "498",
+                  "dec_rigid_rock_m": "61"
+                }
+              ]
+            },
+            {
+              "dec_depth_from": "1661",
+              "dec_depth_to": "1302",
+              "voc_material": "РТМ-75 ПВ",
+              "dec_amount": "18.0",
+              "dec_volume_plan": "26.69",
+              "dec_volume_fact": "27.48",
+              "dec_density_plan": "1.42",
+              "dec_density_fact": "1.43",
+              "cementing_buffer": [
+                {
+                  "dec_volume": "2.7",
+                  "voc_composition": "МБП-М",
+                  "dec_weight": "72"
+                }
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.64",
+                  "dec_spreadability": "234",
+                  "dec_temp_static": "77",
+                  "dec_temp_dynamic": "57",
+                  "dec_pressure": "286",
+                  "dec_thickening_time": "220",
+                  "data_setting_start": "3-29",
+                  "data_setting_end": "3-57",
+                  "dec_strength_bending": "6.9",
+                  "dec_strength_compress": "9.0",
+                  "dec_water_separation": "2.0",
+                  "dec_fluid_loss": "897"
+                }
+              ],
+              "akc_by_material": [
+                {
+                  "dec_partial_casing_m": "238",
+                  "dec_partial_rock_m": "393",
+                  "dec_partial_casing_pct": "78.0",
+                  "dec_partial_rock_pct": "44.9",
+                  "dec_rigid_casing_m": "227",
+                  "dec_rigid_rock_m": "65"
+                }
+              ]
+            },
+            {
+              "dec_depth_from": "1302",
+              "dec_depth_to": "860",
+              "voc_material": "ОТМ-3",
+              "dec_amount": "29.5",
+              "dec_volume_plan": "17.22",
+              "dec_volume_fact": "17.15",
+              "dec_density_plan": "1.79",
+              "dec_density_fact": "1.8",
+              "cementing_buffer": [
+                {
+                  "dec_volume": "4.9",
+                  "voc_composition": "Буфер водный",
+                  "dec_weight": "145"
+                }
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.45",
+                  "dec_spreadability": "204",
+                  "dec_temp_static": "50",
+                  "dec_temp_dynamic": "47",
+                  "dec_pressure": "450",
+                  "dec_thickening_time": "228",
+                  "data_setting_start": "1-37",
+                  "data_setting_end": "4-22",
+                  "dec_strength_bending": "4.7",
+                  "dec_strength_compress": "12.6",
+                  "dec_water_separation": "2.2",
+                  "dec_fluid_loss": "716"
+                }
+              ],
+              "akc_by_material": [
+                {
+                  "dec_partial_casing_m": "360",
+                  "dec_partial_rock_m": "187",
+                  "dec_partial_casing_pct": "79.8",
+                  "dec_partial_rock_pct": "23.6",
+                  "dec_rigid_casing_m": "224",
+                  "dec_rigid_rock_m": "157"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "int_number": "102",
+      "date_done": "2024-09-02",
+      "voc_mr": "Самотлорская",
+      "voc_enterprise": "ООО \"Бурнефтесервис\"",
+      "voc_subsoiluser": "ООО \"Ватьеганнефть\"",
+      "dec_depth": "1897",
+      "dec_temp": "69",
+      "dec_diam_col": "178",
+      "dec_diam_prev_col": "273",
+      "dec_depth_prev_col": "1206",
+      "dec_depth_usc": "1067",
+      "voc_usc": "МСЦ-178",
+      "voc_technolog": "Назаров",
+      "voc_status": "Завершена",
+      "productive_horizon": [
+        {
+          "data_formation": "БС9(1)",
+          "dec_depth_from": "1654",
+          "dec_depth_to": "1598",
+          "voc_fluid_type": "нефть+вода",
+          "bul_peretok": "0",
+          "akc_by_horizon": [
+            {
+              "dec_partial_casing_m": "120",
+              "dec_partial_rock_m": "389",
+              "dec_partial_casing_pct": "63.7",
+              "dec_partial_rock_pct": "83.6",
+              "dec_rigid_casing_m": "576",
+              "dec_rigid_rock_m": "55"
+            }
+          ]
+        },
+        {
+          "data_formation": "АС11",
+          "dec_depth_from": "1421",
+          "dec_depth_to": "1384",
+          "voc_fluid_type": "нефть+вода",
+          "bul_peretok": "0",
+          "akc_by_horizon": [
+            {
+              "dec_partial_casing_m": "387",
+              "dec_partial_rock_m": "294",
+              "dec_partial_casing_pct": "10.2",
+              "dec_partial_rock_pct": "15.2",
+              "dec_rigid_casing_m": "176",
+              "dec_rigid_rock_m": "595"
+            }
+          ]
+        },
+        {
+          "data_formation": "АС11",
+          "dec_depth_from": "1244",
+          "dec_depth_to": "1199",
+          "voc_fluid_type": "нефть+газ",
+          "bul_peretok": "0",
+          "akc_by_horizon": [
+            {
+              "dec_partial_casing_m": "482",
+              "dec_partial_rock_m": "21",
+              "dec_partial_casing_pct": "41.3",
+              "dec_partial_rock_pct": "88.3",
+              "dec_rigid_casing_m": "519",
+              "dec_rigid_rock_m": "110"
+            }
+          ]
+        }
+      ],
+      "cementing_stage": [
+        {
+          "int_stage_number": "1",
+          "dec_pressure_work": "14.6",
+          "dec_pressure_stop": "18.5",
+          "cementing_interval": [
+            {
+              "dec_depth_from": "1845",
+              "dec_depth_to": "1390",
+              "voc_material": "ОТМ-5",
+              "dec_amount": "19.7",
+              "dec_volume_plan": "19.27",
+              "dec_volume_fact": "18.91",
+              "dec_density_plan": "1.52",
+              "dec_density_fact": "1.52",
+              "cementing_buffer": [
+                {
+                  "dec_volume": "4.1",
+                  "voc_composition": "НТФ",
+                  "dec_weight": "57"
+                }
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.68",
+                  "dec_spreadability": "256",
+                  "dec_temp_static": "76",
+                  "dec_temp_dynamic": "68",
+                  "dec_pressure": "302",
+                  "dec_thickening_time": "241",
+                  "data_setting_start": "3-58",
+                  "data_setting_end": "6-12",
+                  "dec_strength_bending": "7.4",
+                  "dec_strength_compress": "9.6",
+                  "dec_water_separation": "2.9",
+                  "dec_fluid_loss": "1206",
+                  "dec_linear_expansion": "15.4"
+                }
+              ],
+              "akc_by_material": [
+                {
+                  "dec_partial_casing_m": "334",
+                  "dec_partial_rock_m": "366",
+                  "dec_partial_casing_pct": "89.5",
+                  "dec_partial_rock_pct": "48.0",
+                  "dec_rigid_casing_m": "194",
+                  "dec_rigid_rock_m": "193"
+                }
+              ]
+            },
+            {
+              "dec_depth_from": "1390",
+              "dec_depth_to": "988",
+              "voc_material": "РТМ-100",
+              "dec_amount": "23.1",
+              "dec_volume_plan": "23.08",
+              "dec_volume_fact": "21.54",
+              "dec_density_plan": "1.74",
+              "dec_density_fact": "1.71",
+              "cementing_buffer": [
+                {
+                  "dec_volume": "2.5",
+                  "voc_composition": "МБП-С",
+                  "dec_weight": "80"
+                },
+                {
+                  "dec_volume": "1.7",
+                  "voc_composition": "МБП-С",
+                  "dec_weight": "146"
+                }
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.47",
+                  "dec_spreadability": "206",
+                  "dec_temp_static": "51",
+                  "dec_temp_dynamic": "45",
+                  "dec_pressure": "280",
+                  "dec_thickening_time": "206",
+                  "data_setting_start": "5-14",
+                  "data_setting_end": "7-30",
+                  "dec_strength_bending": "5.7",
+                  "dec_strength_compress": "9.8",
+                  "dec_water_separation": "2.3",
+                  "dec_fluid_loss": "1667",
+                  "dec_linear_expansion": "18.1"
+                }
+              ],
+              "akc_by_material": [
+                {
+                  "dec_partial_casing_m": "440",
+                  "dec_partial_rock_m": "400",
+                  "dec_partial_casing_pct": "71.6",
+                  "dec_partial_rock_pct": "51.2",
+                  "dec_rigid_casing_m": "230",
+                  "dec_rigid_rock_m": "355"
+                }
+              ]
+            },
+            {
+              "dec_depth_from": "988",
+              "dec_depth_to": "661",
+              "voc_material": "ОТМ-3",
+              "dec_amount": "12.0",
+              "dec_volume_plan": "34.18",
+              "dec_volume_fact": "31.66",
+              "dec_density_plan": "1.52",
+              "dec_density_fact": "1.5",
+              "cementing_buffer": [
+                {
+                  "dec_volume": "2.6",
+                  "voc_composition": "МБП-С",
+                  "dec_weight": "70"
+                }
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.68",
+                  "dec_spreadability": "231",
+                  "dec_temp_static": "88",
+                  "dec_temp_dynamic": "61",
+                  "dec_pressure": "302",
+                  "dec_thickening_time": "203",
+                  "data_setting_start": "6-42",
+                  "data_setting_end": "8-34",
+                  "dec_strength_bending": "6.8",
+                  "dec_strength_compress": "9.1",
+                  "dec_water_separation": "3.3",
+                  "dec_fluid_loss": "1335",
+                  "dec_linear_expansion": "18.3"
+                }
+              ],
+              "akc_by_material": [
+                {
+                  "dec_partial_casing_m": "453",
+                  "dec_partial_rock_m": "128",
+                  "dec_partial_casing_pct": "24.4",
+                  "dec_partial_rock_pct": "33.7",
+                  "dec_rigid_casing_m": "238",
+                  "dec_rigid_rock_m": "417"
+                }
+              ]
+            }
+          ],
+          "cementing_reper": [
+            {
+              "dec_volume": "4.2",
+              "dec_density": "1.46",
+              "cementing_reper_component": [
+                {
+                  "voc_component": "Сульфацелл"
+                },
+                {
+                  "voc_component": "ПЦТ-G-CC-1",
+                  "dec_amount": "1.63"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "int_stage_number": "2",
+          "dec_pressure_work": "11.4",
+          "dec_pressure_stop": "15.6",
+          "cementing_interval": [
+            {
+              "dec_depth_from": "661",
+              "dec_depth_to": "409",
+              "voc_material": "РТМ-75",
+              "dec_amount": "20.9",
+              "dec_volume_plan": "19.21",
+              "dec_volume_fact": "18.35",
+              "dec_density_plan": "1.71",
+              "dec_density_fact": "1.72",
+              "cementing_buffer": [
+                {
+                  "dec_volume": "3.4",
+                  "voc_composition": "КССБ",
+                  "dec_weight": "134"
+                }
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.54",
+                  "dec_spreadability": "202",
+                  "dec_temp_static": "71",
+                  "dec_temp_dynamic": "45",
+                  "dec_pressure": "305",
+                  "dec_thickening_time": "121",
+                  "data_setting_start": "2-43",
+                  "data_setting_end": "5-22",
+                  "dec_strength_bending": "1.7",
+                  "dec_strength_compress": "6.4",
+                  "dec_water_separation": "2.4",
+                  "dec_fluid_loss": "2815"
+                }
+              ],
+              "akc_by_material": [
+                {
+                  "dec_partial_casing_m": "68",
+                  "dec_partial_rock_m": "190",
+                  "dec_partial_casing_pct": "62.7",
+                  "dec_partial_rock_pct": "74.5",
+                  "dec_rigid_casing_m": "186",
+                  "dec_rigid_rock_m": "82"
+                }
+              ]
+            }
+          ],
+          "cementing_reper": [
+            {
+              "dec_volume": "4.3",
+              "dec_density": "1.57",
+              "cementing_reper_component": [
+                {
+                  "voc_component": "Гипан"
+                },
+                {
+                  "voc_component": "ПЦТ-G-CC-1",
+                  "dec_amount": "0.91"
+                },
+                {
+                  "voc_component": "ПЦТ-G-CC-1",
+                  "dec_amount": "0.66"
+                },
+                {
+                  "voc_component": "КМЦ",
+                  "dec_amount": "1.9"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "int_number": "103",
+      "date_done": "2023-11-17",
+      "voc_mr": "Мамуринская",
+      "voc_enterprise": "ООО \"ГеоБурСервис\"",
+      "voc_subsoiluser": "ЗАО \"Самара-Нафта\"",
+      "dec_depth": "2936",
+      "dec_temp": "85",
+      "dec_diam_col": "146",
+      "dec_diam_prev_col": "219",
+      "dec_depth_prev_col": "1757",
+      "dec_depth_usc": "1850",
+      "voc_usc": "МСЦ-146",
+      "voc_technolog": "Бельский",
+      "voc_status": "Завершена",
+      "productive_horizon": [
+        {
+          "data_formation": "ЮС8",
+          "dec_depth_from": "2759",
+          "dec_depth_to": "2740",
+          "voc_fluid_type": "нефть+газ",
+          "bul_peretok": "0",
+          "akc_by_horizon": [
+            {
+              "dec_partial_casing_m": "120",
+              "dec_partial_rock_m": "499",
+              "dec_partial_casing_pct": "23.6",
+              "dec_partial_rock_pct": "89.0",
+              "dec_rigid_casing_m": "87",
+              "dec_rigid_rock_m": "99"
+            }
+          ]
+        },
+        {
+          "data_formation": "АС9",
+          "dec_depth_from": "2623",
+          "dec_depth_to": "2577",
+          "voc_fluid_type": "нефть+газ",
+          "bul_peretok": "1",
+          "akc_by_horizon": [
+            {
+              "dec_partial_casing_m": "29",
+              "dec_partial_rock_m": "289",
+              "dec_partial_casing_pct": "80.3",
+              "dec_partial_rock_pct": "36.5",
+              "dec_rigid_casing_m": "60",
+              "dec_rigid_rock_m": "58"
+            }
+          ]
+        },
+        {
+          "data_formation": "АС10",
+          "dec_depth_from": "2443",
+          "dec_depth_to": "2387",
+          "voc_fluid_type": "нефть",
+          "bul_peretok": "1",
+          "akc_by_horizon": [
+            {
+              "dec_partial_casing_m": "89",
+              "dec_partial_rock_m": "284",
+              "dec_partial_casing_pct": "57.5",
+              "dec_partial_rock_pct": "15.0",
+              "dec_rigid_casing_m": "252",
+              "dec_rigid_rock_m": "283"
+            }
+          ]
+        },
+        {
+          "data_formation": "ЮС11",
+          "dec_depth_from": "2268",
+          "dec_depth_to": "2248",
+          "voc_fluid_type": "нефть",
+          "bul_peretok": "1",
+          "akc_by_horizon": [
+            {
+              "dec_partial_casing_m": "119",
+              "dec_partial_rock_m": "372",
+              "dec_partial_casing_pct": "88.0",
+              "dec_partial_rock_pct": "18.8",
+              "dec_rigid_casing_m": "99",
+              "dec_rigid_rock_m": "176"
+            }
+          ]
+        },
+        {
+          "data_formation": "АС11",
+          "dec_depth_from": "2169",
+          "dec_depth_to": "2146",
+          "voc_fluid_type": "нефть+вода",
+          "bul_peretok": "1",
+          "akc_by_horizon": [
+            {
+              "dec_partial_casing_m": "496",
+              "dec_partial_rock_m": "126",
+              "dec_partial_casing_pct": "63.0",
+              "dec_partial_rock_pct": "51.3",
+              "dec_rigid_casing_m": "135",
+              "dec_rigid_rock_m": "582"
+            }
+          ]
+        }
+      ],
+      "cementing_stage": [
+        {
+          "int_stage_number": "1",
+          "dec_pressure_work": "16.7",
+          "dec_pressure_stop": "21.6",
+          "cementing_interval": [
+            {
+              "dec_depth_from": "2923",
+              "dec_depth_to": "2280",
+              "voc_material": "РТМ-75 ПВ",
+              "dec_amount": "16.2",
+              "dec_volume_plan": "28.39",
+              "dec_volume_fact": "28.15",
+              "dec_density_plan": "1.8",
+              "dec_density_fact": "1.8",
+              "cementing_buffer": [
+                {
+                  "dec_volume": "2.2",
+                  "voc_composition": "МБП-СМ",
+                  "dec_weight": "106"
+                }
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.79",
+                  "dec_spreadability": "253",
+                  "dec_temp_static": "70",
+                  "dec_temp_dynamic": "52",
+                  "dec_pressure": "307",
+                  "dec_thickening_time": "188",
+                  "data_setting_start": "3-54",
+                  "data_setting_end": "5-26",
+                  "dec_strength_bending": "6.0",
+                  "dec_strength_compress": "8.1",
+                  "dec_water_separation": "2.0",
+                  "dec_fluid_loss": "1076",
+                  "dec_linear_expansion": "18.3"
+                }
+              ],
+              "akc_by_material": [
+                {
+                  "dec_partial_casing_m": "112",
+                  "dec_partial_rock_m": "231",
+                  "dec_partial_casing_pct": "16.1",
+                  "dec_partial_rock_pct": "84.1",
+                  "dec_rigid_casing_m": "460",
+                  "dec_rigid_rock_m": "546"
+                }
+              ]
+            },
+            {
+              "dec_depth_from": "2280",
+              "dec_depth_to": "1990",
+              "voc_material": "РТМ-75 ПВ",
+              "dec_amount": "28.0",
+              "dec_volume_plan": "9.86",
+              "dec_volume_fact": "10.06",
+              "dec_density_plan": "1.24",
+              "dec_density_fact": "1.26",
+              "cementing_buffer": [
+                {
+                  "dec_volume": "4.2",
+                  "voc_composition": "МБП-С",
+                  "dec_weight": "197"
+                }
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.55",
+                  "dec_spreadability": "215",
+                  "dec_temp_static": "60",
+                  "dec_temp_dynamic": "57",
+                  "dec_pressure": "256",
+                  "dec_thickening_time": "242",
+                  "data_setting_start": "3-32",
+                  "data_setting_end": "6-24",
+                  "dec_strength_bending": "5.7",
+                  "dec_strength_compress": "13.4",
+                  "dec_water_separation": "0.8",
+                  "dec_fluid_loss": "1090",
+                  "dec_linear_expansion": "12.6"
+                }
+              ],
+              "akc_by_material": [
+                {
+                  "dec_partial_casing_m": "187",
+                  "dec_partial_rock_m": "495",
+                  "dec_partial_casing_pct": "55.8",
+                  "dec_partial_rock_pct": "33.7",
+                  "dec_rigid_casing_m": "583",
+                  "dec_rigid_rock_m": "184"
+                }
+              ]
+            },
+            {
+              "dec_depth_from": "1990",
+              "dec_depth_to": "1155",
+              "voc_material": "ПЦТ I-G-CC-1",
+              "dec_amount": "20.9",
+              "dec_volume_plan": "13.67",
+              "dec_volume_fact": "14.26",
+              "dec_density_plan": "1.61",
+              "dec_density_fact": "1.61",
+              "cementing_buffer": [
+                {
+                  "dec_volume": "4.1",
+                  "voc_composition": "МБП-М",
+                  "dec_weight": "124"
+                }
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.62",
+                  "dec_spreadability": "240",
+                  "dec_temp_static": "64",
+                  "dec_temp_dynamic": "56",
+                  "dec_pressure": "332",
+                  "dec_thickening_time": "248",
+                  "data_setting_start": "1-18",
+                  "data_setting_end": "3-52",
+                  "dec_strength_bending": "6.4",
+                  "dec_strength_compress": "12.5",
+                  "dec_water_separation": "1.2",
+                  "dec_fluid_loss": "2983"
+                }
+              ],
+              "akc_by_material": [
+                {
+                  "dec_partial_casing_m": "499",
+                  "dec_partial_rock_m": "405",
+                  "dec_partial_casing_pct": "34.5",
+                  "dec_partial_rock_pct": "79.4",
+                  "dec_rigid_casing_m": "94",
+                  "dec_rigid_rock_m": "72"
+                }
+              ]
+            }
+          ],
+          "cementing_reper": [
+            {
+              "dec_volume": "2.6",
+              "dec_density": "1.56",
+              "cementing_reper_component": [
+                {
+                  "voc_component": "Полицем"
+                },
+                {
+                  "voc_component": "Гипан",
+                  "dec_amount": "0.83"
+                },
+                {
+                  "voc_component": "Гипан",
+                  "dec_amount": "0.52"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "int_number": "104",
+      "date_done": "2020-06-24",
+      "voc_mr": "Приобская",
+      "voc_enterprise": "ООО \"ГеоБурСервис\"",
+      "voc_subsoiluser": "ООО \"Ватьеганнефть\"",
+      "dec_depth": "2830",
+      "dec_temp": "84",
+      "dec_diam_col": "178",
+      "dec_diam_prev_col": "324",
+      "dec_depth_prev_col": "1896",
+      "dec_depth_usc": "1899",
+      "voc_usc": "МСЦ-178",
+      "voc_technolog": "Ковалёв",
+      "voc_status": "Завершена",
+      "ltext_remark": "Отклонение по плотности в пределах допуска.",
+      "productive_horizon": [
+        {
+          "data_formation": "ЮС8",
+          "dec_depth_from": "2673",
+          "dec_depth_to": "2656",
+          "voc_fluid_type": "нефть+газ",
+          "bul_peretok": "0",
+          "akc_by_horizon": [
+            {
+              "dec_partial_casing_m": "130",
+              "dec_partial_rock_m": "37",
+              "dec_partial_casing_pct": "10.0",
+              "dec_partial_rock_pct": "78.0",
+              "dec_rigid_casing_m": "537",
+              "dec_rigid_rock_m": "80"
+            }
+          ]
+        },
+        {
+          "data_formation": "АС9(1)",
+          "dec_depth_from": "2577",
+          "dec_depth_to": "2523",
+          "voc_fluid_type": "нефть+газ",
+          "bul_peretok": "0",
+          "akc_by_horizon": [
+            {
+              "dec_partial_casing_m": "134",
+              "dec_partial_rock_m": "261",
+              "dec_partial_casing_pct": "10.3",
+              "dec_partial_rock_pct": "25.8",
+              "dec_rigid_casing_m": "24",
+              "dec_rigid_rock_m": "564"
+            }
+          ]
+        },
+        {
+          "data_formation": "БС8",
+          "dec_depth_from": "2432",
+          "dec_depth_to": "2409",
+          "voc_fluid_type": "нефть+вода",
+          "bul_peretok": "0",
+          "akc_by_horizon": [
+            {
+              "dec_partial_casing_m": "173",
+              "dec_partial_rock_m": "186",
+              "dec_partial_casing_pct": "82.4",
+              "dec_partial_rock_pct": "14.6",
+              "dec_rigid_casing_m": "96",
+              "dec_rigid_rock_m": "64"
+            }
+          ]
+        },
+        {
+          "data_formation": "ЮС11",
+          "dec_depth_from": "2135",
+          "dec_depth_to": "2093",
+          "voc_fluid_type": "нефть+вода",
+          "bul_peretok": "0",
+          "akc_by_horizon": [
+            {
+              "dec_partial_casing_m": "279",
+              "dec_partial_rock_m": "118",
+              "dec_partial_casing_pct": "18.9",
+              "dec_partial_rock_pct": "48.2",
+              "dec_rigid_casing_m": "404",
+              "dec_rigid_rock_m": "542"
+            }
+          ]
+        }
+      ],
+      "cementing_stage": [
+        {
+          "int_stage_number": "1",
+          "dec_pressure_work": "19.8",
+          "dec_pressure_stop": "23.9",
+          "cementing_interval": [
+            {
+              "dec_depth_from": "2829",
+              "dec_depth_to": "2015",
+              "voc_material": "ОТМ-5",
+              "dec_amount": "28.5",
+              "dec_volume_plan": "11.0",
+              "dec_volume_fact": "11.58",
+              "dec_density_plan": "1.3",
+              "dec_density_fact": "1.3",
+              "cementing_buffer": [
+                {
+                  "dec_volume": "1.3",
+                  "voc_composition": "КССБ",
+                  "dec_weight": "187"
+                }
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.6",
+                  "dec_spreadability": "217",
+                  "dec_temp_static": "87",
+                  "dec_temp_dynamic": "48",
+                  "dec_pressure": "337",
+                  "dec_thickening_time": "188",
+                  "data_setting_start": "4-03",
+                  "data_setting_end": "5-00",
+                  "dec_strength_bending": "3.8",
+                  "dec_strength_compress": "10.0",
+                  "dec_water_separation": "1.8",
+                  "dec_fluid_loss": "415"
+                }
+              ],
+              "akc_by_material": [
+                {
+                  "dec_partial_casing_m": "224",
+                  "dec_partial_rock_m": "78",
+                  "dec_partial_casing_pct": "40.6",
+                  "dec_partial_rock_pct": "27.5",
+                  "dec_rigid_casing_m": "190",
+                  "dec_rigid_rock_m": "463"
+                }
+              ]
+            },
+            {
+              "dec_depth_from": "2015",
+              "dec_depth_to": "1298",
+              "voc_material": "ПЦТ I-G-CC-1",
+              "dec_amount": "20.2",
+              "dec_volume_plan": "19.56",
+              "dec_volume_fact": "20.18",
+              "dec_density_plan": "1.32",
+              "dec_density_fact": "1.31",
+              "cementing_buffer": [
+                {
+                  "dec_volume": "4.1",
+                  "voc_composition": "МБП-С",
+                  "dec_weight": "179"
+                }
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.66",
+                  "dec_spreadability": "248",
+                  "dec_temp_static": "83",
+                  "dec_temp_dynamic": "62",
+                  "dec_pressure": "332",
+                  "dec_thickening_time": "258",
+                  "data_setting_start": "4-53",
+                  "data_setting_end": "7-41",
+                  "dec_strength_bending": "5.5",
+                  "dec_strength_compress": "8.9",
+                  "dec_water_separation": "0.4",
+                  "dec_fluid_loss": "820"
+                }
+              ],
+              "akc_by_material": [
+                {
+                  "dec_partial_casing_m": "209",
+                  "dec_partial_rock_m": "144",
+                  "dec_partial_casing_pct": "88.2",
+                  "dec_partial_rock_pct": "13.1",
+                  "dec_rigid_casing_m": "349",
+                  "dec_rigid_rock_m": "369"
+                }
+              ]
+            }
+          ],
+          "cementing_reper": [
+            {
+              "dec_volume": "4.1",
+              "dec_density": "1.5",
+              "cementing_reper_component": [
+                {
+                  "voc_component": "Полицем"
+                },
+                {
+                  "voc_component": "ПЦТ-G-CC-1",
+                  "dec_amount": "0.13"
+                },
+                {
+                  "voc_component": "CFL-110",
+                  "dec_amount": "1.68"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "int_stage_number": "2",
+          "dec_pressure_work": "18.2",
+          "dec_pressure_stop": "22.0",
+          "cementing_interval": [
+            {
+              "dec_depth_from": "1298",
+              "dec_depth_to": "512",
+              "voc_material": "ОТМ-3",
+              "dec_amount": "9.5",
+              "dec_volume_plan": "32.69",
+              "dec_volume_fact": "33.32",
+              "dec_density_plan": "1.93",
+              "dec_density_fact": "1.91",
+              "cementing_buffer": [
+                {
+                  "dec_volume": "1.1",
+                  "voc_composition": "НТФ",
+                  "dec_weight": "111"
+                }
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.83",
+                  "dec_spreadability": "205",
+                  "dec_temp_static": "53",
+                  "dec_temp_dynamic": "48",
+                  "dec_pressure": "313",
+                  "dec_thickening_time": "94",
+                  "data_setting_start": "2-34",
+                  "data_setting_end": "3-41",
+                  "dec_strength_bending": "2.2",
+                  "dec_strength_compress": "12.8",
+                  "dec_water_separation": "0.5",
+                  "dec_fluid_loss": "633"
+                }
+              ],
+              "akc_by_material": [
+                {
+                  "dec_partial_casing_m": "469",
+                  "dec_partial_rock_m": "175",
+                  "dec_partial_casing_pct": "20.2",
+                  "dec_partial_rock_pct": "46.0",
+                  "dec_rigid_casing_m": "72",
+                  "dec_rigid_rock_m": "548"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "int_number": "105",
+      "date_done": "2020-07-28",
+      "voc_mr": "Самотлорская",
+      "voc_enterprise": "ООО \"Западбурнефть\"",
+      "voc_subsoiluser": "ЗАО \"Самара-Нафта\"",
+      "dec_depth": "1801",
+      "dec_temp": "68",
+      "dec_diam_col": "168",
+      "dec_diam_prev_col": "324",
+      "dec_depth_prev_col": "1075",
+      "dec_depth_usc": "1206",
+      "voc_usc": "МСЦ-168",
+      "voc_technolog": "Ковалёв",
+      "voc_status": "Завершена",
+      "productive_horizon": [
+        {
+          "data_formation": "БС8",
+          "dec_depth_from": "1585",
+          "dec_depth_to": "1535",
+          "voc_fluid_type": "нефть+вода",
+          "bul_peretok": "0",
+          "akc_by_horizon": [
+            {
+              "dec_partial_casing_m": "313",
+              "dec_partial_rock_m": "110",
+              "dec_partial_casing_pct": "28.6",
+              "dec_partial_rock_pct": "45.9",
+              "dec_rigid_casing_m": "58",
+              "dec_rigid_rock_m": "160"
+            }
+          ]
+        },
+        {
+          "data_formation": "АС12",
+          "dec_depth_from": "1451",
+          "dec_depth_to": "1414",
+          "voc_fluid_type": "нефть",
+          "bul_peretok": "0",
+          "akc_by_horizon": [
+            {
+              "dec_partial_casing_m": "192",
+              "dec_partial_rock_m": "125",
+              "dec_partial_casing_pct": "68.5",
+              "dec_partial_rock_pct": "79.8",
+              "dec_rigid_casing_m": "25",
+              "dec_rigid_rock_m": "547"
+            }
+          ]
+        },
+        {
+          "data_formation": "БС9",
+          "dec_depth_from": "1210",
+          "dec_depth_to": "1175",
+          "voc_fluid_type": "нефть",
+          "bul_peretok": "0",
+          "akc_by_horizon": [
+            {
+              "dec_partial_casing_m": "134",
+              "dec_partial_rock_m": "280",
+              "dec_partial_casing_pct": "81.3",
+              "dec_partial_rock_pct": "87.1",
+              "dec_rigid_casing_m": "242",
+              "dec_rigid_rock_m": "421"
+            }
+          ]
+        },
+        {
+          "data_formation": "АС12(2)",
+          "dec_depth_from": "1062",
+          "dec_depth_to": "1022",
+          "voc_fluid_type": "нефть+газ",
+          "bul_peretok": "0",
+          "akc_by_horizon": [
+            {
+              "dec_partial_casing_m": "400",
+              "dec_partial_rock_m": "25",
+              "dec_partial_casing_pct": "63.7",
+              "dec_partial_rock_pct": "49.3",
+              "dec_rigid_casing_m": "431",
+              "dec_rigid_rock_m": "465"
+            }
+          ]
+        }
+      ],
+      "cementing_stage": [
+        {
+          "int_stage_number": "1",
+          "dec_pressure_work": "10.3",
+          "dec_pressure_stop": "15.2",
+          "cementing_interval": [
+            {
+              "dec_depth_from": "1697",
+              "dec_depth_to": "1302",
+              "voc_material": "ПЦТ I-G-CC-1",
+              "dec_amount": "25.4",
+              "dec_volume_plan": "8.47",
+              "dec_volume_fact": "8.41",
+              "dec_density_plan": "1.33",
+              "dec_density_fact": "1.33",
+              "cementing_buffer": [
+                {
+                  "dec_volume": "2.2",
+                  "voc_composition": "НТФ",
+                  "dec_weight": "66"
+                }
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.86",
+                  "dec_spreadability": "225",
+                  "dec_temp_static": "65",
+                  "dec_temp_dynamic": "48",
+                  "dec_pressure": "363",
+                  "dec_thickening_time": "134",
+                  "data_setting_start": "2-56",
+                  "data_setting_end": "3-18",
+                  "dec_strength_bending": "4.2",
+                  "dec_strength_compress": "10.0",
+                  "dec_water_separation": "2.0",
+                  "dec_fluid_loss": "640"
+                }
+              ],
+              "akc_by_material": [
+                {
+                  "dec_partial_casing_m": "125",
+                  "dec_partial_rock_m": "487",
+                  "dec_partial_casing_pct": "70.1",
+                  "dec_partial_rock_pct": "43.0",
+                  "dec_rigid_casing_m": "162",
+                  "dec_rigid_rock_m": "24"
+                }
+              ]
+            },
+            {
+              "dec_depth_from": "1302",
+              "dec_depth_to": "926",
+              "voc_material": "РТМ-100",
+              "dec_amount": "20.0",
+              "dec_volume_plan": "9.47",
+              "dec_volume_fact": "9.52",
+              "dec_density_plan": "1.54",
+              "dec_density_fact": "1.51",
+              "cementing_buffer": [
+                {
+                  "dec_volume": "1.3",
+                  "voc_composition": "КССБ",
+                  "dec_weight": "85"
+                }
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.87",
+                  "dec_spreadability": "205",
+                  "dec_temp_static": "71",
+                  "dec_temp_dynamic": "50",
+                  "dec_pressure": "355",
+                  "dec_thickening_time": "173",
+                  "data_setting_start": "4-59",
+                  "data_setting_end": "7-44",
+                  "dec_strength_bending": "6.3",
+                  "dec_strength_compress": "9.2",
+                  "dec_water_separation": "3.3",
+                  "dec_fluid_loss": "1141",
+                  "dec_linear_expansion": "10.4"
+                }
+              ],
+              "akc_by_material": [
+                {
+                  "dec_partial_casing_m": "45",
+                  "dec_partial_rock_m": "490",
+                  "dec_partial_casing_pct": "17.0",
+                  "dec_partial_rock_pct": "17.8",
+                  "dec_rigid_casing_m": "346",
+                  "dec_rigid_rock_m": "174"
+                }
+              ]
+            },
+            {
+              "dec_depth_from": "926",
+              "dec_depth_to": "469",
+              "voc_material": "ОТМ-3",
+              "dec_amount": "23.0",
+              "dec_volume_plan": "17.63",
+              "dec_volume_fact": "17.23",
+              "dec_density_plan": "1.46",
+              "dec_density_fact": "1.45",
+              "cementing_buffer": [
+                {
+                  "dec_volume": "3.1",
+                  "voc_composition": "МБП-СМ",
+                  "dec_weight": "152"
+                },
+                {
+                  "dec_volume": "1.1",
+                  "voc_composition": "Буфер водный",
+                  "dec_weight": "193"
+                }
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.68",
+                  "dec_spreadability": "217",
+                  "dec_temp_static": "77",
+                  "dec_temp_dynamic": "51",
+                  "dec_pressure": "397",
+                  "dec_thickening_time": "97",
+                  "data_setting_start": "1-50",
+                  "data_setting_end": "3-12",
+                  "dec_strength_bending": "2.2",
+                  "dec_strength_compress": "10.5",
+                  "dec_water_separation": "1.7",
+                  "dec_fluid_loss": "1806",
+                  "dec_linear_expansion": "17.4"
+                }
+              ],
+              "akc_by_material": [
+                {
+                  "dec_partial_casing_m": "434",
+                  "dec_partial_rock_m": "230",
+                  "dec_partial_casing_pct": "78.2",
+                  "dec_partial_rock_pct": "86.0",
+                  "dec_rigid_casing_m": "460",
+                  "dec_rigid_rock_m": "299"
+                }
+              ]
+            }
+          ],
+          "cementing_reper": [
+            {
+              "dec_volume": "4.1",
+              "dec_density": "1.58",
+              "cementing_reper_component": [
+                {
+                  "voc_component": "CFL-110"
+                },
+                {
+                  "voc_component": "НТФ",
+                  "dec_amount": "0.24"
+                },
+                {
+                  "voc_component": "ПЦТ III-Об",
+                  "dec_amount": "0.79"
+                },
+                {
+                  "voc_component": "Сульфацелл",
+                  "dec_amount": "0.43"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "int_number": "106",
+      "date_done": "2021-01-20",
+      "voc_mr": "Тевлинско-Русскинская",
+      "voc_enterprise": "ООО \"Западбурнефть\"",
+      "voc_subsoiluser": "ООО \"Ватьеганнефть\"",
+      "dec_depth": "3774",
+      "dec_temp": "98",
+      "dec_diam_col": "168",
+      "dec_diam_prev_col": "245",
+      "dec_depth_prev_col": "1171",
+      "dec_depth_usc": "2122",
+      "voc_usc": "МСЦ-168",
+      "voc_technolog": "Назаров",
+      "voc_status": "Завершена",
+      "productive_horizon": [
+        {
+          "data_formation": "ЮС8(1)",
+          "dec_depth_from": "3670",
+          "dec_depth_to": "3611",
+          "voc_fluid_type": "нефть+газ",
+          "bul_peretok": "0",
+          "akc_by_horizon": [
+            {
+              "dec_partial_casing_m": "178",
+              "dec_partial_rock_m": "350",
+              "dec_partial_casing_pct": "55.0",
+              "dec_partial_rock_pct": "79.2",
+              "dec_rigid_casing_m": "147",
+              "dec_rigid_rock_m": "36"
+            }
+          ]
+        },
+        {
+          "data_formation": "БС8",
+          "dec_depth_from": "3445",
+          "dec_depth_to": "3394",
+          "voc_fluid_type": "нефть",
+          "bul_peretok": "0",
+          "akc_by_horizon": [
+            {
+              "dec_partial_casing_m": "153",
+              "dec_partial_rock_m": "243",
+              "dec_partial_casing_pct": "52.3",
+              "dec_partial_rock_pct": "84.3",
+              "dec_rigid_casing_m": "295",
+              "dec_rigid_rock_m": "441"
+            }
+          ]
+        },
+        {
+          "data_formation": "АС8",
+          "dec_depth_from": "3236",
+          "dec_depth_to": "3183",
+          "voc_fluid_type": "нефть+газ",
+          "bul_peretok": "0",
+          "akc_by_horizon": [
+            {
+              "dec_partial_casing_m": "381",
+              "dec_partial_rock_m": "298",
+              "dec_partial_casing_pct": "54.5",
+              "dec_partial_rock_pct": "51.3",
+              "dec_rigid_casing_m": "475",
+              "dec_rigid_rock_m": "516"
+            }
+          ]
+        },
+        {
+          "data_formation": "БС11",
+          "dec_depth_from": "3109",
+          "dec_depth_to": "3087",
+          "voc_fluid_type": "нефть+вода",
+          "bul_peretok": "0",
+          "akc_by_horizon": [
+            {
+              "dec_partial_casing_m": "13",
+              "dec_partial_rock_m": "61",
+              "dec_partial_casing_pct": "85.0",
+              "dec_partial_rock_pct": "16.8",
+              "dec_rigid_casing_m": "288",
+              "dec_rigid_rock_m": "175"
+            }
+          ]
+        }
+      ],
+      "cementing_stage": [
+        {
+          "int_stage_number": "1",
+          "dec_pressure_work": "12.8",
+          "dec_pressure_stop": "16.6",
+          "cementing_interval": [
+            {
+              "dec_depth_from": "3672",
+              "dec_depth_to": "3253",
+              "voc_material": "РТМ-75",
+              "dec_amount": "11.8",
+              "dec_volume_plan": "32.66",
+              "dec_volume_fact": "32.43",
+              "dec_density_plan": "1.24",
+              "dec_density_fact": "1.24",
+              "cementing_buffer": [
+                {
+                  "dec_volume": "4.6",
+                  "voc_composition": "МБП-СМ",
+                  "dec_weight": "46"
+                }
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.39",
+                  "dec_spreadability": "218",
+                  "dec_temp_static": "67",
+                  "dec_temp_dynamic": "46",
+                  "dec_pressure": "292",
+                  "dec_thickening_time": "159",
+                  "data_setting_start": "4-50",
+                  "data_setting_end": "6-28",
+                  "dec_strength_bending": "2.7",
+                  "dec_strength_compress": "9.2",
+                  "dec_water_separation": "2.0",
+                  "dec_fluid_loss": "829",
+                  "dec_linear_expansion": "13.6"
+                }
+              ],
+              "akc_by_material": [
+                {
+                  "dec_partial_casing_m": "452",
+                  "dec_partial_rock_m": "383",
+                  "dec_partial_casing_pct": "61.2",
+                  "dec_partial_rock_pct": "43.8",
+                  "dec_rigid_casing_m": "581",
+                  "dec_rigid_rock_m": "222"
+                }
+              ]
+            },
+            {
+              "dec_depth_from": "3253",
+              "dec_depth_to": "2500",
+              "voc_material": "РТМ-75",
+              "dec_amount": "21.4",
+              "dec_volume_plan": "11.9",
+              "dec_volume_fact": "11.27",
+              "dec_density_plan": "1.79",
+              "dec_density_fact": "1.81",
+              "cementing_buffer": [
+                {
+                  "dec_volume": "4.3",
+                  "voc_composition": "Буфер водный",
+                  "dec_weight": "46"
+                },
+                {
+                  "dec_volume": "3.5",
+                  "voc_composition": "КССБ",
+                  "dec_weight": "183"
+                }
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.42",
+                  "dec_spreadability": "217",
+                  "dec_temp_static": "68",
+                  "dec_temp_dynamic": "56",
+                  "dec_pressure": "392",
+                  "dec_thickening_time": "194",
+                  "data_setting_start": "2-13",
+                  "data_setting_end": "4-29",
+                  "dec_strength_bending": "7.1",
+                  "dec_strength_compress": "13.4",
+                  "dec_water_separation": "2.4",
+                  "dec_fluid_loss": "1027",
+                  "dec_linear_expansion": "5.2"
+                }
+              ],
+              "akc_by_material": [
+                {
+                  "dec_partial_casing_m": "391",
+                  "dec_partial_rock_m": "284",
+                  "dec_partial_casing_pct": "15.8",
+                  "dec_partial_rock_pct": "34.3",
+                  "dec_rigid_casing_m": "165",
+                  "dec_rigid_rock_m": "160"
+                }
+              ]
+            },
+            {
+              "dec_depth_from": "2500",
+              "dec_depth_to": "2120",
+              "voc_material": "ЦТРО-1",
+              "dec_amount": "16.5",
+              "dec_volume_plan": "33.42",
+              "dec_volume_fact": "35.37",
+              "dec_density_plan": "1.45",
+              "dec_density_fact": "1.42",
+              "cementing_buffer": [
+                {
+                  "dec_volume": "1.9",
+                  "voc_composition": "Буфер водный",
+                  "dec_weight": "157"
+                },
+                {
+                  "dec_volume": "3.2",
+                  "voc_composition": "МБП-СМ",
+                  "dec_weight": "20"
+                }
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.88",
+                  "dec_spreadability": "225",
+                  "dec_temp_static": "72",
+                  "dec_temp_dynamic": "46",
+                  "dec_pressure": "414",
+                  "dec_thickening_time": "190",
+                  "data_setting_start": "3-08",
+                  "data_setting_end": "6-00",
+                  "dec_strength_bending": "2.1",
+                  "dec_strength_compress": "8.2",
+                  "dec_water_separation": "2.2",
+                  "dec_fluid_loss": "477",
+                  "dec_linear_expansion": "18.3"
+                }
+              ],
+              "akc_by_material": [
+                {
+                  "dec_partial_casing_m": "456",
+                  "dec_partial_rock_m": "160",
+                  "dec_partial_casing_pct": "52.1",
+                  "dec_partial_rock_pct": "48.2",
+                  "dec_rigid_casing_m": "429",
+                  "dec_rigid_rock_m": "365"
+                }
+              ]
+            }
+          ],
+          "cementing_reper": [
+            {
+              "dec_volume": "2.8",
+              "dec_density": "1.39",
+              "cementing_reper_component": [
+                {
+                  "voc_component": "CFL-110"
+                },
+                {
+                  "voc_component": "CFL-110",
+                  "dec_amount": "1.52"
+                },
+                {
+                  "voc_component": "Сульфацелл",
+                  "dec_amount": "0.65"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "int_number": "107",
+      "date_done": "2019-04-01",
+      "voc_mr": "Мамуринская",
+      "voc_enterprise": "АО \"Сибирская буровая компания\"",
+      "voc_subsoiluser": "ООО \"Ватьеганнефть\"",
+      "dec_depth": "2566",
+      "dec_temp": "80",
+      "dec_diam_col": "168",
+      "dec_diam_prev_col": "219",
+      "dec_depth_prev_col": "1640",
+      "dec_depth_usc": "1585",
+      "voc_usc": "МСЦ-168",
+      "voc_technolog": "Ерохин",
+      "voc_status": "Завершена",
+      "productive_horizon": [
+        {
+          "data_formation": "ЮС9",
+          "dec_depth_from": "2494",
+          "dec_depth_to": "2479",
+          "voc_fluid_type": "нефть+вода",
+          "bul_peretok": "1",
+          "akc_by_horizon": [
+            {
+              "dec_partial_casing_m": "63",
+              "dec_partial_rock_m": "391",
+              "dec_partial_casing_pct": "18.9",
+              "dec_partial_rock_pct": "48.8",
+              "dec_rigid_casing_m": "50",
+              "dec_rigid_rock_m": "181"
+            }
+          ]
+        },
+        {
+          "data_formation": "АС8",
+          "dec_depth_from": "2263",
+          "dec_depth_to": "2210",
+          "voc_fluid_type": "нефть+газ",
+          "bul_peretok": "0",
+          "akc_by_horizon": [
+            {
+              "dec_partial_casing_m": "432",
+              "dec_partial_rock_m": "165",
+              "dec_partial_casing_pct": "17.9",
+              "dec_partial_rock_pct": "43.4",
+              "dec_rigid_casing_m": "147",
+              "dec_rigid_rock_m": "228"
+            }
+          ]
+        }
+      ],
+      "cementing_stage": [
+        {
+          "int_stage_number": "1",
+          "dec_pressure_work": "19.8",
+          "dec_pressure_stop": "23.3",
+          "cementing_interval": [
+            {
+              "dec_depth_from": "2508",
+              "dec_depth_to": "1975",
+              "voc_material": "ПЦТ I-G-CC-1",
+              "dec_amount": "8.6",
+              "dec_volume_plan": "30.34",
+              "dec_volume_fact": "28.64",
+              "dec_density_plan": "1.61",
+              "dec_density_fact": "1.62",
+              "cementing_buffer": [
+                {
+                  "dec_volume": "1.8",
+                  "voc_composition": "МБП-СМ",
+                  "dec_weight": "11"
+                }
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.42",
+                  "dec_spreadability": "252",
+                  "dec_temp_static": "54",
+                  "dec_temp_dynamic": "49",
+                  "dec_pressure": "291",
+                  "dec_thickening_time": "177",
+                  "data_setting_start": "3-58",
+                  "data_setting_end": "4-26",
+                  "dec_strength_bending": "2.1",
+                  "dec_strength_compress": "5.0",
+                  "dec_water_separation": "2.5",
+                  "dec_fluid_loss": "2353"
+                }
+              ],
+              "akc_by_material": [
+                {
+                  "dec_partial_casing_m": "425",
+                  "dec_partial_rock_m": "268",
+                  "dec_partial_casing_pct": "85.1",
+                  "dec_partial_rock_pct": "65.0",
+                  "dec_rigid_casing_m": "209",
+                  "dec_rigid_rock_m": "124"
+                }
+              ]
+            },
+            {
+              "dec_depth_from": "1975",
+              "dec_depth_to": "1311",
+              "voc_material": "ОТМ-5",
+              "dec_amount": "14.7",
+              "dec_volume_plan": "15.85",
+              "dec_volume_fact": "15.91",
+              "dec_density_plan": "1.41",
+              "dec_density_fact": "1.42",
+              "cementing_buffer": [
+                {
+                  "dec_volume": "1.2",
+                  "voc_composition": "МБП-СМ",
+                  "dec_weight": "98"
+                }
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.76",
+                  "dec_spreadability": "233",
+                  "dec_temp_static": "64",
+                  "dec_temp_dynamic": "58",
+                  "dec_pressure": "391",
+                  "dec_thickening_time": "95",
+                  "data_setting_start": "3-10",
+                  "data_setting_end": "4-59",
+                  "dec_strength_bending": "5.8",
+                  "dec_strength_compress": "11.5",
+                  "dec_water_separation": "1.1",
+                  "dec_fluid_loss": "2192"
+                }
+              ],
+              "akc_by_material": [
+                {
+                  "dec_partial_casing_m": "424",
+                  "dec_partial_rock_m": "46",
+                  "dec_partial_casing_pct": "73.4",
+                  "dec_partial_rock_pct": "86.0",
+                  "dec_rigid_casing_m": "439",
+                  "dec_rigid_rock_m": "530"
+                }
+              ]
+            },
+            {
+              "dec_depth_from": "1311",
+              "dec_depth_to": "522",
+              "voc_material": "ПЦТ I-G-CC-1",
+              "dec_amount": "13.9",
+              "dec_volume_plan": "19.38",
+              "dec_volume_fact": "20.83",
+              "dec_density_plan": "1.27",
+              "dec_density_fact": "1.3",
+              "cementing_buffer": [
+                {
+                  "dec_volume": "2.3",
+                  "voc_composition": "МБП-СМ",
+                  "dec_weight": "162"
+                }
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.58",
+                  "dec_spreadability": "246",
+                  "dec_temp_static": "74",
+                  "dec_temp_dynamic": "64",
+                  "dec_pressure": "425",
+                  "dec_thickening_time": "256",
+                  "data_setting_start": "1-00",
+                  "data_setting_end": "2-00",
+                  "dec_strength_bending": "7.5",
+                  "dec_strength_compress": "12.2",
+                  "dec_water_separation": "3.5",
+                  "dec_fluid_loss": "444",
+                  "dec_linear_expansion": "5.1"
+                }
+              ],
+              "akc_by_material": [
+                {
+                  "dec_partial_casing_m": "398",
+                  "dec_partial_rock_m": "382",
+                  "dec_partial_casing_pct": "17.3",
+                  "dec_partial_rock_pct": "76.6",
+                  "dec_rigid_casing_m": "178",
+                  "dec_rigid_rock_m": "424"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "int_number": "108",
+      "date_done": "2025-10-09",
+      "voc_mr": "Повховская",
+      "voc_enterprise": "АО \"Сибирская буровая компания\"",
+      "voc_subsoiluser": "АО \"Приобскнефть\"",
+      "dec_depth": "1801",
+      "dec_temp": "68",
+      "dec_diam_col": "146",
+      "dec_diam_prev_col": "273",
+      "dec_depth_prev_col": "1151",
+      "dec_depth_usc": "1123",
+      "voc_usc": "МСЦ-146",
+      "voc_technolog": "Ерохин",
+      "voc_status": "В работе",
+      "productive_horizon": [
+        {
+          "data_formation": "АС11(3)",
+          "dec_depth_from": "1736",
+          "dec_depth_to": "1697",
+          "voc_fluid_type": "нефть+газ",
+          "bul_peretok": "0"
+        },
+        {
+          "data_formation": "БС10",
+          "dec_depth_from": "1577",
+          "dec_depth_to": "1559",
+          "voc_fluid_type": "нефть",
+          "bul_peretok": "0"
+        }
+      ],
+      "cementing_stage": [
+        {
+          "int_stage_number": "1",
+          "dec_pressure_work": "11.4",
+          "dec_pressure_stop": "14.9",
+          "cementing_interval": [
+            {
+              "dec_depth_from": "1762",
+              "dec_depth_to": "1220",
+              "voc_material": "РТМ-75 ПВ",
+              "dec_amount": "25.8",
+              "dec_volume_plan": "27.74",
+              "dec_volume_fact": "29.6",
+              "dec_density_plan": "1.75",
+              "dec_density_fact": "1.74",
+              "cementing_buffer": [
+                {
+                  "dec_volume": "1.7",
+                  "voc_composition": "Буфер водный",
+                  "dec_weight": "108"
+                }
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.71",
+                  "dec_spreadability": "249",
+                  "dec_temp_static": "82",
+                  "dec_temp_dynamic": "66",
+                  "dec_pressure": "394",
+                  "dec_thickening_time": "163",
+                  "data_setting_start": "1-41",
+                  "data_setting_end": "3-53",
+                  "dec_strength_bending": "7.1",
+                  "dec_strength_compress": "8.7",
+                  "dec_water_separation": "0.9",
+                  "dec_fluid_loss": "2389",
+                  "dec_linear_expansion": "14.1"
+                }
+              ]
+            }
+          ],
+          "cementing_reper": [
+            {
+              "dec_volume": "4.1",
+              "dec_density": "1.37",
+              "cementing_reper_component": [
+                {
+                  "voc_component": "Гипан"
+                },
+                {
+                  "voc_component": "КМЦ",
+                  "dec_amount": "0.92"
+                },
+                {
+                  "voc_component": "Гипан",
+                  "dec_amount": "0.95"
+                },
+                {
+                  "voc_component": "НТФ",
+                  "dec_amount": "0.94"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "int_number": "109",
+      "date_done": "2025-12-15",
+      "voc_mr": "Тевлинско-Русскинская",
+      "voc_enterprise": "ООО \"Западбурнефть\"",
+      "voc_subsoiluser": "ЗАО \"Самара-Нафта\"",
+      "dec_depth": "4071",
+      "dec_temp": "103",
+      "dec_diam_col": "168",
+      "dec_diam_prev_col": "245",
+      "dec_depth_prev_col": "1309",
+      "dec_depth_usc": "3035",
+      "voc_usc": "МСЦ-168",
+      "voc_technolog": "Шаймиев",
+      "voc_status": "В работе",
+      "productive_horizon": [
+        {
+          "data_formation": "БС10",
+          "dec_depth_from": "3859",
+          "dec_depth_to": "3811",
+          "voc_fluid_type": "нефть+газ",
+          "bul_peretok": "0"
+        },
+        {
+          "data_formation": "ЮС12",
+          "dec_depth_from": "3712",
+          "dec_depth_to": "3699",
+          "voc_fluid_type": "нефть+вода",
+          "bul_peretok": "0"
+        }
+      ],
+      "cementing_stage": [
+        {
+          "int_stage_number": "1",
+          "dec_pressure_work": "10.5",
+          "dec_pressure_stop": "15.2",
+          "cementing_interval": [
+            {
+              "dec_depth_from": "4051",
+              "dec_depth_to": "3705",
+              "voc_material": "РТМ-75",
+              "dec_amount": "25.3",
+              "dec_volume_plan": "5.63",
+              "dec_volume_fact": "5.2",
+              "dec_density_plan": "1.66",
+              "dec_density_fact": "1.63",
+              "cementing_buffer": [
+                {
+                  "dec_volume": "3.7",
+                  "voc_composition": "Буфер водный",
+                  "dec_weight": "144"
+                }
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.86",
+                  "dec_spreadability": "243",
+                  "dec_temp_static": "58",
+                  "dec_temp_dynamic": "52",
+                  "dec_pressure": "441",
+                  "dec_thickening_time": "106",
+                  "data_setting_start": "5-53",
+                  "data_setting_end": "6-42",
+                  "dec_strength_bending": "1.9",
+                  "dec_strength_compress": "8.4",
+                  "dec_water_separation": "2.8",
+                  "dec_fluid_loss": "969"
+                }
+              ]
+            },
+            {
+              "dec_depth_from": "3705",
+              "dec_depth_to": "2994",
+              "voc_material": "ОТМ-3",
+              "dec_amount": "25.9",
+              "dec_volume_plan": "31.1",
+              "dec_volume_fact": "31.14",
+              "dec_density_plan": "1.46",
+              "dec_density_fact": "1.44",
+              "cementing_buffer": [
+                {
+                  "dec_volume": "4.9",
+                  "voc_composition": "Буфер водный",
+                  "dec_weight": "54"
+                }
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.39",
+                  "dec_spreadability": "202",
+                  "dec_temp_static": "64",
+                  "dec_temp_dynamic": "54",
+                  "dec_pressure": "340",
+                  "dec_thickening_time": "98",
+                  "data_setting_start": "4-56",
+                  "data_setting_end": "6-57",
+                  "dec_strength_bending": "2.7",
+                  "dec_strength_compress": "5.6",
+                  "dec_water_separation": "0.3",
+                  "dec_fluid_loss": "742"
+                }
+              ]
+            },
+            {
+              "dec_depth_from": "2994",
+              "dec_depth_to": "2499",
+              "voc_material": "РТМ-75 ПВ",
+              "dec_amount": "13.9",
+              "dec_volume_plan": "7.33",
+              "dec_volume_fact": "7.44",
+              "dec_density_plan": "1.19",
+              "dec_density_fact": "1.16",
+              "cementing_buffer": [
+                {
+                  "dec_volume": "3.0",
+                  "voc_composition": "МБП-СМ",
+                  "dec_weight": "59"
+                }
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.64",
+                  "dec_spreadability": "248",
+                  "dec_temp_static": "61",
+                  "dec_temp_dynamic": "47",
+                  "dec_pressure": "280",
+                  "dec_thickening_time": "238",
+                  "data_setting_start": "4-42",
+                  "data_setting_end": "5-46",
+                  "dec_strength_bending": "1.0",
+                  "dec_strength_compress": "8.8",
+                  "dec_water_separation": "2.9",
+                  "dec_fluid_loss": "1487",
+                  "dec_linear_expansion": "13.8"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "int_stage_number": "2",
+          "dec_pressure_work": "13.2",
+          "dec_pressure_stop": "17.7",
+          "cementing_interval": [
+            {
+              "dec_depth_from": "2499",
+              "dec_depth_to": "2053",
+              "voc_material": "ОТМ-3",
+              "dec_amount": "22.4",
+              "dec_volume_plan": "27.13",
+              "dec_volume_fact": "29.01",
+              "dec_density_plan": "1.31",
+              "dec_density_fact": "1.31",
+              "cementing_buffer": [
+                {
+                  "dec_volume": "3.1",
+                  "voc_composition": "КССБ",
+                  "dec_weight": "149"
+                }
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.57",
+                  "dec_spreadability": "220",
+                  "dec_temp_static": "66",
+                  "dec_temp_dynamic": "61",
+                  "dec_pressure": "448",
+                  "dec_thickening_time": "178",
+                  "data_setting_start": "1-31",
+                  "data_setting_end": "2-52",
+                  "dec_strength_bending": "2.7",
+                  "dec_strength_compress": "10.8",
+                  "dec_water_separation": "1.0",
+                  "dec_fluid_loss": "538",
+                  "dec_linear_expansion": "17.2"
+                }
+              ]
+            },
+            {
+              "dec_depth_from": "2053",
+              "dec_depth_to": "1606",
+              "voc_material": "ОТМ-3",
+              "dec_amount": "22.5",
+              "dec_volume_plan": "32.73",
+              "dec_volume_fact": "35.23",
+              "dec_density_plan": "1.34",
+              "dec_density_fact": "1.32",
+              "cementing_buffer": [
+                {
+                  "dec_volume": "1.2",
+                  "voc_composition": "МБП-С",
+                  "dec_weight": "34"
+                }
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.48",
+                  "dec_spreadability": "243",
+                  "dec_temp_static": "57",
+                  "dec_temp_dynamic": "48",
+                  "dec_pressure": "273",
+                  "dec_thickening_time": "112",
+                  "data_setting_start": "1-24",
+                  "data_setting_end": "2-47",
+                  "dec_strength_bending": "6.8",
+                  "dec_strength_compress": "12.0",
+                  "dec_water_separation": "3.1",
+                  "dec_fluid_loss": "538"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "int_stage_number": "3",
+          "dec_pressure_work": "10.4",
+          "dec_pressure_stop": "14.9",
+          "cementing_interval": [
+            {
+              "dec_depth_from": "1606",
+              "dec_depth_to": "918",
+              "voc_material": "ОТМ-3",
+              "dec_amount": "16.8",
+              "dec_volume_plan": "24.77",
+              "dec_volume_fact": "25.28",
+              "dec_density_plan": "1.86",
+              "dec_density_fact": "1.84",
+              "cementing_buffer": [
+                {
+                  "dec_volume": "4.5",
+                  "voc_composition": "НТФ",
+                  "dec_weight": "143"
+                }
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.87",
+                  "dec_spreadability": "232",
+                  "dec_temp_static": "68",
+                  "dec_temp_dynamic": "53",
+                  "dec_pressure": "281",
+                  "dec_thickening_time": "96",
+                  "data_setting_start": "5-03",
+                  "data_setting_end": "7-39",
+                  "dec_strength_bending": "4.9",
+                  "dec_strength_compress": "13.4",
+                  "dec_water_separation": "1.9",
+                  "dec_fluid_loss": "2170"
+                }
+              ]
+            },
+            {
+              "dec_depth_from": "918",
+              "dec_depth_to": "371",
+              "voc_material": "ОТМ-5",
+              "dec_amount": "21.7",
+              "dec_volume_plan": "16.31",
+              "dec_volume_fact": "15.53",
+              "dec_density_plan": "1.17",
+              "dec_density_fact": "1.18",
+              "cementing_buffer": [
+                {
+                  "dec_volume": "2.5",
+                  "voc_composition": "КССБ",
+                  "dec_weight": "103"
+                },
+                {
+                  "dec_volume": "1.7",
+                  "voc_composition": "Буфер водный",
+                  "dec_weight": "147"
+                }
+              ],
+              "material_test": [
+                {
+                  "dec_water_cement_ratio": "0.54",
+                  "dec_spreadability": "238",
+                  "dec_temp_static": "71",
+                  "dec_temp_dynamic": "45",
+                  "dec_pressure": "371",
+                  "dec_thickening_time": "213",
+                  "data_setting_start": "4-39",
+                  "data_setting_end": "6-39",
+                  "dec_strength_bending": "4.0",
+                  "dec_strength_compress": "5.8",
+                  "dec_water_separation": "3.3",
+                  "dec_fluid_loss": "543",
+                  "dec_linear_expansion": "18.5"
+                }
+              ]
+            }
+          ],
+          "cementing_reper": [
+            {
+              "dec_volume": "2.2",
+              "dec_density": "1.49",
+              "cementing_reper_component": [
+                {
+                  "voc_component": "Гипан"
+                },
+                {
+                  "voc_component": "Полицем",
+                  "dec_amount": "1.39"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "int_number": "110",
+      "date_done": "2026-04-10",
+      "voc_mr": "Повховская",
+      "voc_enterprise": "ООО \"Бурнефтесервис\"",
+      "voc_subsoiluser": "ООО \"Ватьеганнефть\"",
+      "dec_depth": "3789",
+      "dec_temp": "99",
+      "dec_diam_col": "168",
+      "dec_diam_prev_col": "324",
+      "dec_depth_prev_col": "2082",
+      "dec_depth_usc": "2232",
+      "voc_usc": "МСЦ-168",
+      "voc_technolog": "Ковалёв",
+      "voc_status": "Запланирована",
+      "productive_horizon": [
+        {
+          "data_formation": "АС8",
+          "dec_depth_from": "3632",
+          "dec_depth_to": "3591",
+          "voc_fluid_type": "нефть+газ",
+          "bul_peretok": "0"
+        },
+        {
+          "data_formation": "БС11",
+          "dec_depth_from": "3441",
+          "dec_depth_to": "3429",
+          "voc_fluid_type": "нефть",
+          "bul_peretok": "0"
+        },
+        {
+          "data_formation": "БС9",
+          "dec_depth_from": "3216",
+          "dec_depth_to": "3160",
+          "voc_fluid_type": "нефть+вода",
+          "bul_peretok": "0"
+        }
+      ]
+    }
+  ]
+}
