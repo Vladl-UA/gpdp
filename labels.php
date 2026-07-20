@@ -93,39 +93,56 @@ function labels_dispatch(PgSql\Connection $db_connection): void
         $table  = (string) ($_POST['table'] ?? '');
 
         if ($action === 'save_all') {
-            $saved = 0;
-            $errors = 0;
+            $begin = db_transaction_begin($db_connection);
+            if (!$begin['ok']) {
+                $flash = ['err', 'Не удалось открыть транзакцию: ' . $begin['error']];
+            } else {
+                $saved = 0;
+                $fail_reason = null;
 
-            $t_id = model_label_registry_id($db_connection, 'table', null, $table);
-            if ($t_id !== null) {
-                model_label_save(
-                    $db_connection, $t_id,
-                    (string) ($_POST['t_short'] ?? ''),
-                    (string) ($_POST['t_full'] ?? ''),
-                    (string) ($_POST['t_template'] ?? '')
-                ) ? $saved++ : $errors++;
-            }
-
-            $f_short = (array) ($_POST['f_short'] ?? []);
-            $f_full  = (array) ($_POST['f_full'] ?? []);
-            foreach ($f_short as $element => $short) {
-                $element = (string) $element;
-                $f_id = model_label_registry_id($db_connection, 'field', $table, $element);
-                if ($f_id === null) {
-                    $errors++;
-                    continue;
+                $t_id = model_label_registry_id($db_connection, 'table', null, $table);
+                if ($t_id !== null) {
+                    if (model_label_save(
+                        $db_connection, $t_id,
+                        (string) ($_POST['t_short'] ?? ''),
+                        (string) ($_POST['t_full'] ?? ''),
+                        (string) ($_POST['t_template'] ?? '')
+                    )) {
+                        $saved++;
+                    } else {
+                        $fail_reason = "подпись таблицы '$table'";
+                    }
                 }
-                model_label_save(
-                    $db_connection, $f_id,
-                    (string) $short,
-                    (string) ($f_full[$element] ?? ''),
-                    ''
-                ) ? $saved++ : $errors++;
-            }
 
-            $flash = (snapshot_refresh_presentation($db_connection) && $errors === 0)
-                ? ['ok', "Сохранено подписей: $saved"]
-                : ['err', "Сохранено: $saved, с ошибками: $errors"];
+                $f_short = (array) ($_POST['f_short'] ?? []);
+                $f_full  = (array) ($_POST['f_full'] ?? []);
+                foreach ($f_short as $element => $short) {
+                    if ($fail_reason !== null) {
+                        break;
+                    }
+                    $element = (string) $element;
+                    $f_id = model_label_registry_id($db_connection, 'field', $table, $element);
+                    if ($f_id === null) {
+                        $fail_reason = "нет записи реестра для поля '$element'";
+                        break;
+                    }
+                    if (model_label_save($db_connection, $f_id, (string) $short, (string) ($f_full[$element] ?? ''), '')) {
+                        $saved++;
+                    } else {
+                        $fail_reason = "подпись поля '$element'";
+                    }
+                }
+
+                if ($fail_reason !== null) {
+                    db_transaction_rollback($db_connection);
+                    $flash = ['err', "Ничего не сохранено — отказ на «$fail_reason», откат целиком"];
+                } else {
+                    $commit = db_transaction_commit($db_connection);
+                    $flash = ($commit['ok'] && snapshot_refresh_presentation($db_connection))
+                        ? ['ok', "Сохранено подписей: $saved"]
+                        : ['err', "Записано в БД ($saved), но обновление снапшота не удалось — см. диагностику"];
+                }
+            }
         }
 
         elseif ($action === 'dict_add' || $action === 'dict_edit' || $action === 'dict_delete') {
@@ -148,7 +165,16 @@ function labels_dispatch(PgSql\Connection $db_connection): void
                 $msg = "Добавлено: $name";
             }
 
-            $flash = (($result['ok'] ?? false) && snapshot_refresh_presentation($db_connection))
+            // Значения простого словаря (data_name строки) не хранятся в
+            // снапшоте — lookup_labels() читает исходную таблицу живьём на
+            // каждый запрос (helpers.php). Refresh presentation здесь не
+            // требуется вообще: он нужен при правке ПОДПИСИ таблицы/поля/
+            // словаря или шаблона (ветка save_all выше), не при CRUD
+            // обычной предметной строки словаря (обзор Chat, п.5 — было
+            // безусловным, тянуло пересборку словарных планов и перезапись
+            // файла снапшота без единого факта, который бы от этого
+            // изменился).
+            $flash = ($result['ok'] ?? false)
                 ? ['ok', $msg]
                 : ['err', implode('; ', $result['errors'] ?? ['неизвестно'])];
         }

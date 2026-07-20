@@ -58,22 +58,6 @@ if ($snapshot === null) {
 }
 
 /**
- * Найти имя структурного поля-родителя (dep_<parent>) в таблице.
- * Одна таблица — максимум один родитель в этом дереве (§16.1: dep_
- * строго одно дерево, без множественных родителей) — первое найденное
- * и есть единственное.
- */
-function bulk_import_dep_field(array $snapshot, string $table): ?string
-{
-    foreach ($snapshot['structure']['tables'][$table]['fields'] ?? [] as $field_name => $schema) {
-        if (($schema['kind'] ?? '') === 'structural' && str_starts_with($field_name, 'dep_')) {
-            return $field_name;
-        }
-    }
-    return null;
-}
-
-/**
  * Разобрать один объект записи на entity-поля (для $input) и дочерние
  * таблицы (вложенные массивы) — по факту наличия такой таблицы в
  * структуре, не по префиксу имени ключа (§1 — не гадать по имени).
@@ -133,9 +117,18 @@ function bulk_import_resolve_fields(
 
 /**
  * Рекурсивная вставка одной записи + её детей. $parent_id — null на
- * корне дерева. Отказ на любом уровне — дети этой ветки не трогаются:
- * родителя нет, вставлять в никуда нечестно, даже если бы формально
- * получилось (§9 — доверенный канал несёт факт, не догадку).
+ * корне дерева. $parent_table — имя таблицы, под которой запись
+ * вложена В ФАЙЛЕ (null на корне); сверяется с тем, куда РЕАЛЬНО ведёт
+ * единственная dep_-связь таблицы (record_parent_relation, core.php) —
+ * без этой сверки вложенность файла принималась на веру: например,
+ * `material_test`, ошибочно положенный прямо под `well` вместо
+ * `cementing_interval`, взял бы свою настоящую dep_-колонку
+ * (`dep_cementing_interval`) и записал туда id скважины — число
+ * синтаксически корректно, связь по смыслу разрушена, а FK в базе нет,
+ * чтобы это поймать (найдено обзором Chat 2026-07-20). Отказ на любом
+ * уровне — дети этой ветки не трогаются: родителя нет, вставлять в
+ * никуда нечестно, даже если бы формально получилось (§9 — доверенный
+ * канал несёт факт, не догадку).
  */
 function bulk_import_insert(
     PgSql\Connection $db_connection,
@@ -143,6 +136,7 @@ function bulk_import_insert(
     string $table,
     array $record,
     ?int $parent_id,
+    ?string $parent_table,
     array &$stats,
     string $path
 ): void {
@@ -157,11 +151,15 @@ function bulk_import_insert(
 
     $structural = [];
     if ($parent_id !== null) {
-        $dep_field = bulk_import_dep_field($snapshot, $table);
-        if ($dep_field === null) {
-            $errors[] = "нет структурного поля-родителя (dep_*) у таблицы '$table'";
+        $relation = record_parent_relation($snapshot, $table);
+        if ($relation === null) {
+            $errors[] = "нет однозначного структурного поля-родителя (dep_*) у таблицы '$table'";
+        } elseif ($relation['parent_table'] !== $parent_table) {
+            $errors[] = "таблица '$table' вложена в файле под '$parent_table', "
+                . "но её dep_-связь ведёт к '{$relation['parent_table']}' — "
+                . "дерево файла не соответствует модели";
         } else {
-            $structural[$dep_field] = $parent_id;
+            $structural[$relation['fk']] = $parent_id;
         }
     }
 
@@ -185,7 +183,7 @@ function bulk_import_insert(
         foreach ($child_records as $i => $child_record) {
             bulk_import_insert(
                 $db_connection, $snapshot, $child_table, $child_record,
-                (int) $result['id'], $stats, "$path." . $child_table . "[$i]"
+                (int) $result['id'], $table, $stats, "$path." . $child_table . "[$i]"
             );
         }
     }
@@ -214,7 +212,7 @@ foreach ($data as $table => $records) {
         continue;
     }
     foreach ($records as $i => $record) {
-        bulk_import_insert($db_connection, $snapshot, $table, $record, null, $stats, "$table" . "[$i]");
+        bulk_import_insert($db_connection, $snapshot, $table, $record, null, null, $stats, "$table" . "[$i]");
     }
 }
 

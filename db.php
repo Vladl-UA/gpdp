@@ -42,15 +42,29 @@ declare(strict_types=1);
  * разное уместное поведение при отказе (HTTP 500 против текста в
  * stdout); решает вызывающий код, этот файл не навязывает форму.
  */
+/**
+ * Экранирование одного значения libpq conninfo (формат `key=value`,
+ * НЕ URI): значения с пробелом должны быть в одинарных кавычках,
+ * кавычка и обратный слэш внутри значения — экранированы обратным
+ * слэшем (libpq, не SQL-экранирование — другой формат, другая функция).
+ * Без этого пароль/имя с пробелом или `'` рвёт разбор строки
+ * подключения молча (найдено обзором Chat 2026-07-20, docs.postgresql.org
+ * §33.1.1). Пустая строка — валидное значение, тоже в кавычках.
+ */
+function db_conninfo_escape(string $value): string
+{
+    return "'" . str_replace(['\\', "'"], ['\\\\', "\\'"], $value) . "'";
+}
+
 function db_connect(array $cfg): PgSql\Connection
 {
     $conninfo = sprintf(
         'host=%s port=%d dbname=%s user=%s password=%s options=--client_encoding=UTF8',
-        $cfg['host'],
+        db_conninfo_escape((string) $cfg['host']),
         $cfg['port'] ?? 5432,
-        $cfg['name'],
-        $cfg['user'],
-        $cfg['password']
+        db_conninfo_escape((string) $cfg['name']),
+        db_conninfo_escape((string) $cfg['user']),
+        db_conninfo_escape((string) $cfg['password'])
     );
 
     $connection = @pg_connect($conninfo);

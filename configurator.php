@@ -21,11 +21,18 @@ error_reporting(E_ALL);
  * не касается — кэш для него живёт как жил.
  *
  * v0 умеет: список таблиц с бейджем «используется как словарь»,
- * создание новой таблицы с первым набором полей одним атомарным actом,
- * удаление таблицы с трёхступенчатым подтверждением.
- * v0 НЕ умеет (сознательно вне охвата): ALTER (добавление полей к уже
- * существующей таблице), reparent, паспорт-словари (§16 уровень 2),
+ * создание новой таблицы с первым набором полей одним атомарным актом,
+ * удаление таблицы с трёхступенчатым подтверждением, добавление и
+ * удаление отдельных полей у уже существующей таблицы (ALTER, Волна 2
+ * — configurator_add_field/configurator_drop_field), создание
+ * гибридных словарей (Postgres VIEW, 07-17).
+ * v0 НЕ умеет (сознательно вне охвата): паспорт-словари (§16 уровень 2),
  * составные сущности (date и подобные) — появятся отдельными решениями.
+ * (Смена родителя у ЗАПИСИ — record_reparent в core.php — не структурная
+ * DDL-операция, живёт вне этого файла, сюда никогда не относилась.)
+ * (Уточнено 2026-07-20: список ALTER выше был устаревшим годы — правка
+ * не поспевала за кодом; найдено обзором Chat, тот же класс дыры, что
+ * §14.2 в журнале 07-19 «ночь, 3».)
  */
 
 require_once 'config.php';
@@ -49,6 +56,20 @@ function configurator_identifier_valid(string $s): bool
 {
     return (bool) preg_match('/^[a-z][a-z0-9_]{0,58}$/', $s);
 }
+
+/**
+ * Максимальная длина ГОТОВОГО имени колонки/таблицы (с префиксом
+ * сущности), в байтах — предел самой СУБД, не решение проекта.
+ * Postgres усекает идентификаторы длиннее 63 байт молча (NAMEDATALEN),
+ * не отказом; проверка здесь — единственное, что не даёт реестру
+ * запомнить имя длиннее того, что реально создастся в базе (иначе
+ * реестр и физическая колонка расходятся при следующей сборке снапшота).
+ * Значение диалектное — при развороте на другую СУБД меняется одна
+ * константа, вызывающий код (обе точки проверки ниже) не трогается.
+ * До 2026-07-20 здесь стоял унаследованный от MySQL предел 64 — тексты
+ * ошибок ссылались на MySQL уже после переезда на Postgres 07-16.
+ */
+const DB_IDENTIFIER_MAX_BYTES = 63;
 
 /**
  * Разбирает и проверяет спецификацию новой таблицы. Два пути создания —
@@ -180,8 +201,8 @@ function configurator_validate_spec(array $input, array $live_structure): array
             $errors[] = 'Родительская таблица не выбрана или не существует.';
         } else {
             $dep_column = 'dep_' . $parent;
-            if (strlen($dep_column) > 64) {
-                $errors[] = "Колонка \"$dep_column\" длиннее 64 символов (лимит MySQL).";
+            if (strlen($dep_column) > DB_IDENTIFIER_MAX_BYTES) {
+                $errors[] = "Колонка \"$dep_column\" длиннее " . DB_IDENTIFIER_MAX_BYTES . " байт (лимит Postgres, NAMEDATALEN).";
             }
             $structural_columns[] = $dep_column;
         }
@@ -347,8 +368,8 @@ function configurator_parse_field(
 
     $column = $entity_choice . '_' . $name_part;
 
-    if (strlen($column) > 64) {
-        $errors[] = "имя колонки \"$column\" длиннее 64 символов (лимит MySQL).";
+    if (strlen($column) > DB_IDENTIFIER_MAX_BYTES) {
+        $errors[] = "имя колонки \"$column\" длиннее " . DB_IDENTIFIER_MAX_BYTES . " байт (лимит Postgres, NAMEDATALEN).";
     }
     if (in_array($column, STRUCTURAL_FIELD_NAMES, true) || str_starts_with($column, 'dep_')) {
         $errors[] = "\"$column\" — зарезервированное структурное имя.";
@@ -1081,6 +1102,74 @@ if ($caction === 'alter_drop_field' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
+// --- построители списков для форм (общие для new_table и edit) -----------
+// Обзор Chat 2026-07-20, п.8: оба режима строили эти три списка каждый
+// своим циклом, дословно совпадающим. Вынесено ровно то, что реально
+// повторялось дважды — не универсальный «строитель формы конфигуратора»
+// (§15.8): $parent_items и $view_source_bul_fields ниже нужны только
+// режиму создания, второго потребителя нет, они остаются на месте.
+
+/** Список типов сущностей для <select> «Тип» — тег строит render.php. */
+function configurator_entity_type_items(): array
+{
+    $items = [];
+    foreach (entities() as $entity_id => $passport) {
+        $items[] = [
+            'value' => $entity_id,
+            'label' => $entity_id . ' — ' . (string) ($passport['label'] ?? $entity_id),
+        ];
+    }
+    return $items;
+}
+
+/**
+ * Существующие словари уровня 0 (voc_* с полем data_name): опции
+ * <select> ('items') + карта подписей для JS ('labels'), тем же живым
+ * чтением (§8, админ-режим), что было в обоих местах по отдельности.
+ */
+function configurator_dictionary_catalog(array $structure, array $presentation): array
+{
+    $available_dicts = [];
+    $dict_items       = [['value' => '', 'label' => '— выберите словарь —']];
+
+    foreach ($structure['tables'] as $t_name => $t_schema) {
+        if (!str_starts_with($t_name, 'voc_') || !isset($t_schema['fields']['data_name'])) {
+            continue;
+        }
+        $name_part = substr($t_name, strlen('voc_'));
+        $t_labels  = $presentation['labels']['table'][$t_name] ?? [];
+        $short     = (string) ($t_labels['data_short'] ?? $t_name);
+        $full      = (string) ($t_labels['data_full'] ?? $t_name);
+
+        $available_dicts[$name_part] = ['short' => $short, 'full' => $full];
+        $dict_items[] = ['value' => $name_part, 'label' => "$full ($t_name)"];
+    }
+
+    return ['items' => $dict_items, 'labels' => $available_dicts];
+}
+
+/**
+ * Цели для link_ (журнал 2026-07-12, Идея А): ЛЮБАЯ таблица с data_name,
+ * не только voc_* — в этом весь смысл link_ против voc_. Системные
+ * (model_) уже исключены структурным сканером. Более широкие цели
+ * (только с шаблоном подписи, без data_name) движок понимает, но этот
+ * список — сознательно суженный v0-фильтр для удобного выбора, не
+ * полный охват движка.
+ */
+function configurator_link_target_items(array $structure, array $presentation): array
+{
+    $items = [['value' => '', 'label' => '— выберите цель —']];
+    foreach ($structure['tables'] as $t_name => $t_schema) {
+        if (!isset($t_schema['fields']['data_name'])) {
+            continue;
+        }
+        $t_labels = $presentation['labels']['table'][$t_name] ?? [];
+        $t_full   = (string) ($t_labels['data_full'] ?? $t_name);
+        $items[] = ['value' => $t_name, 'label' => "$t_full ($t_name)"];
+    }
+    return $items;
+}
+
 // --- отрисовка -----------------------------------------------------------
 
 $flash    = isset($_GET['_msg']) ? (string) $_GET['_msg'] : null; // экранирует render_admin_flash()
@@ -1102,51 +1191,18 @@ if ($caction === 'diagnose') {
 
     // 2026-07-19: здесь собирается СПИСОК, тег <option> строит render.php
     // (§3, §12). Экранирование — тоже забота рендера, не эта.
-    $type_items = [];
-    foreach (entities() as $entity_id => $passport) {
-        $type_items[] = [
-            'value' => $entity_id,
-            'label' => $entity_id . ' — ' . (string) ($passport['label'] ?? $entity_id),
-        ];
-    }
+    $type_items = configurator_entity_type_items();
 
-    // Существующие словари уровня 0: таблицы voc_* с полем data_name.
     // Живое чтение — та же дисциплина, что у списка (§8, админ-режим),
     // не кэш: только что созданный словарь обязан появиться сразу.
     $live_structure    = snapshot_build_structure($db_connection);
     $live_presentation = snapshot_build_presentation($db_connection);
-    $available_dicts   = [];
-    $dict_items        = [['value' => '', 'label' => '— выберите словарь —']];
 
-    foreach ($live_structure['tables'] as $t_name => $t_schema) {
-        if (!str_starts_with($t_name, 'voc_') || !isset($t_schema['fields']['data_name'])) {
-            continue;
-        }
-        $name_part = substr($t_name, strlen('voc_'));
-        $t_labels  = $live_presentation['labels']['table'][$t_name] ?? [];
-        $short     = (string) ($t_labels['data_short'] ?? $t_name);
-        $full      = (string) ($t_labels['data_full'] ?? $t_name);
+    $dict_catalog     = configurator_dictionary_catalog($live_structure, $live_presentation);
+    $dict_items       = $dict_catalog['items'];
+    $dict_labels_json = json_encode($dict_catalog['labels'], JSON_UNESCAPED_UNICODE);
 
-        $available_dicts[$name_part] = ['short' => $short, 'full' => $full];
-        $dict_items[] = ['value' => $name_part, 'label' => "$full ($t_name)"];
-    }
-    $dict_labels_json = json_encode($available_dicts, JSON_UNESCAPED_UNICODE);
-
-    // Цели для link_ (журнал 2026-07-12): ЛЮБАЯ таблица с data_name —
-    // не только voc_*, в этом и смысл link_ (Идея А). Системные (model_)
-    // уже исключены структурным сканером. Более широкие цели (только с
-    // шаблоном подписи, без data_name) движок понимает, но этот список —
-    // сознательно суженный v0-фильтр для удобного выбора, не полный
-    // охват движка.
-    $link_target_items = [['value' => '', 'label' => '— выберите цель —']];
-    foreach ($live_structure['tables'] as $t_name => $t_schema) {
-        if (!isset($t_schema['fields']['data_name'])) {
-            continue;
-        }
-        $t_labels = $live_presentation['labels']['table'][$t_name] ?? [];
-        $t_full   = (string) ($t_labels['data_full'] ?? $t_name);
-        $link_target_items[] = ['value' => $t_name, 'label' => "$t_full ($t_name)"];
-    }
+    $link_target_items = configurator_link_target_items($live_structure, $live_presentation);
 
     // Родители для режима "Зависимая таблица" — ВСЕ живые таблицы
     // (включая словари: контекстные таблицы могут подчиняться и им).
@@ -1216,43 +1272,13 @@ if ($caction === 'diagnose') {
         }
 
         // --- добавить поле: одна строка, та же механика, что при создании ---
-        $type_items = [];
-        foreach (entities() as $entity_id => $passport) {
-            $type_items[] = [
-                'value' => $entity_id,
-                'label' => $entity_id . ' — ' . (string) ($passport['label'] ?? $entity_id),
-            ];
-        }
-        $available_dicts = [];
-        $dict_items      = [['value' => '', 'label' => '— выберите словарь —']];
-        foreach ($live_structure['tables'] as $t_name => $ts) {
-            if (!str_starts_with($t_name, 'voc_') || !isset($ts['fields']['data_name'])) {
-                continue;
-            }
-            $name_part = substr($t_name, strlen('voc_'));
-            $tl = $live_presentation['labels']['table'][$t_name] ?? [];
-            $available_dicts[$name_part] = [
-                'short' => (string) ($tl['data_short'] ?? $t_name),
-                'full'  => (string) ($tl['data_full'] ?? $t_name),
-            ];
-            $dict_items[] = [
-                'value' => $name_part,
-                'label' => $available_dicts[$name_part]['full'] . " ($t_name)",
-            ];
-        }
-        $dict_labels_json = json_encode($available_dicts, JSON_UNESCAPED_UNICODE);
+        $type_items = configurator_entity_type_items();
 
-        // Цели для link_ — тот же критерий, что при создании таблицы
-        // (любая таблица с data_name, не только voc_*).
-        $link_target_items = [['value' => '', 'label' => '— выберите цель —']];
-        foreach ($live_structure['tables'] as $t_name => $ts) {
-            if (!isset($ts['fields']['data_name'])) {
-                continue;
-            }
-            $tl     = $live_presentation['labels']['table'][$t_name] ?? [];
-            $t_full = (string) ($tl['data_full'] ?? $t_name);
-            $link_target_items[] = ['value' => $t_name, 'label' => "$t_full ($t_name)"];
-        }
+        $dict_catalog     = configurator_dictionary_catalog($live_structure, $live_presentation);
+        $dict_items       = $dict_catalog['items'];
+        $dict_labels_json = json_encode($dict_catalog['labels'], JSON_UNESCAPED_UNICODE);
+
+        $link_target_items = configurator_link_target_items($live_structure, $live_presentation);
 
         // calc_: подсказка переменных — ТОЛЬКО entity-поля ЭТОЙ таблицы
         // (тот же whitelist, что проверит configurator_parse_field()

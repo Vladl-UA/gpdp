@@ -130,8 +130,7 @@ if (!isset($snapshot['structure']['tables'][$request_table])) {
     http_response_code(404);
     exit('Неизвестная таблица');
 }
-$task_table  = $request_table;
-$task_fields = $snapshot['structure']['tables'][$task_table]['fields'];
+$task_table = $request_table;
 
 // --- 4. действия записи: операции конвейера, не режимы сущностей ----------------
 // PRG: после успешной записи — redirect на просмотр, не отрисовка
