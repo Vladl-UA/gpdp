@@ -1,0 +1,52 @@
+{
+  "voc_mr": [
+    {"data_name": "Приобская"},
+    {"data_name": "Самотлорская"},
+    {"data_name": "Ватьеганская"},
+    {"data_name": "Тевлинско-Русскинская"},
+    {"data_name": "Южно-Ягунская"},
+    {"data_name": "Повховская"}
+  ],
+  "voc_enterprise": [
+    {"data_name": "ООО \"Бурнефтесервис\""},
+    {"data_name": "АО \"Сибирская буровая компания\""},
+    {"data_name": "ООО \"ГеоБурСервис\""},
+    {"data_name": "ООО \"Западбурнефть\""}
+  ],
+  "voc_subsoiluser": [
+    {"data_name": "АО \"Приобскнефть\""},
+    {"data_name": "ПАО \"Севернефтегаз\""},
+    {"data_name": "ООО \"Ватьеганнефть\""}
+  ],
+  "voc_usc": [
+    {"data_name": "МСЦ-168"},
+    {"data_name": "МСЦ-178"},
+    {"data_name": "УСЦ-140"},
+    {"data_name": "МСЦ-219"}
+  ],
+  "voc_technolog": [
+    {"data_name": "Ковалёв"},
+    {"data_name": "Ерохин"},
+    {"data_name": "Шаймиев"},
+    {"data_name": "Дорошенко"},
+    {"data_name": "Бельский"}
+  ],
+  "voc_material": [
+    {"data_name": "ПЦТ I-G-CC-1"},
+    {"data_name": "ПЦТ III-Об 5-100"},
+    {"data_name": "ОТМ-7"},
+    {"data_name": "РТМ-100"},
+    {"data_name": "ЦТРО-1"}
+  ],
+  "voc_composition": [
+    {"data_name": "МБП-СМ"},
+    {"data_name": "Буфер водный"},
+    {"data_name": "КССБ"}
+  ],
+  "voc_component": [
+    {"data_name": "ПЦТ III-Об"},
+    {"data_name": "Полицем"},
+    {"data_name": "Гипан"},
+    {"data_name": "Сульфацелл"}
+  ]
+}
