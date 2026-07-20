@@ -65,15 +65,46 @@ def load_dictionaries():
 
 
 def repair_quotes(text):
-    """Экранирует кавычки внутри строкового значения одной строки JSON."""
-    def fix(line):
-        m = re.match(r'^(\s*"[a-zA-Z_0-9]+"\s*:\s*)"(.*)"(,?)\s*$', line)
-        if not m:
-            return line
-        head, value, tail = m.groups()
-        value = value.replace('\\"', '"').replace('"', '\\"')
-        return f'{head}"{value}"{tail}\n'
-    return ''.join(fix(line) for line in text.splitlines(keepends=True))
+    """
+    Экранирует кавычки внутри строковых значений. Работает и на
+    отформатированном JSON, и на однострочном — генераторы выдают и то
+    и другое, а построчный разбор на минифицированном файле бесполезен.
+
+    Приём: идём по тексту символ за символом. Внутри строки кавычка
+    закрывает её, только если следующий значащий символ — структурный
+    (`:` `,` `}` `]`). Иначе это кавычка внутри значения, и её надо
+    экранировать. Ровно та беда, на которой спотыкаются генераторы:
+    `"ООО "Интер-Ойл""`.
+    """
+    out = []
+    inside = False
+    i = 0
+    while i < len(text):
+        ch = text[i]
+        if not inside:
+            out.append(ch)
+            if ch == '"':
+                inside = True
+            i += 1
+            continue
+        if ch == '\\' and i + 1 < len(text):
+            out.append(text[i:i + 2])
+            i += 2
+            continue
+        if ch == '"':
+            j = i + 1
+            while j < len(text) and text[j] in ' \t\r\n':
+                j += 1
+            if j >= len(text) or text[j] in ':,}]':
+                out.append('"')
+                inside = False
+            else:
+                out.append('\\"')
+            i += 1
+            continue
+        out.append(ch)
+        i += 1
+    return ''.join(out)
 
 
 def num(value):

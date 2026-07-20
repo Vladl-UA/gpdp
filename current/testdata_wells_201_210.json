@@ -1,0 +1,1578 @@
+{
+    "well": [
+        {
+            "int_number": "201",
+            "date_done": "2020-03-18",
+            "voc_mr": "\u041c\u0430\u043c\u0443\u0440\u0438\u043d\u0441\u043a\u0430\u044f",
+            "voc_enterprise": "\u041e\u041e\u041e \"\u0418\u043d\u0442\u0435\u0440-\u041e\u0439\u043b\"",
+            "voc_subsoiluser": "\u0417\u0410\u041e \"\u0421\u0430\u043c\u0430\u0440\u0430-\u041d\u0430\u0444\u0442\u0430\"",
+            "dec_depth": "3120",
+            "dec_temp": "78",
+            "dec_diam_col": "146",
+            "dec_diam_prev_col": "219",
+            "dec_depth_prev_col": "1680",
+            "dec_depth_usc": "2050",
+            "voc_usc": "\u041c\u0421\u0426-219",
+            "voc_technolog": "\u041d\u0430\u0437\u0430\u0440\u043e\u0432",
+            "voc_status": "\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u0430",
+            "ltext_remark": "\u0426\u0435\u043c\u0435\u043d\u0442\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u0435 \u0432\u044b\u043f\u043e\u043b\u043d\u0435\u043d\u043e \u0448\u0442\u0430\u0442\u043d\u043e.",
+            "cementing_stage": [
+                {
+                    "int_stage_number": "1",
+                    "dec_pressure_work": "17",
+                    "dec_pressure_stop": "21",
+                    "cementing_interval": [
+                        {
+                            "dec_depth_from": "3120",
+                            "dec_depth_to": "2520",
+                            "voc_material": "\u041e\u0422\u041c-5",
+                            "dec_amount": "13.00",
+                            "dec_volume_plan": "10.50",
+                            "dec_volume_fact": "10.08",
+                            "dec_density_plan": "1.27",
+                            "dec_density_fact": "1.26",
+                            "cementing_buffer": [
+                                {
+                                    "dec_volume": "1.65",
+                                    "voc_composition": "\u041c\u0411\u041f-\u041c",
+                                    "dec_weight": "41.00"
+                                }
+                            ],
+                            "material_test": [
+                                {
+                                    "dec_water_cement_ratio": "0.45",
+                                    "dec_spreadability": "212",
+                                    "dec_temp_static": "57",
+                                    "dec_temp_dynamic": "50",
+                                    "dec_pressure": "277",
+                                    "dec_thickening_time": "108",
+                                    "data_setting_start": "3-22",
+                                    "data_setting_end": "6-45",
+                                    "dec_strength_bending": "1.65",
+                                    "dec_strength_compress": "4.40",
+                                    "dec_water_separation": "0.58",
+                                    "dec_fluid_loss": "217"
+                                }
+                            ],
+                            "akc_by_material": [
+                                {
+                                    "dec_partial_casing_m": "90",
+                                    "dec_partial_rock_m": "84",
+                                    "dec_partial_casing_pct": "29.0",
+                                    "dec_partial_rock_pct": "27.0",
+                                    "dec_rigid_casing_m": "300",
+                                    "dec_rigid_rock_m": "258"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "productive_horizon": [
+                {
+                    "data_formation": "\u0410\u042111",
+                    "dec_depth_from": "2683",
+                    "dec_depth_to": "2665",
+                    "voc_fluid_type": "\u043d\u0435\u0444\u0442\u044c+\u0432\u043e\u0434\u0430",
+                    "bul_peretok": "0",
+                    "akc_by_horizon": [
+                        {
+                            "dec_partial_casing_m": "15",
+                            "dec_partial_rock_m": "12",
+                            "dec_partial_casing_pct": "72.0",
+                            "dec_partial_rock_pct": "78.0",
+                            "dec_rigid_casing_m": "25",
+                            "dec_rigid_rock_m": "22"
+                        }
+                    ]
+                },
+                {
+                    "data_formation": "\u0410\u042112(2)",
+                    "dec_depth_from": "2588",
+                    "dec_depth_to": "2559",
+                    "voc_fluid_type": "\u043d\u0435\u0444\u0442\u044c+\u0433\u0430\u0437",
+                    "bul_peretok": "0",
+                    "akc_by_horizon": [
+                        {
+                            "dec_partial_casing_m": "15",
+                            "dec_partial_rock_m": "12",
+                            "dec_partial_casing_pct": "79.0",
+                            "dec_partial_rock_pct": "87.0",
+                            "dec_rigid_casing_m": "25",
+                            "dec_rigid_rock_m": "22"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "int_number": "202",
+            "date_done": "2021-07-09",
+            "voc_mr": "\u041f\u0440\u0438\u043e\u0431\u0441\u043a\u0430\u044f",
+            "voc_enterprise": "\u0410\u041e \"\u0421\u0438\u0431\u0438\u0440\u0441\u043a\u0430\u044f \u0431\u0443\u0440\u043e\u0432\u0430\u044f \u043a\u043e\u043c\u043f\u0430\u043d\u0438\u044f\"",
+            "voc_subsoiluser": "\u0410\u041e \"\u041f\u0440\u0438\u043e\u0431\u0441\u043a\u043d\u0435\u0444\u0442\u044c\"",
+            "dec_depth": "2850",
+            "dec_temp": "70",
+            "dec_diam_col": "168",
+            "dec_diam_prev_col": "245",
+            "dec_depth_prev_col": "1450",
+            "dec_depth_usc": "1780",
+            "voc_usc": "\u041c\u0421\u0426-219",
+            "voc_technolog": "\u041d\u0430\u0437\u0430\u0440\u043e\u0432",
+            "voc_status": "\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u0430",
+            "cementing_stage": [
+                {
+                    "int_stage_number": "1",
+                    "dec_pressure_work": "18",
+                    "dec_pressure_stop": "23",
+                    "cementing_interval": [
+                        {
+                            "dec_depth_from": "2850",
+                            "dec_depth_to": "2350",
+                            "voc_material": "\u041e\u0422\u041c-5",
+                            "dec_amount": "18.00",
+                            "dec_volume_plan": "13.50",
+                            "dec_volume_fact": "13.77",
+                            "dec_density_plan": "1.34",
+                            "dec_density_fact": "1.35",
+                            "cementing_buffer": [
+                                {
+                                    "dec_volume": "2.10",
+                                    "voc_composition": "\u041d\u0422\u0424",
+                                    "dec_weight": "60.00"
+                                }
+                            ],
+                            "material_test": [
+                                {
+                                    "dec_water_cement_ratio": "0.50",
+                                    "dec_spreadability": "219",
+                                    "dec_temp_static": "62",
+                                    "dec_temp_dynamic": "54",
+                                    "dec_pressure": "294",
+                                    "dec_thickening_time": "121",
+                                    "data_setting_start": "4-29",
+                                    "data_setting_end": "8-55",
+                                    "dec_strength_bending": "2.10",
+                                    "dec_strength_compress": "5.40",
+                                    "dec_water_separation": "0.86",
+                                    "dec_fluid_loss": "354",
+                                    "dec_linear_expansion": "8.00"
+                                }
+                            ],
+                            "akc_by_material": [
+                                {
+                                    "dec_partial_casing_m": "90",
+                                    "dec_partial_rock_m": "90",
+                                    "dec_partial_casing_pct": "36.0",
+                                    "dec_partial_rock_pct": "36.0",
+                                    "dec_rigid_casing_m": "275",
+                                    "dec_rigid_rock_m": "240"
+                                }
+                            ]
+                        }
+                    ],
+                    "cementing_reper": [
+                        {
+                            "dec_volume": "3.00",
+                            "dec_density": "1.40",
+                            "cementing_reper_component": [
+                                {
+                                    "voc_component": "\u0411\u0435\u043d\u0442\u043e\u043d\u0438\u0442"
+                                },
+                                {
+                                    "voc_component": "\u041d\u0422\u0424",
+                                    "dec_amount": "1.10"
+                                },
+                                {
+                                    "voc_component": "CFL-110",
+                                    "dec_amount": "1.50"
+                                },
+                                {
+                                    "voc_component": "\u041f\u0426\u0422 III-\u041e\u0431",
+                                    "dec_amount": "0.10"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "int_stage_number": "2",
+                    "dec_pressure_work": "8",
+                    "dec_pressure_stop": "11",
+                    "cementing_interval": [
+                        {
+                            "dec_depth_from": "2350",
+                            "dec_depth_to": "1750",
+                            "voc_material": "\u0420\u0422\u041c-75",
+                            "dec_amount": "23.00",
+                            "dec_volume_plan": "16.50",
+                            "dec_volume_fact": "17.32",
+                            "dec_density_plan": "1.41",
+                            "dec_density_fact": "1.43",
+                            "cementing_buffer": [
+                                {
+                                    "dec_volume": "2.55",
+                                    "voc_composition": "\u041c\u0411\u041f-\u0421\u041c",
+                                    "dec_weight": "79.00"
+                                }
+                            ],
+                            "material_test": [
+                                {
+                                    "dec_water_cement_ratio": "0.55",
+                                    "dec_spreadability": "226",
+                                    "dec_temp_static": "67",
+                                    "dec_temp_dynamic": "58",
+                                    "dec_pressure": "311",
+                                    "dec_thickening_time": "134",
+                                    "data_setting_start": "5-36",
+                                    "data_setting_end": "10-05",
+                                    "dec_strength_bending": "2.55",
+                                    "dec_strength_compress": "6.40",
+                                    "dec_water_separation": "1.14",
+                                    "dec_fluid_loss": "491"
+                                }
+                            ],
+                            "akc_by_material": [
+                                {
+                                    "dec_partial_casing_m": "126",
+                                    "dec_partial_rock_m": "132",
+                                    "dec_partial_casing_pct": "43.0",
+                                    "dec_partial_rock_pct": "45.0",
+                                    "dec_rigid_casing_m": "360",
+                                    "dec_rigid_rock_m": "318"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "productive_horizon": [
+                {
+                    "data_formation": "\u0411\u04218",
+                    "dec_depth_from": "2439",
+                    "dec_depth_to": "2414",
+                    "voc_fluid_type": "\u043d\u0435\u0444\u0442\u044c+\u0433\u0430\u0437",
+                    "bul_peretok": "0",
+                    "akc_by_horizon": [
+                        {
+                            "dec_partial_casing_m": "15",
+                            "dec_partial_rock_m": "12",
+                            "dec_partial_casing_pct": "56.0",
+                            "dec_partial_rock_pct": "71.0",
+                            "dec_rigid_casing_m": "25",
+                            "dec_rigid_rock_m": "22"
+                        }
+                    ]
+                },
+                {
+                    "data_formation": "\u042e\u04211(1)",
+                    "dec_depth_from": "2344",
+                    "dec_depth_to": "2308",
+                    "voc_fluid_type": "\u043d\u0435\u0444\u0442\u044c",
+                    "bul_peretok": "1",
+                    "akc_by_horizon": [
+                        {
+                            "dec_partial_casing_m": "15",
+                            "dec_partial_rock_m": "12",
+                            "dec_partial_casing_pct": "63.0",
+                            "dec_partial_rock_pct": "80.0",
+                            "dec_rigid_casing_m": "25",
+                            "dec_rigid_rock_m": "22"
+                        }
+                    ]
+                },
+                {
+                    "data_formation": "\u0411\u042110",
+                    "dec_depth_from": "2249",
+                    "dec_depth_to": "2202",
+                    "voc_fluid_type": "\u043d\u0435\u0444\u0442\u044c+\u0432\u043e\u0434\u0430",
+                    "bul_peretok": "1",
+                    "akc_by_horizon": [
+                        {
+                            "dec_partial_casing_m": "15",
+                            "dec_partial_rock_m": "12",
+                            "dec_partial_casing_pct": "70.0",
+                            "dec_partial_rock_pct": "19.0",
+                            "dec_rigid_casing_m": "25",
+                            "dec_rigid_rock_m": "27"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "int_number": "203",
+            "date_done": "2024-09-22",
+            "voc_mr": "\u0421\u0430\u043c\u043e\u0442\u043b\u043e\u0440\u0441\u043a\u0430\u044f",
+            "voc_enterprise": "\u041e\u041e\u041e \"\u0411\u0443\u0440\u043d\u0435\u0444\u0442\u0435\u0441\u0435\u0440\u0432\u0438\u0441\"",
+            "voc_subsoiluser": "\u041f\u0410\u041e \"\u0421\u0435\u0432\u0435\u0440\u043d\u0435\u0444\u0442\u0435\u0433\u0430\u0437\"",
+            "dec_depth": "3550",
+            "dec_temp": "88",
+            "dec_diam_col": "146",
+            "dec_diam_prev_col": "273",
+            "dec_depth_prev_col": "1900",
+            "dec_depth_usc": "2480",
+            "voc_usc": "\u041c\u0421\u0426-178",
+            "voc_technolog": "\u041a\u043e\u0432\u0430\u043b\u0451\u0432",
+            "voc_status": "\u0412 \u0440\u0430\u0431\u043e\u0442\u0435",
+            "ltext_remark": "\u041e\u0436\u0438\u0434\u0430\u0435\u0442\u0441\u044f \u0430\u043a\u0443\u0441\u0442\u0438\u0447\u0435\u0441\u043a\u0438\u0439 \u043a\u043e\u043d\u0442\u0440\u043e\u043b\u044c.",
+            "cementing_stage": [
+                {
+                    "int_stage_number": "1",
+                    "dec_pressure_work": "19",
+                    "dec_pressure_stop": "22",
+                    "cementing_interval": [
+                        {
+                            "dec_depth_from": "3550",
+                            "dec_depth_to": "2850",
+                            "voc_material": "\u041e\u0422\u041c-3",
+                            "dec_amount": "28.00",
+                            "dec_volume_plan": "19.50",
+                            "dec_volume_fact": "21.06",
+                            "dec_density_plan": "1.48",
+                            "dec_density_fact": "1.51",
+                            "cementing_buffer": [
+                                {
+                                    "dec_volume": "3.00",
+                                    "voc_composition": "\u0411\u0443\u0444\u0435\u0440 \u0432\u043e\u0434\u043d\u044b\u0439",
+                                    "dec_weight": "98.00"
+                                }
+                            ],
+                            "material_test": [
+                                {
+                                    "dec_water_cement_ratio": "0.60",
+                                    "dec_spreadability": "233",
+                                    "dec_temp_static": "72",
+                                    "dec_temp_dynamic": "62",
+                                    "dec_pressure": "328",
+                                    "dec_thickening_time": "147",
+                                    "data_setting_start": "6-43",
+                                    "data_setting_end": "8-15",
+                                    "dec_strength_bending": "3.00",
+                                    "dec_strength_compress": "7.40",
+                                    "dec_water_separation": "1.42",
+                                    "dec_fluid_loss": "628",
+                                    "dec_linear_expansion": "10.00"
+                                }
+                            ]
+                        }
+                    ],
+                    "cementing_reper": [
+                        {
+                            "dec_volume": "3.80",
+                            "dec_density": "1.48",
+                            "cementing_reper_component": [
+                                {
+                                    "voc_component": "CFL-110"
+                                },
+                                {
+                                    "voc_component": "\u041f\u0426\u0422 III-\u041e\u0431",
+                                    "dec_amount": "1.70"
+                                },
+                                {
+                                    "voc_component": "\u041f\u043e\u043b\u0438\u0446\u0435\u043c",
+                                    "dec_amount": "0.30"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "productive_horizon": [
+                {
+                    "data_formation": "\u0411\u042110",
+                    "dec_depth_from": "3029",
+                    "dec_depth_to": "2997",
+                    "voc_fluid_type": "\u043d\u0435\u0444\u0442\u044c",
+                    "bul_peretok": "0"
+                },
+                {
+                    "data_formation": "\u0410\u042110",
+                    "dec_depth_from": "2934",
+                    "dec_depth_to": "2891",
+                    "voc_fluid_type": "\u043d\u0435\u0444\u0442\u044c+\u0432\u043e\u0434\u0430",
+                    "bul_peretok": "0"
+                }
+            ]
+        },
+        {
+            "int_number": "204",
+            "date_done": "2019-11-14",
+            "voc_mr": "\u0412\u0430\u0442\u044c\u0435\u0433\u0430\u043d\u0441\u043a\u0430\u044f",
+            "voc_enterprise": "\u041e\u041e\u041e \"\u0413\u0435\u043e\u0411\u0443\u0440\u0421\u0435\u0440\u0432\u0438\u0441\"",
+            "voc_subsoiluser": "\u041e\u041e\u041e \"\u0412\u0430\u0442\u044c\u0435\u0433\u0430\u043d\u043d\u0435\u0444\u0442\u044c\"",
+            "dec_depth": "3980",
+            "dec_temp": "101",
+            "dec_diam_col": "140",
+            "dec_diam_prev_col": "324",
+            "dec_depth_prev_col": "2250",
+            "dec_depth_usc": "2940",
+            "voc_usc": "\u0423\u0421\u0426-140",
+            "voc_technolog": "\u041d\u0430\u0437\u0430\u0440\u043e\u0432",
+            "voc_status": "\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u0430",
+            "cementing_stage": [
+                {
+                    "int_stage_number": "1",
+                    "dec_pressure_work": "20",
+                    "dec_pressure_stop": "24",
+                    "cementing_interval": [
+                        {
+                            "dec_depth_from": "3980",
+                            "dec_depth_to": "3280",
+                            "voc_material": "\u041e\u0422\u041c-5",
+                            "dec_amount": "11.00",
+                            "dec_volume_plan": "22.50",
+                            "dec_volume_fact": "22.05",
+                            "dec_density_plan": "1.55",
+                            "dec_density_fact": "1.52",
+                            "cementing_buffer": [
+                                {
+                                    "dec_volume": "3.45",
+                                    "voc_composition": "\u041a\u0421\u0421\u0411",
+                                    "dec_weight": "117.00"
+                                },
+                                {
+                                    "dec_volume": "1.20",
+                                    "voc_composition": "\u041c\u0411\u041f-\u041c",
+                                    "dec_weight": "148.00"
+                                }
+                            ],
+                            "material_test": [
+                                {
+                                    "dec_water_cement_ratio": "0.65",
+                                    "dec_spreadability": "240",
+                                    "dec_temp_static": "77",
+                                    "dec_temp_dynamic": "66",
+                                    "dec_pressure": "345",
+                                    "dec_thickening_time": "160",
+                                    "data_setting_start": "2-50",
+                                    "data_setting_end": "5-25",
+                                    "dec_strength_bending": "3.45",
+                                    "dec_strength_compress": "8.40",
+                                    "dec_water_separation": "1.70",
+                                    "dec_fluid_loss": "765"
+                                }
+                            ],
+                            "akc_by_material": [
+                                {
+                                    "dec_partial_casing_m": "84",
+                                    "dec_partial_rock_m": "98",
+                                    "dec_partial_casing_pct": "57.0",
+                                    "dec_partial_rock_pct": "63.0",
+                                    "dec_rigid_casing_m": "350",
+                                    "dec_rigid_rock_m": "266"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "int_stage_number": "2",
+                    "dec_pressure_work": "10",
+                    "dec_pressure_stop": "15",
+                    "cementing_interval": [
+                        {
+                            "dec_depth_from": "3280",
+                            "dec_depth_to": "2580",
+                            "voc_material": "\u041f\u0426\u0422 I-G-CC-1",
+                            "dec_amount": "16.00",
+                            "dec_volume_plan": "25.50",
+                            "dec_volume_fact": "26.27",
+                            "dec_density_plan": "1.62",
+                            "dec_density_fact": "1.61",
+                            "cementing_buffer": [
+                                {
+                                    "dec_volume": "3.90",
+                                    "voc_composition": "\u041c\u0411\u041f-\u0421",
+                                    "dec_weight": "136.00"
+                                }
+                            ],
+                            "material_test": [
+                                {
+                                    "dec_water_cement_ratio": "0.70",
+                                    "dec_spreadability": "247",
+                                    "dec_temp_static": "82",
+                                    "dec_temp_dynamic": "70",
+                                    "dec_pressure": "362",
+                                    "dec_thickening_time": "173",
+                                    "data_setting_start": "3-57",
+                                    "data_setting_end": "7-35",
+                                    "dec_strength_bending": "3.90",
+                                    "dec_strength_compress": "9.40",
+                                    "dec_water_separation": "1.98",
+                                    "dec_fluid_loss": "902",
+                                    "dec_linear_expansion": "12.00"
+                                }
+                            ],
+                            "akc_by_material": [
+                                {
+                                    "dec_partial_casing_m": "105",
+                                    "dec_partial_rock_m": "126",
+                                    "dec_partial_casing_pct": "64.0",
+                                    "dec_partial_rock_pct": "72.0",
+                                    "dec_rigid_casing_m": "385",
+                                    "dec_rigid_rock_m": "301"
+                                }
+                            ]
+                        }
+                    ],
+                    "cementing_reper": [
+                        {
+                            "dec_volume": "4.60",
+                            "dec_density": "1.56",
+                            "cementing_reper_component": [
+                                {
+                                    "voc_component": "\u041f\u043e\u043b\u0438\u0446\u0435\u043c"
+                                },
+                                {
+                                    "voc_component": "\u0413\u0438\u043f\u0430\u043d",
+                                    "dec_amount": "0.50"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "int_stage_number": "3",
+                    "dec_pressure_work": "13",
+                    "dec_pressure_stop": "16",
+                    "cementing_interval": [
+                        {
+                            "dec_depth_from": "2580",
+                            "dec_depth_to": "1880",
+                            "voc_material": "\u0420\u0422\u041c-75 \u041f\u0412",
+                            "dec_amount": "21.00",
+                            "dec_volume_plan": "28.50",
+                            "dec_volume_fact": "26.50",
+                            "dec_density_plan": "1.69",
+                            "dec_density_fact": "1.70",
+                            "cementing_buffer": [
+                                {
+                                    "dec_volume": "4.35",
+                                    "voc_composition": "\u041c\u0411\u041f-\u041c",
+                                    "dec_weight": "155.00"
+                                }
+                            ],
+                            "material_test": [
+                                {
+                                    "dec_water_cement_ratio": "0.75",
+                                    "dec_spreadability": "254",
+                                    "dec_temp_static": "87",
+                                    "dec_temp_dynamic": "70",
+                                    "dec_pressure": "379",
+                                    "dec_thickening_time": "186",
+                                    "data_setting_start": "4-04",
+                                    "data_setting_end": "9-45",
+                                    "dec_strength_bending": "4.35",
+                                    "dec_strength_compress": "6.55",
+                                    "dec_water_separation": "2.26",
+                                    "dec_fluid_loss": "1039"
+                                }
+                            ],
+                            "akc_by_material": [
+                                {
+                                    "dec_partial_casing_m": "126",
+                                    "dec_partial_rock_m": "154",
+                                    "dec_partial_casing_pct": "71.0",
+                                    "dec_partial_rock_pct": "81.0",
+                                    "dec_rigid_casing_m": "420",
+                                    "dec_rigid_rock_m": "336"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "productive_horizon": [
+                {
+                    "data_formation": "\u042e\u04212",
+                    "dec_depth_from": "3422",
+                    "dec_depth_to": "3383",
+                    "voc_fluid_type": "\u043d\u0435\u0444\u0442\u044c+\u0432\u043e\u0434\u0430",
+                    "bul_peretok": "0",
+                    "akc_by_horizon": [
+                        {
+                            "dec_partial_casing_m": "15",
+                            "dec_partial_rock_m": "12",
+                            "dec_partial_casing_pct": "24.0",
+                            "dec_partial_rock_pct": "57.0",
+                            "dec_rigid_casing_m": "25",
+                            "dec_rigid_rock_m": "22"
+                        }
+                    ]
+                },
+                {
+                    "data_formation": "\u0411\u042111",
+                    "dec_depth_from": "3327",
+                    "dec_depth_to": "3277",
+                    "voc_fluid_type": "\u043d\u0435\u0444\u0442\u044c+\u0433\u0430\u0437",
+                    "bul_peretok": "0",
+                    "akc_by_horizon": [
+                        {
+                            "dec_partial_casing_m": "15",
+                            "dec_partial_rock_m": "12",
+                            "dec_partial_casing_pct": "31.0",
+                            "dec_partial_rock_pct": "66.0",
+                            "dec_rigid_casing_m": "27",
+                            "dec_rigid_rock_m": "24"
+                        }
+                    ]
+                },
+                {
+                    "data_formation": "\u0410\u042111",
+                    "dec_depth_from": "3232",
+                    "dec_depth_to": "3214",
+                    "voc_fluid_type": "\u043d\u0435\u0444\u0442\u044c",
+                    "bul_peretok": "0",
+                    "akc_by_horizon": [
+                        {
+                            "dec_partial_casing_m": "15",
+                            "dec_partial_rock_m": "12",
+                            "dec_partial_casing_pct": "38.0",
+                            "dec_partial_rock_pct": "75.0",
+                            "dec_rigid_casing_m": "25",
+                            "dec_rigid_rock_m": "22"
+                        }
+                    ]
+                },
+                {
+                    "data_formation": "\u0410\u042112(2)",
+                    "dec_depth_from": "3137",
+                    "dec_depth_to": "3108",
+                    "voc_fluid_type": "\u043d\u0435\u0444\u0442\u044c+\u0432\u043e\u0434\u0430",
+                    "bul_peretok": "0",
+                    "akc_by_horizon": [
+                        {
+                            "dec_partial_casing_m": "15",
+                            "dec_partial_rock_m": "12",
+                            "dec_partial_casing_pct": "45.0",
+                            "dec_partial_rock_pct": "84.0",
+                            "dec_rigid_casing_m": "25",
+                            "dec_rigid_rock_m": "22"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "int_number": "205",
+            "date_done": "2025-11-20",
+            "voc_mr": "\u0422\u0435\u0432\u043b\u0438\u043d\u0441\u043a\u043e-\u0420\u0443\u0441\u0441\u043a\u0438\u043d\u0441\u043a\u0430\u044f",
+            "voc_enterprise": "\u041e\u041e\u041e \"\u0417\u0430\u043f\u0430\u0434\u0431\u0443\u0440\u043d\u0435\u0444\u0442\u044c\"",
+            "voc_subsoiluser": "\u041f\u0410\u041e \"\u0421\u0435\u0432\u0435\u0440\u043d\u0435\u0444\u0442\u0435\u0433\u0430\u0437\"",
+            "dec_depth": "3370",
+            "dec_temp": "84",
+            "dec_diam_col": "178",
+            "dec_diam_prev_col": "245",
+            "dec_depth_prev_col": "1750",
+            "dec_depth_usc": "2190",
+            "voc_usc": "\u041c\u0421\u0426-178",
+            "voc_technolog": "\u0415\u0440\u043e\u0445\u0438\u043d",
+            "voc_status": "\u0417\u0430\u043f\u043b\u0430\u043d\u0438\u0440\u043e\u0432\u0430\u043d\u0430",
+            "productive_horizon": [
+                {
+                    "data_formation": "\u0410\u042111",
+                    "dec_depth_from": "2886",
+                    "dec_depth_to": "2840",
+                    "voc_fluid_type": "\u043d\u0435\u0444\u0442\u044c+\u0433\u0430\u0437",
+                    "bul_peretok": "0"
+                },
+                {
+                    "data_formation": "\u0410\u042112(2)",
+                    "dec_depth_from": "2791",
+                    "dec_depth_to": "2734",
+                    "voc_fluid_type": "\u043d\u0435\u0444\u0442\u044c",
+                    "bul_peretok": "0"
+                }
+            ]
+        },
+        {
+            "int_number": "206",
+            "date_done": "2022-05-27",
+            "voc_mr": "\u042e\u0436\u043d\u043e-\u042f\u0433\u0443\u043d\u0441\u043a\u0430\u044f",
+            "voc_enterprise": "\u041e\u041e\u041e \"\u0418\u043d\u0442\u0435\u0440-\u041e\u0439\u043b\"",
+            "voc_subsoiluser": "\u0410\u041e \"\u041f\u0440\u0438\u043e\u0431\u0441\u043a\u043d\u0435\u0444\u0442\u044c\"",
+            "dec_depth": "2740",
+            "dec_temp": "66",
+            "dec_diam_col": "146",
+            "dec_diam_prev_col": "219",
+            "dec_depth_prev_col": "1320",
+            "dec_depth_usc": "1760",
+            "voc_usc": "\u041c\u0421\u0426-219",
+            "voc_technolog": "\u041d\u0430\u0437\u0430\u0440\u043e\u0432",
+            "voc_status": "\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u0430",
+            "ltext_remark": "\u041f\u043e\u0441\u043b\u0435 \u041e\u0417\u0426 \u0434\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u0432\u043e\u0441\u0441\u0442\u0430\u043d\u043e\u0432\u0438\u043b\u043e\u0441\u044c.",
+            "cementing_stage": [
+                {
+                    "int_stage_number": "1",
+                    "dec_pressure_work": "9",
+                    "dec_pressure_stop": "12",
+                    "cementing_interval": [
+                        {
+                            "dec_depth_from": "2740",
+                            "dec_depth_to": "2340",
+                            "voc_material": "\u041e\u0422\u041c-7",
+                            "dec_amount": "26.00",
+                            "dec_volume_plan": "31.50",
+                            "dec_volume_fact": "30.24",
+                            "dec_density_plan": "1.76",
+                            "dec_density_fact": "1.78",
+                            "cementing_buffer": [
+                                {
+                                    "dec_volume": "1.20",
+                                    "voc_composition": "\u041d\u0422\u0424",
+                                    "dec_weight": "174.00"
+                                }
+                            ],
+                            "material_test": [
+                                {
+                                    "dec_water_cement_ratio": "0.80",
+                                    "dec_spreadability": "205",
+                                    "dec_temp_static": "55",
+                                    "dec_temp_dynamic": "45",
+                                    "dec_pressure": "396",
+                                    "dec_thickening_time": "199",
+                                    "data_setting_start": "5-11",
+                                    "data_setting_end": "7-55",
+                                    "dec_strength_bending": "4.80",
+                                    "dec_strength_compress": "7.55",
+                                    "dec_water_separation": "2.54",
+                                    "dec_fluid_loss": "1176",
+                                    "dec_linear_expansion": "14.00"
+                                }
+                            ],
+                            "akc_by_material": [
+                                {
+                                    "dec_partial_casing_m": "84",
+                                    "dec_partial_rock_m": "40",
+                                    "dec_partial_casing_pct": "78.0",
+                                    "dec_partial_rock_pct": "20.0",
+                                    "dec_rigid_casing_m": "180",
+                                    "dec_rigid_rock_m": "212"
+                                }
+                            ]
+                        },
+                        {
+                            "dec_depth_from": "2340",
+                            "dec_depth_to": "1940",
+                            "voc_material": "\u041e\u0422\u041c-5",
+                            "dec_amount": "9.00",
+                            "dec_volume_plan": "7.50",
+                            "dec_volume_fact": "7.65",
+                            "dec_density_plan": "1.83",
+                            "dec_density_fact": "1.86",
+                            "cementing_buffer": [
+                                {
+                                    "dec_volume": "1.65",
+                                    "voc_composition": "\u041c\u0411\u041f-\u0421\u041c",
+                                    "dec_weight": "23.00"
+                                }
+                            ],
+                            "material_test": [
+                                {
+                                    "dec_water_cement_ratio": "0.40",
+                                    "dec_spreadability": "212",
+                                    "dec_temp_static": "60",
+                                    "dec_temp_dynamic": "45",
+                                    "dec_pressure": "413",
+                                    "dec_thickening_time": "212",
+                                    "data_setting_start": "6-18",
+                                    "data_setting_end": "9-05",
+                                    "dec_strength_bending": "5.25",
+                                    "dec_strength_compress": "8.55",
+                                    "dec_water_separation": "2.82",
+                                    "dec_fluid_loss": "1313"
+                                }
+                            ],
+                            "akc_by_material": [
+                                {
+                                    "dec_partial_casing_m": "96",
+                                    "dec_partial_rock_m": "56",
+                                    "dec_partial_casing_pct": "85.0",
+                                    "dec_partial_rock_pct": "29.0",
+                                    "dec_rigid_casing_m": "200",
+                                    "dec_rigid_rock_m": "232"
+                                }
+                            ]
+                        }
+                    ],
+                    "cementing_reper": [
+                        {
+                            "dec_volume": "2.60",
+                            "dec_density": "1.36",
+                            "cementing_reper_component": [
+                                {
+                                    "voc_component": "\u0421\u0443\u043b\u044c\u0444\u0430\u0446\u0435\u043b\u043b"
+                                },
+                                {
+                                    "voc_component": "\u041f\u0426\u0422-G-CC-1",
+                                    "dec_amount": "1.10"
+                                },
+                                {
+                                    "voc_component": "\u041a\u041c\u0426",
+                                    "dec_amount": "1.50"
+                                },
+                                {
+                                    "voc_component": "\u0411\u0435\u043d\u0442\u043e\u043d\u0438\u0442",
+                                    "dec_amount": "0.10"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "productive_horizon": [
+                {
+                    "data_formation": "\u0411\u04218",
+                    "dec_depth_from": "2332",
+                    "dec_depth_to": "2279",
+                    "voc_fluid_type": "\u043d\u0435\u0444\u0442\u044c",
+                    "bul_peretok": "0",
+                    "akc_by_horizon": [
+                        {
+                            "dec_partial_casing_m": "15",
+                            "dec_partial_rock_m": "12",
+                            "dec_partial_casing_pct": "57.0",
+                            "dec_partial_rock_pct": "43.0",
+                            "dec_rigid_casing_m": "31",
+                            "dec_rigid_rock_m": "22"
+                        }
+                    ]
+                },
+                {
+                    "data_formation": "\u042e\u04211(1)",
+                    "dec_depth_from": "2237",
+                    "dec_depth_to": "2216",
+                    "voc_fluid_type": "\u043d\u0435\u0444\u0442\u044c+\u0432\u043e\u0434\u0430",
+                    "bul_peretok": "0",
+                    "akc_by_horizon": [
+                        {
+                            "dec_partial_casing_m": "15",
+                            "dec_partial_rock_m": "12",
+                            "dec_partial_casing_pct": "64.0",
+                            "dec_partial_rock_pct": "52.0",
+                            "dec_rigid_casing_m": "25",
+                            "dec_rigid_rock_m": "22"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "int_number": "207",
+            "date_done": "2024-12-06",
+            "voc_mr": "\u041f\u043e\u0432\u0445\u043e\u0432\u0441\u043a\u0430\u044f",
+            "voc_enterprise": "\u041e\u041e\u041e \"\u0411\u0443\u0440\u043d\u0435\u0444\u0442\u0435\u0441\u0435\u0440\u0432\u0438\u0441\"",
+            "voc_subsoiluser": "\u0417\u0410\u041e \"\u0421\u0430\u043c\u0430\u0440\u0430-\u041d\u0430\u0444\u0442\u0430\"",
+            "dec_depth": "3320",
+            "dec_temp": "82",
+            "dec_diam_col": "168",
+            "dec_diam_prev_col": "273",
+            "dec_depth_prev_col": "1840",
+            "dec_depth_usc": "2320",
+            "voc_usc": "\u041c\u0421\u0426-168",
+            "voc_technolog": "\u0428\u0430\u0439\u043c\u0438\u0435\u0432",
+            "voc_status": "\u0412 \u0440\u0430\u0431\u043e\u0442\u0435",
+            "cementing_stage": [
+                {
+                    "int_stage_number": "1",
+                    "dec_pressure_work": "10",
+                    "dec_pressure_stop": "14",
+                    "cementing_interval": [
+                        {
+                            "dec_depth_from": "3320",
+                            "dec_depth_to": "2720",
+                            "voc_material": "\u0426\u0422\u0420\u041e-1",
+                            "dec_amount": "14.00",
+                            "dec_volume_plan": "10.50",
+                            "dec_volume_fact": "11.03",
+                            "dec_density_plan": "1.90",
+                            "dec_density_fact": "1.87",
+                            "cementing_buffer": [
+                                {
+                                    "dec_volume": "2.10",
+                                    "voc_composition": "\u0411\u0443\u0444\u0435\u0440 \u0432\u043e\u0434\u043d\u044b\u0439",
+                                    "dec_weight": "42.00"
+                                },
+                                {
+                                    "dec_volume": "3.45",
+                                    "voc_composition": "\u041c\u0411\u041f-\u0421",
+                                    "dec_weight": "73.00"
+                                }
+                            ],
+                            "material_test": [
+                                {
+                                    "dec_water_cement_ratio": "0.45",
+                                    "dec_spreadability": "219",
+                                    "dec_temp_static": "65",
+                                    "dec_temp_dynamic": "49",
+                                    "dec_pressure": "430",
+                                    "dec_thickening_time": "225",
+                                    "data_setting_start": "2-25",
+                                    "data_setting_end": "6-15",
+                                    "dec_strength_bending": "5.70",
+                                    "dec_strength_compress": "9.55",
+                                    "dec_water_separation": "0.30",
+                                    "dec_fluid_loss": "1450",
+                                    "dec_linear_expansion": "16.00"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "int_stage_number": "2",
+                    "dec_pressure_work": "13",
+                    "dec_pressure_stop": "18",
+                    "cementing_interval": [
+                        {
+                            "dec_depth_from": "2720",
+                            "dec_depth_to": "2120",
+                            "voc_material": "\u0420\u0422\u041c-100",
+                            "dec_amount": "19.00",
+                            "dec_volume_plan": "13.50",
+                            "dec_volume_fact": "14.58",
+                            "dec_density_plan": "1.25",
+                            "dec_density_fact": "1.24",
+                            "cementing_buffer": [
+                                {
+                                    "dec_volume": "2.55",
+                                    "voc_composition": "\u041a\u0421\u0421\u0411",
+                                    "dec_weight": "61.00"
+                                }
+                            ],
+                            "material_test": [
+                                {
+                                    "dec_water_cement_ratio": "0.50",
+                                    "dec_spreadability": "226",
+                                    "dec_temp_static": "70",
+                                    "dec_temp_dynamic": "53",
+                                    "dec_pressure": "267",
+                                    "dec_thickening_time": "238",
+                                    "data_setting_start": "3-32",
+                                    "data_setting_end": "8-25",
+                                    "dec_strength_bending": "6.15",
+                                    "dec_strength_compress": "10.55",
+                                    "dec_water_separation": "0.58",
+                                    "dec_fluid_loss": "1587"
+                                }
+                            ]
+                        }
+                    ],
+                    "cementing_reper": [
+                        {
+                            "dec_volume": "3.40",
+                            "dec_density": "1.44",
+                            "cementing_reper_component": [
+                                {
+                                    "voc_component": "\u041a\u041c\u0426"
+                                },
+                                {
+                                    "voc_component": "\u0411\u0435\u043d\u0442\u043e\u043d\u0438\u0442",
+                                    "dec_amount": "1.70"
+                                },
+                                {
+                                    "voc_component": "\u041d\u0422\u0424",
+                                    "dec_amount": "0.30"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "productive_horizon": [
+                {
+                    "data_formation": "\u0411\u042110",
+                    "dec_depth_from": "2855",
+                    "dec_depth_to": "2795",
+                    "voc_fluid_type": "\u043d\u0435\u0444\u0442\u044c+\u0432\u043e\u0434\u0430",
+                    "bul_peretok": "0"
+                },
+                {
+                    "data_formation": "\u0410\u042110",
+                    "dec_depth_from": "2760",
+                    "dec_depth_to": "2732",
+                    "voc_fluid_type": "\u043d\u0435\u0444\u0442\u044c+\u0433\u0430\u0437",
+                    "bul_peretok": "0"
+                },
+                {
+                    "data_formation": "\u042e\u04212",
+                    "dec_depth_from": "2665",
+                    "dec_depth_to": "2626",
+                    "voc_fluid_type": "\u043d\u0435\u0444\u0442\u044c",
+                    "bul_peretok": "0"
+                }
+            ]
+        },
+        {
+            "int_number": "208",
+            "date_done": "2023-08-16",
+            "voc_mr": "\u041f\u0440\u0438\u043e\u0431\u0441\u043a\u0430\u044f",
+            "voc_enterprise": "\u0410\u041e \"\u0421\u0438\u0431\u0438\u0440\u0441\u043a\u0430\u044f \u0431\u0443\u0440\u043e\u0432\u0430\u044f \u043a\u043e\u043c\u043f\u0430\u043d\u0438\u044f\"",
+            "voc_subsoiluser": "\u041f\u0410\u041e \"\u0421\u0435\u0432\u0435\u0440\u043d\u0435\u0444\u0442\u0435\u0433\u0430\u0437\"",
+            "dec_depth": "4180",
+            "dec_temp": "109",
+            "dec_diam_col": "140",
+            "dec_diam_prev_col": "324",
+            "dec_depth_prev_col": "2380",
+            "dec_depth_usc": "3260",
+            "voc_usc": "\u0423\u0421\u0426-140",
+            "voc_technolog": "\u041d\u0430\u0437\u0430\u0440\u043e\u0432",
+            "voc_status": "\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u0430",
+            "cementing_stage": [
+                {
+                    "int_stage_number": "1",
+                    "dec_pressure_work": "11",
+                    "dec_pressure_stop": "16",
+                    "cementing_interval": [
+                        {
+                            "dec_depth_from": "4180",
+                            "dec_depth_to": "3480",
+                            "voc_material": "\u041f\u0426\u0422 III-\u041e\u0431 5-100",
+                            "dec_amount": "24.00",
+                            "dec_volume_plan": "16.50",
+                            "dec_volume_fact": "16.17",
+                            "dec_density_plan": "1.32",
+                            "dec_density_fact": "1.33",
+                            "cementing_buffer": [
+                                {
+                                    "dec_volume": "3.00",
+                                    "voc_composition": "\u041c\u0411\u041f-\u0421",
+                                    "dec_weight": "80.00"
+                                }
+                            ],
+                            "material_test": [
+                                {
+                                    "dec_water_cement_ratio": "0.55",
+                                    "dec_spreadability": "233",
+                                    "dec_temp_static": "75",
+                                    "dec_temp_dynamic": "57",
+                                    "dec_pressure": "284",
+                                    "dec_thickening_time": "251",
+                                    "data_setting_start": "4-39",
+                                    "data_setting_end": "6-35",
+                                    "dec_strength_bending": "1.20",
+                                    "dec_strength_compress": "6.15",
+                                    "dec_water_separation": "0.86",
+                                    "dec_fluid_loss": "1724",
+                                    "dec_linear_expansion": "18.00"
+                                }
+                            ],
+                            "akc_by_material": [
+                                {
+                                    "dec_partial_casing_m": "126",
+                                    "dec_partial_rock_m": "70",
+                                    "dec_partial_casing_pct": "41.0",
+                                    "dec_partial_rock_pct": "56.0",
+                                    "dec_rigid_casing_m": "315",
+                                    "dec_rigid_rock_m": "336"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "int_stage_number": "2",
+                    "dec_pressure_work": "14",
+                    "dec_pressure_stop": "17",
+                    "cementing_interval": [
+                        {
+                            "dec_depth_from": "3480",
+                            "dec_depth_to": "2980",
+                            "voc_material": "\u041e\u0422\u041c-5",
+                            "dec_amount": "29.00",
+                            "dec_volume_plan": "19.50",
+                            "dec_volume_fact": "20.09",
+                            "dec_density_plan": "1.39",
+                            "dec_density_fact": "1.41",
+                            "cementing_buffer": [
+                                {
+                                    "dec_volume": "3.45",
+                                    "voc_composition": "\u041c\u0411\u041f-\u041c",
+                                    "dec_weight": "99.00"
+                                }
+                            ],
+                            "material_test": [
+                                {
+                                    "dec_water_cement_ratio": "0.60",
+                                    "dec_spreadability": "240",
+                                    "dec_temp_static": "80",
+                                    "dec_temp_dynamic": "61",
+                                    "dec_pressure": "301",
+                                    "dec_thickening_time": "104",
+                                    "data_setting_start": "5-46",
+                                    "data_setting_end": "8-45",
+                                    "dec_strength_bending": "1.65",
+                                    "dec_strength_compress": "7.15",
+                                    "dec_water_separation": "1.14",
+                                    "dec_fluid_loss": "1861"
+                                }
+                            ],
+                            "akc_by_material": [
+                                {
+                                    "dec_partial_casing_m": "105",
+                                    "dec_partial_rock_m": "70",
+                                    "dec_partial_casing_pct": "48.0",
+                                    "dec_partial_rock_pct": "65.0",
+                                    "dec_rigid_casing_m": "250",
+                                    "dec_rigid_rock_m": "265"
+                                }
+                            ]
+                        },
+                        {
+                            "dec_depth_from": "2980",
+                            "dec_depth_to": "2480",
+                            "voc_material": "\u041e\u0422\u041c-5",
+                            "dec_amount": "12.00",
+                            "dec_volume_plan": "22.50",
+                            "dec_volume_fact": "20.92",
+                            "dec_density_plan": "1.46",
+                            "dec_density_fact": "1.49",
+                            "cementing_buffer": [
+                                {
+                                    "dec_volume": "3.90",
+                                    "voc_composition": "\u041d\u0422\u0424",
+                                    "dec_weight": "118.00"
+                                }
+                            ],
+                            "material_test": [
+                                {
+                                    "dec_water_cement_ratio": "0.65",
+                                    "dec_spreadability": "247",
+                                    "dec_temp_static": "85",
+                                    "dec_temp_dynamic": "70",
+                                    "dec_pressure": "318",
+                                    "dec_thickening_time": "117",
+                                    "data_setting_start": "6-53",
+                                    "data_setting_end": "10-55",
+                                    "dec_strength_bending": "2.10",
+                                    "dec_strength_compress": "4.30",
+                                    "dec_water_separation": "1.42",
+                                    "dec_fluid_loss": "1998",
+                                    "dec_linear_expansion": "7.00"
+                                }
+                            ],
+                            "akc_by_material": [
+                                {
+                                    "dec_partial_casing_m": "120",
+                                    "dec_partial_rock_m": "90",
+                                    "dec_partial_casing_pct": "55.0",
+                                    "dec_partial_rock_pct": "74.0",
+                                    "dec_rigid_casing_m": "275",
+                                    "dec_rigid_rock_m": "290"
+                                }
+                            ]
+                        }
+                    ],
+                    "cementing_reper": [
+                        {
+                            "dec_volume": "4.20",
+                            "dec_density": "1.52",
+                            "cementing_reper_component": [
+                                {
+                                    "voc_component": "\u041d\u0422\u0424"
+                                },
+                                {
+                                    "voc_component": "CFL-110",
+                                    "dec_amount": "0.50"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "productive_horizon": [
+                {
+                    "data_formation": "\u042e\u04212",
+                    "dec_depth_from": "3582",
+                    "dec_depth_to": "3558",
+                    "voc_fluid_type": "\u043d\u0435\u0444\u0442\u044c+\u0433\u0430\u0437",
+                    "bul_peretok": "1",
+                    "akc_by_horizon": [
+                        {
+                            "dec_partial_casing_m": "15",
+                            "dec_partial_rock_m": "12",
+                            "dec_partial_casing_pct": "25.0",
+                            "dec_partial_rock_pct": "29.0",
+                            "dec_rigid_casing_m": "25",
+                            "dec_rigid_rock_m": "22"
+                        }
+                    ]
+                },
+                {
+                    "data_formation": "\u0411\u042111",
+                    "dec_depth_from": "3487",
+                    "dec_depth_to": "3452",
+                    "voc_fluid_type": "\u043d\u0435\u0444\u0442\u044c",
+                    "bul_peretok": "1",
+                    "akc_by_horizon": [
+                        {
+                            "dec_partial_casing_m": "15",
+                            "dec_partial_rock_m": "12",
+                            "dec_partial_casing_pct": "32.0",
+                            "dec_partial_rock_pct": "38.0",
+                            "dec_rigid_casing_m": "25",
+                            "dec_rigid_rock_m": "22"
+                        }
+                    ]
+                },
+                {
+                    "data_formation": "\u0410\u042111",
+                    "dec_depth_from": "3392",
+                    "dec_depth_to": "3346",
+                    "voc_fluid_type": "\u043d\u0435\u0444\u0442\u044c+\u0432\u043e\u0434\u0430",
+                    "bul_peretok": "0",
+                    "akc_by_horizon": [
+                        {
+                            "dec_partial_casing_m": "15",
+                            "dec_partial_rock_m": "12",
+                            "dec_partial_casing_pct": "39.0",
+                            "dec_partial_rock_pct": "47.0",
+                            "dec_rigid_casing_m": "27",
+                            "dec_rigid_rock_m": "22"
+                        }
+                    ]
+                },
+                {
+                    "data_formation": "\u0410\u042112(2)",
+                    "dec_depth_from": "3297",
+                    "dec_depth_to": "3240",
+                    "voc_fluid_type": "\u043d\u0435\u0444\u0442\u044c+\u0433\u0430\u0437",
+                    "bul_peretok": "0",
+                    "akc_by_horizon": [
+                        {
+                            "dec_partial_casing_m": "15",
+                            "dec_partial_rock_m": "12",
+                            "dec_partial_casing_pct": "46.0",
+                            "dec_partial_rock_pct": "56.0",
+                            "dec_rigid_casing_m": "25",
+                            "dec_rigid_rock_m": "27"
+                        }
+                    ]
+                },
+                {
+                    "data_formation": "\u0411\u04218",
+                    "dec_depth_from": "3202",
+                    "dec_depth_to": "3177",
+                    "voc_fluid_type": "\u043d\u0435\u0444\u0442\u044c",
+                    "bul_peretok": "0",
+                    "akc_by_horizon": [
+                        {
+                            "dec_partial_casing_m": "15",
+                            "dec_partial_rock_m": "12",
+                            "dec_partial_casing_pct": "53.0",
+                            "dec_partial_rock_pct": "65.0",
+                            "dec_rigid_casing_m": "25",
+                            "dec_rigid_rock_m": "22"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "int_number": "209",
+            "date_done": "2020-10-02",
+            "voc_mr": "\u0421\u0430\u043c\u043e\u0442\u043b\u043e\u0440\u0441\u043a\u0430\u044f",
+            "voc_enterprise": "\u041e\u041e\u041e \"\u0413\u0435\u043e\u0411\u0443\u0440\u0421\u0435\u0440\u0432\u0438\u0441\"",
+            "voc_subsoiluser": "\u041e\u041e\u041e \"\u0412\u0430\u0442\u044c\u0435\u0433\u0430\u043d\u043d\u0435\u0444\u0442\u044c\"",
+            "dec_depth": "3650",
+            "dec_temp": "91",
+            "dec_diam_col": "146",
+            "dec_diam_prev_col": "245",
+            "dec_depth_prev_col": "2040",
+            "dec_depth_usc": "2550",
+            "voc_usc": "\u041c\u0421\u0426-178",
+            "voc_technolog": "\u0414\u043e\u0440\u043e\u0448\u0435\u043d\u043a\u043e",
+            "voc_status": "\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u0430",
+            "ltext_remark": "\u0424\u0430\u043a\u0442\u0438\u0447\u0435\u0441\u043a\u0438\u0439 \u043e\u0431\u044a\u0451\u043c \u043d\u0435\u043c\u043d\u043e\u0433\u043e \u0432\u044b\u0448\u0435 \u043f\u043b\u0430\u043d\u0430.",
+            "cementing_stage": [
+                {
+                    "int_stage_number": "1",
+                    "dec_pressure_work": "12",
+                    "dec_pressure_stop": "15",
+                    "cementing_interval": [
+                        {
+                            "dec_depth_from": "3650",
+                            "dec_depth_to": "2950",
+                            "voc_material": "\u0420\u0422\u041c-75",
+                            "dec_amount": "17.00",
+                            "dec_volume_plan": "25.50",
+                            "dec_volume_fact": "24.48",
+                            "dec_density_plan": "1.53",
+                            "dec_density_fact": "1.50",
+                            "cementing_buffer": [
+                                {
+                                    "dec_volume": "4.35",
+                                    "voc_composition": "\u041c\u0411\u041f-\u0421\u041c",
+                                    "dec_weight": "137.00"
+                                },
+                                {
+                                    "dec_volume": "2.10",
+                                    "voc_composition": "\u041a\u0421\u0421\u0411",
+                                    "dec_weight": "168.00"
+                                }
+                            ],
+                            "material_test": [
+                                {
+                                    "dec_water_cement_ratio": "0.70",
+                                    "dec_spreadability": "254",
+                                    "dec_temp_static": "53",
+                                    "dec_temp_dynamic": "46",
+                                    "dec_pressure": "335",
+                                    "dec_thickening_time": "130",
+                                    "data_setting_start": "2-00",
+                                    "data_setting_end": "7-05",
+                                    "dec_strength_bending": "2.55",
+                                    "dec_strength_compress": "5.30",
+                                    "dec_water_separation": "1.70",
+                                    "dec_fluid_loss": "2135"
+                                }
+                            ],
+                            "akc_by_material": [
+                                {
+                                    "dec_partial_casing_m": "84",
+                                    "dec_partial_rock_m": "154",
+                                    "dec_partial_casing_pct": "62.0",
+                                    "dec_partial_rock_pct": "83.0",
+                                    "dec_rigid_casing_m": "420",
+                                    "dec_rigid_rock_m": "266"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "productive_horizon": [
+                {
+                    "data_formation": "\u0410\u042111",
+                    "dec_depth_from": "3115",
+                    "dec_depth_to": "3084",
+                    "voc_fluid_type": "\u043d\u0435\u0444\u0442\u044c",
+                    "bul_peretok": "0",
+                    "akc_by_horizon": [
+                        {
+                            "dec_partial_casing_m": "15",
+                            "dec_partial_rock_m": "12",
+                            "dec_partial_casing_pct": "74.0",
+                            "dec_partial_rock_pct": "22.0",
+                            "dec_rigid_casing_m": "25",
+                            "dec_rigid_rock_m": "22"
+                        }
+                    ]
+                },
+                {
+                    "data_formation": "\u0410\u042112(2)",
+                    "dec_depth_from": "3020",
+                    "dec_depth_to": "2978",
+                    "voc_fluid_type": "\u043d\u0435\u0444\u0442\u044c+\u0432\u043e\u0434\u0430",
+                    "bul_peretok": "0",
+                    "akc_by_horizon": [
+                        {
+                            "dec_partial_casing_m": "15",
+                            "dec_partial_rock_m": "12",
+                            "dec_partial_casing_pct": "81.0",
+                            "dec_partial_rock_pct": "31.0",
+                            "dec_rigid_casing_m": "25",
+                            "dec_rigid_rock_m": "22"
+                        }
+                    ]
+                },
+                {
+                    "data_formation": "\u0411\u04218",
+                    "dec_depth_from": "2925",
+                    "dec_depth_to": "2872",
+                    "voc_fluid_type": "\u043d\u0435\u0444\u0442\u044c+\u0433\u0430\u0437",
+                    "bul_peretok": "1",
+                    "akc_by_horizon": [
+                        {
+                            "dec_partial_casing_m": "15",
+                            "dec_partial_rock_m": "12",
+                            "dec_partial_casing_pct": "23.0",
+                            "dec_partial_rock_pct": "40.0",
+                            "dec_rigid_casing_m": "29",
+                            "dec_rigid_rock_m": "28"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "int_number": "210",
+            "date_done": "2022-12-19",
+            "voc_mr": "\u041c\u0430\u043c\u0443\u0440\u0438\u043d\u0441\u043a\u0430\u044f",
+            "voc_enterprise": "\u041e\u041e\u041e \"\u0417\u0430\u043f\u0430\u0434\u0431\u0443\u0440\u043d\u0435\u0444\u0442\u044c\"",
+            "voc_subsoiluser": "\u0417\u0410\u041e \"\u0421\u0430\u043c\u0430\u0440\u0430-\u041d\u0430\u0444\u0442\u0430\"",
+            "dec_depth": "2480",
+            "dec_temp": "57",
+            "dec_diam_col": "178",
+            "dec_diam_prev_col": "219",
+            "dec_depth_prev_col": "1180",
+            "dec_depth_usc": "1510",
+            "voc_usc": "\u041c\u0421\u0426-219",
+            "voc_technolog": "\u0411\u0435\u043b\u044c\u0441\u043a\u0438\u0439",
+            "voc_status": "\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u0430",
+            "cementing_stage": [
+                {
+                    "int_stage_number": "1",
+                    "dec_pressure_work": "13",
+                    "dec_pressure_stop": "17",
+                    "cementing_interval": [
+                        {
+                            "dec_depth_from": "2480",
+                            "dec_depth_to": "1980",
+                            "voc_material": "\u041e\u0422\u041c-3",
+                            "dec_amount": "22.00",
+                            "dec_volume_plan": "28.50",
+                            "dec_volume_fact": "29.07",
+                            "dec_density_plan": "1.60",
+                            "dec_density_fact": "1.59",
+                            "cementing_buffer": [
+                                {
+                                    "dec_volume": "1.20",
+                                    "voc_composition": "\u0411\u0443\u0444\u0435\u0440 \u0432\u043e\u0434\u043d\u044b\u0439",
+                                    "dec_weight": "156.00"
+                                }
+                            ],
+                            "material_test": [
+                                {
+                                    "dec_water_cement_ratio": "0.75",
+                                    "dec_spreadability": "205",
+                                    "dec_temp_static": "58",
+                                    "dec_temp_dynamic": "50",
+                                    "dec_pressure": "352",
+                                    "dec_thickening_time": "143",
+                                    "data_setting_start": "3-07",
+                                    "data_setting_end": "5-15",
+                                    "dec_strength_bending": "3.00",
+                                    "dec_strength_compress": "6.30",
+                                    "dec_water_separation": "1.98",
+                                    "dec_fluid_loss": "2272",
+                                    "dec_linear_expansion": "9.00"
+                                }
+                            ],
+                            "akc_by_material": [
+                                {
+                                    "dec_partial_casing_m": "75",
+                                    "dec_partial_rock_m": "50",
+                                    "dec_partial_casing_pct": "69.0",
+                                    "dec_partial_rock_pct": "22.0",
+                                    "dec_rigid_casing_m": "225",
+                                    "dec_rigid_rock_m": "215"
+                                }
+                            ]
+                        }
+                    ],
+                    "cementing_reper": [
+                        {
+                            "dec_volume": "2.20",
+                            "dec_density": "1.32",
+                            "cementing_reper_component": [
+                                {
+                                    "voc_component": "\u041f\u0426\u0422 III-\u041e\u0431"
+                                },
+                                {
+                                    "voc_component": "\u041f\u043e\u043b\u0438\u0446\u0435\u043c",
+                                    "dec_amount": "1.10"
+                                },
+                                {
+                                    "voc_component": "\u0413\u0438\u043f\u0430\u043d",
+                                    "dec_amount": "1.50"
+                                },
+                                {
+                                    "voc_component": "\u0421\u0443\u043b\u044c\u0444\u0430\u0446\u0435\u043b\u043b",
+                                    "dec_amount": "0.10"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "int_stage_number": "2",
+                    "dec_pressure_work": "16",
+                    "dec_pressure_stop": "21",
+                    "cementing_interval": [
+                        {
+                            "dec_depth_from": "1980",
+                            "dec_depth_to": "1480",
+                            "voc_material": "\u041e\u0422\u041c-5",
+                            "dec_amount": "27.00",
+                            "dec_volume_plan": "31.50",
+                            "dec_volume_fact": "33.08",
+                            "dec_density_plan": "1.67",
+                            "dec_density_fact": "1.68",
+                            "cementing_buffer": [
+                                {
+                                    "dec_volume": "1.65",
+                                    "voc_composition": "\u041a\u0421\u0421\u0411",
+                                    "dec_weight": "175.00"
+                                }
+                            ],
+                            "material_test": [
+                                {
+                                    "dec_water_cement_ratio": "0.80",
+                                    "dec_spreadability": "212",
+                                    "dec_temp_static": "63",
+                                    "dec_temp_dynamic": "54",
+                                    "dec_pressure": "369",
+                                    "dec_thickening_time": "156",
+                                    "data_setting_start": "4-14",
+                                    "data_setting_end": "7-25",
+                                    "dec_strength_bending": "3.45",
+                                    "dec_strength_compress": "7.30",
+                                    "dec_water_separation": "2.26",
+                                    "dec_fluid_loss": "2409"
+                                }
+                            ],
+                            "akc_by_material": [
+                                {
+                                    "dec_partial_casing_m": "90",
+                                    "dec_partial_rock_m": "70",
+                                    "dec_partial_casing_pct": "76.0",
+                                    "dec_partial_rock_pct": "31.0",
+                                    "dec_rigid_casing_m": "250",
+                                    "dec_rigid_rock_m": "240"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "productive_horizon": [
+                {
+                    "data_formation": "\u0411\u04218",
+                    "dec_depth_from": "2132",
+                    "dec_depth_to": "2094",
+                    "voc_fluid_type": "\u043d\u0435\u0444\u0442\u044c+\u0432\u043e\u0434\u0430",
+                    "bul_peretok": "0",
+                    "akc_by_horizon": [
+                        {
+                            "dec_partial_casing_m": "15",
+                            "dec_partial_rock_m": "12",
+                            "dec_partial_casing_pct": "58.0",
+                            "dec_partial_rock_pct": "85.0",
+                            "dec_rigid_casing_m": "25",
+                            "dec_rigid_rock_m": "22"
+                        }
+                    ]
+                },
+                {
+                    "data_formation": "\u042e\u04211(1)",
+                    "dec_depth_from": "2037",
+                    "dec_depth_to": "1988",
+                    "voc_fluid_type": "\u043d\u0435\u0444\u0442\u044c+\u0433\u0430\u0437",
+                    "bul_peretok": "0",
+                    "akc_by_horizon": [
+                        {
+                            "dec_partial_casing_m": "15",
+                            "dec_partial_rock_m": "12",
+                            "dec_partial_casing_pct": "65.0",
+                            "dec_partial_rock_pct": "24.0",
+                            "dec_rigid_casing_m": "25",
+                            "dec_rigid_rock_m": "28"
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
