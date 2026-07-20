@@ -258,6 +258,21 @@ function render_choice(array $result): string
  */
 const RENDER_COMPACT_MAX_COLS = 4;
 
+/**
+ * Второй порог укладки (2026-07-19, схема Chat, коммит e62a89e): узкая
+ * таблица по содержимому против растянутой на всю ширину. До этого
+ * жил голым литералом `7` посреди строки — в одном файле два однотипных
+ * правила, одно объявлено константой с объяснением, другое безымянное.
+ *
+ * Имя дано, но параметром вызова НЕ сделан сознательно: потребителя,
+ * которому нужно другое значение, пока не существует, а параметр без
+ * потребителя — та же заготовка впрок, что дважды отклонённая таблица
+ * весов (решение 2026-07-20, см. журнал). Оба порога и правило слияния
+ * сиблингов переедут в `$opts` вместе с пп. 4–7 карточки объекта, по
+ * первому живому поводу, и ровно тот, которому повод найдётся.
+ */
+const RENDER_FIT_MAX_COLS = 7;
+
 function render_record_compact(array $view, array $opts = []): string
 {
     $columns = $view['columns'] ?? [];
@@ -474,7 +489,7 @@ function render_record_table(array $view, array $opts = []): string
     // всю ширину, сжимать их так же было бы нечитаемо. Порог считает
     // колонку действий тоже (реальная ширина строки, не только полей).
     $col_count   = count($columns) + ($has_actions ? 1 : 0);
-    $table_class = $col_count <= 7 ? 'data-list data-list-fit' : 'data-list data-list-wide';
+    $table_class = $col_count <= RENDER_FIT_MAX_COLS ? 'data-list data-list-fit' : 'data-list data-list-wide';
 
     $html = '<table class="' . $table_class . '"><tr>';
     foreach ($columns as $column) {
