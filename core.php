@@ -1935,7 +1935,32 @@ function record_parent_candidates(PgSql\Connection $db_connection, array $snapsh
     return $candidates;
 }
 
-function record_list(PgSql\Connection $db_connection, array $snapshot, string $table, int $limit = 50): array
+/**
+ * Список записей таблицы. Свежие сверху.
+ *
+ * $limit — временный предел, а НЕ осмысленная величина. Постраничности
+ * в контуре данных нет, поэтому всё, что за пределом, через интерфейс
+ * недостижимо. Обнаружилось 2026-07-20 на тестовых данных: у буферов,
+ * горизонтов и интервалов записей стало больше предела, а раньше
+ * данных было меньше, и он не проявлялся. Поднят с 50 до 100 тем же
+ * днём — чтобы не мешал, пока не появится настоящее решение.
+ *
+ * Параметр рабочий, им уже пользуются: `labels.php` передаёт 500 для
+ * редактора подписей. Контур данных своего значения не передаёт —
+ * `index.php` зовёт `record_table_view()` без него.
+ *
+ * Сортировка тоже зашита (`ORDER BY id DESC`) и снаружи не задаётся.
+ *
+ * Решено 2026-07-20: сортировка, фильтр, поиск и постраничность
+ * приходят сюда ОБРАТНЫМ ходом из слоя представления, а не пишутся
+ * здесь заранее. Это ровно та четвёрка, из которой состоит определение
+ * выборки; написав её дважды — для списка и для отчётов, — мы получим
+ * два расходящихся механизма. Список записей таблицы должен оказаться
+ * частным случаем выборки: источник без фильтра, все колонки,
+ * сортировка по id. Если будущая грамматика такого не выражает —
+ * грамматика неверна.
+ */
+function record_list(PgSql\Connection $db_connection, array $snapshot, string $table, int $limit = 100): array
 {
     if (!isset($snapshot['structure']['tables'][$table])) {
         return [];
@@ -2043,7 +2068,7 @@ function record_reparent_view(
     ];
 }
 
-function record_table_view(PgSql\Connection $db_connection, array $snapshot, string $table, int $limit = 50): array
+function record_table_view(PgSql\Connection $db_connection, array $snapshot, string $table, int $limit = 100): array
 {
     $columns = record_view_columns($snapshot, $table);
     $rows    = [];
