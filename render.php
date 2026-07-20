@@ -42,6 +42,17 @@ function render_admin_styles(): string
 }
 
 /**
+ * Подключение общего скрипта форм конфигуратора. Версия в ссылке — по
+ * той же причине и тем же способом, что у style.css выше.
+ */
+function render_configurator_script(): string
+{
+    $version = @filemtime(__DIR__ . '/configurator.js') ?: time();
+
+    return '<script src="configurator.js?v=' . $version . '"></script>';
+}
+
+/**
  * Открытие админ-страницы: doctype, head (charset, title, общие стили),
  * открытый body и строка навигации. Один каркас на index.php /
  * configurator.php / labels.php — тем же ходом, что render_admin_styles():
@@ -654,6 +665,7 @@ function render_configurator_new_table(
     string $dict_labels_json,
     string $view_source_bul_fields_json
 ): void {
+    $script_tag          = render_configurator_script();
     $type_options        = render_options($type_items);
     $parent_options      = render_options($parent_items);
     $link_target_options = render_options($link_target_items);
@@ -731,6 +743,7 @@ function render_configurator_new_table(
       </div>
     </template>
 
+    $script_tag
     <script>
     const dictLabels = $dict_labels_json;
     const viewSourceBulFields = $view_source_bul_fields_json;
@@ -748,33 +761,16 @@ function render_configurator_new_table(
       try { select.showPicker?.(); } catch { /* браузер не поддерживает — focus() уже сделан */ }
     }
 
+    // Общее — в configurator.js; здесь только своё: подписи всегда
+    // видимы (строк полей несколько, шаблон мог оставить их скрытыми).
     function onFieldTypeChange(select) {
-      const row  = select.closest('.field-row');
-      const name = row.querySelector('.f-name');
-      const voc  = row.querySelector('.f-voc-pick');
-      const link = row.querySelector('.f-link-target');
-      const short = row.querySelector('.f-short');
-      const full  = row.querySelector('.f-full');
-
-      // voc_: имя выбирается из существующих словарей, не печатается
-      // (§16, уровень 0). link_: имя СВОБОДНОЕ (как обычное поле) — а
-      // цель выбирается отдельно (журнал 07-12: имя и адрес — разные
-      // вещи, обе видны сразу, никакого авто-заполнения подписи от
-      // цели — семантика поля («любимый цвет») не совпадает с
-      // подписью цели («Цвет»)).
-      voc.style.display  = select.value === 'voc'  ? '' : 'none';
-      link.style.display = (select.value === 'link' || select.value === 'links') ? '' : 'none';
-      name.style.display = select.value === 'voc'  ? 'none' : '';
-      short.style.display = full.style.display = '';
+      const row = configuratorFieldTypeVisibility(select);
+      row.querySelector('.f-short').style.display = '';
+      row.querySelector('.f-full').style.display  = '';
     }
 
     function onVocPick(select) {
-      const row = select.closest('.field-row');
-      const info = dictLabels[select.value];
-      if (info) {
-        row.querySelector('.f-short').value = info.short;
-        row.querySelector('.f-full').value  = info.full;
-      }
+      configuratorVocPick(select, dictLabels);
     }
 
     function onKindChange() {
@@ -845,6 +841,7 @@ function render_configurator_edit_table(
     string $dict_labels_json,
     string $formula_fields_json
 ): void {
+    $script_tag          = render_configurator_script();
     $type_options        = render_options($type_items);
     $dict_options        = render_options($dict_items);
     $link_target_options = render_options($link_target_items);
@@ -912,20 +909,18 @@ function render_configurator_edit_table(
         переменные (клик — вставить): <span class="f-formula-vars"></span>
       </div>
     </form>
+    $script_tag
     <script>
     const dictLabels    = $dict_labels_json;
     const formulaFields = $formula_fields_json;
+    // Общее — в configurator.js; здесь только своё: строка формулы и
+    // подсказка с кнопками переменных для calc_ (в форме создания
+    // таблицы этого нет — там переменных ещё не существует).
     function onFieldTypeChange(select) {
-      const row     = select.closest('.field-row');
-      const name    = row.querySelector('.f-name');
-      const voc     = row.querySelector('.f-voc-pick');
-      const link    = row.querySelector('.f-link-target');
+      const row     = configuratorFieldTypeVisibility(select);
       const form    = row.parentElement;
       const fRow    = form.querySelector('.f-formula-row');
       const fHint   = form.querySelector('.f-formula-hint');
-      voc.style.display  = select.value === 'voc'  ? '' : 'none';
-      link.style.display = (select.value === 'link' || select.value === 'links') ? '' : 'none';
-      name.style.display = select.value === 'voc'  ? 'none' : '';
       fRow.style.display  = select.value === 'calc' ? '' : 'none';
       fHint.style.display = select.value === 'calc' ? '' : 'none';
       if (select.value === 'calc' && fHint.querySelector('.f-formula-vars').children.length === 0) {
@@ -946,12 +941,7 @@ function render_configurator_edit_table(
       }
     }
     function onVocPick(select) {
-      const row = select.closest('.field-row');
-      const info = dictLabels[select.value];
-      if (info) {
-        row.querySelector('.f-short').value = info.short;
-        row.querySelector('.f-full').value  = info.full;
-      }
+      configuratorVocPick(select, dictLabels);
     }
     </script>
     HTML;
