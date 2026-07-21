@@ -850,7 +850,8 @@ function render_configurator_new_selection(
       </p>
 
       <h3>Подписи выборки</h3>
-      <p>Код (станет <code>select_&lt;код&gt;</code>): <input type="text" name="code" pattern="[a-z][a-z0-9_]*" required></p>
+      <p>Код (техническое имя, латиницей): <input type="text" name="code" placeholder="wells_in_progress" pattern="[a-z][a-z0-9_]*" required>
+         <small>Строчные латинские буквы, цифры, «_». Станет именем настоящей таблицы: <code>select_&lt;код&gt;</code>, например <code>select_wells_in_progress</code>.</small></p>
       <p>Полная подпись: <input type="text" name="table_full" required>
          Короткая подпись: <input type="text" name="table_short" required></p>
 
