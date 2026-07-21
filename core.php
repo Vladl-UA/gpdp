@@ -365,6 +365,19 @@ function snapshot_build_formulas(PgSql\Connection $db_connection, array $structu
  * configurator_create_selection), не эта функция — она чистый
  * структурный тест, к БД не обращается вовсе.
  *
+ * Каждый сегмент $columns — «поле» или «поле AS псевдоним» (2026-07-21,
+ * второй заход: без этого select_ не мог служить словарём по лестнице
+ * §16.1 — адресный словарь требует колонку ИМЕННО `data_name`, а у
+ * источника подписывающее поле сплошь и рядом называется иначе,
+ * `data_number` у `well`, например). Псевдоним — то же имя колонки
+ * результирующего VIEW, не переименование поля источника: source_field
+ * остаётся собой, наружу выходит под другим именем — та же роль, что
+ * `AS` в самом SQL, не второй, отдельно поддерживаемый смысл. Дубли
+ * псевдонимов и конфликт с зашитым `id` (SELECT id, ... — id всегда
+ * первый) — отказ: то же «невалидное состояние физически непостроимо»,
+ * что и везде, а не полагание на то, что Postgres сам откажет DDL
+ * позже с менее понятным сообщением.
+ *
  * $filter_field, если задан, СОЗНАТЕЛЬНО ограничен словарным полем
  * (voc_/links_) — v1 умеет только «= конкретное значение словаря»,
  * как в первом примере (voc_status = 'В работе'). Фильтр по сырому
@@ -380,17 +393,34 @@ function selection_parse(array $structure, string $source_table, string $columns
         return null;
     }
 
-    $column_list = array_values(array_filter(
+    $segments = array_values(array_filter(
         array_map('trim', explode(',', $columns)),
         fn(string $c): bool => $c !== ''
     ));
-    if ($column_list === []) {
+    if ($segments === []) {
         return null;
     }
-    foreach ($column_list as $col) {
-        if (($table_fields[$col]['kind'] ?? '') !== 'entity_field') {
+
+    $column_list  = []; // [['field' => ..., 'alias' => ...], ...]
+    $seen_aliases = ['id' => true]; // структурный id зашит в SELECT первым, всегда занят
+    foreach ($segments as $segment) {
+        if (preg_match('/^([a-z][a-z0-9_]*)\s+AS\s+([a-z][a-z0-9_]*)$/i', $segment, $m)) {
+            $field = $m[1];
+            $alias = strtolower($m[2]);
+        } else {
+            $field = $segment;
+            $alias = $segment;
+        }
+
+        if (($table_fields[$field]['kind'] ?? '') !== 'entity_field') {
             return null;
         }
+        if (isset($seen_aliases[$alias])) {
+            return null; // дубль имени колонки в результате — включая конфликт с id
+        }
+        $seen_aliases[$alias] = true;
+
+        $column_list[] = ['field' => $field, 'alias' => $alias];
     }
 
     if ($filter_field !== null) {

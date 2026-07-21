@@ -838,6 +838,10 @@ function render_configurator_new_selection(
       <div id="sel-related"><small>— выберите источник —</small></div>
 
       <h3>Поля</h3>
+      <p><small>Поле «как назвать» — необязательно: оставь пустым, если родное имя
+         устраивает. Если выборка должна годиться в словарь для других таблиц
+         (§16.1) — колонку-подпись нужно назвать ровно <code>data_name</code>,
+         даже если у источника она называется иначе.</small></p>
       <div id="sel-fields"><small>— выберите источник —</small></div>
 
       <h3>Фильтр (необязательно)</h3>
@@ -873,7 +877,8 @@ function render_configurator_new_selection(
         ? '<small>В этой таблице нет полей для выбора.</small>'
         : fields.map(f =>
             '<label><input type="checkbox" name="columns[]" value="' + f.name + '"> '
-            + f.label + ' <code>(' + f.name + ')</code></label><br>'
+            + f.label + ' <code>(' + f.name + ')</code></label> '
+            + '<input type="text" name="aliases[' + f.name + ']" placeholder="как назвать (необязательно)" style="width:14em"><br>'
           ).join('');
 
       const related = selTableRelations[table] || [];

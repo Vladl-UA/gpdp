@@ -766,11 +766,15 @@ function configurator_create_view(PgSql\Connection $db_connection, array $spec, 
  * $col = 1`, здесь произвольный список колонок и фильтр по конкретному
  * значению, не зашитой единице.
  *
- * $spec: code, source_table, columns (array имён полей source_table),
- * filter_field (?string), filter_value (?string — ЧЕЛОВЕЧЕСКАЯ метка
- * словаря, не id: резолвится здесь через lookup_id_by_label(),
- * helpers.php), table_short/table_full (подписи самого select_ как
- * зарегистрированной таблицы).
+ * $spec: code, source_table, columns (array строк — каждая либо
+ * «поле», либо «поле AS псевдоним»: второе нужно, чтобы select_ мог
+ * служить словарём по лестнице §16.1, требующей колонку ИМЕННО
+ * data_name, даже когда у источника подписывающее поле называется
+ * иначе, например data_number у well — найдено вторым заходом
+ * 2026-07-21, Влад), filter_field (?string), filter_value (?string —
+ * ЧЕЛОВЕЧЕСКАЯ метка словаря, не id: резолвится здесь через
+ * lookup_id_by_label(), helpers.php), table_short/table_full (подписи
+ * самого select_ как зарегистрированной таблицы).
  *
  * Паспорт (presentation_selections) пишется ПОСЛЕ успешной регистрации
  * VIEW — dep_model_registry указывает на строку реестра САМОГО select_
@@ -835,7 +839,12 @@ function configurator_create_selection(PgSql\Connection $db_connection, array $s
             $filter_id = (int) $resolved['id'];
         }
 
-        $select_list = 'id, ' . implode(', ', $columns);
+        $select_list = 'id, ' . implode(', ', array_map(
+            static fn(array $c): string => $c['field'] === $c['alias']
+                ? $c['field']
+                : $c['field'] . ' AS ' . $c['alias'],
+            $plan['columns']
+        ));
         $sql = "CREATE VIEW $view AS SELECT $select_list FROM $source_table";
         if ($filter_field !== null) {
             $sql .= " WHERE $filter_field = $filter_id";
@@ -857,24 +866,28 @@ function configurator_create_selection(PgSql\Connection $db_connection, array $s
             ]];
         }
 
-        // Подписи отобранных полей наследуются от source_table — те же
-        // слова уже стоят в реестре, спрашивать админа заново незачем
-        // (человек уже один раз назвал это поле, когда создавал его).
-        foreach ($columns as $col) {
+        // Подписи наследуются от source_table по имени ИСХОДНОГО поля
+        // (там стоит осмысленный текст), регистрируются под ПСЕВДОНИМОМ
+        // — это и есть настоящее имя колонки результирующего VIEW.
+        // Переименование не меняет смысл подписи: «Номер» остаётся
+        // «Номер», даже если колонка теперь называется data_name — так
+        // select_ может служить словарём (§16.1), не теряя, откуда
+        // подпись взялась изначально.
+        foreach ($plan['columns'] as $c) {
             $src_label = db_select($db_connection, '
                 SELECT l.data_short, l.data_full
                 FROM ' . MODEL_REGISTRY_TABLE . ' r
                 JOIN ' . MODEL_LABELS_TABLE . ' l ON l.dep_model_registry = r.id
                 WHERE r.data_kind = ? AND r.data_owner = ? AND r.data_element = ? AND r.active = 1
-            ', 'sss', ['field', $source_table, $col]);
+            ', 'sss', ['field', $source_table, $c['field']]);
 
-            $short = (string) ($src_label[0]['data_short'] ?? $col);
-            $full  = (string) ($src_label[0]['data_full'] ?? $col);
+            $short = (string) ($src_label[0]['data_short'] ?? $c['field']);
+            $full  = (string) ($src_label[0]['data_full'] ?? $c['field']);
 
-            $col_reg = configurator_register_element($db_connection, 'field', $view, $col, $short, $full);
+            $col_reg = configurator_register_element($db_connection, 'field', $view, $c['alias'], $short, $full);
             if (!$col_reg['ok']) {
                 return ['ok' => false, 'errors' => [
-                    "Выборка $view: поле '$col' не зарегистрировано, изменение откачено целиком: "
+                    "Выборка $view: поле '{$c['alias']}' не зарегистрировано, изменение откачено целиком: "
                     . implode('; ', $col_reg['errors']),
                 ]];
             }
@@ -1225,10 +1238,22 @@ if ($caction === 'create_table' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 if ($caction === 'create_selection' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $checked = array_values(array_filter((array) ($_POST['columns'] ?? []), fn($c) => $c !== ''));
+    $aliases = (array) ($_POST['aliases'] ?? []);
+
+    // «поле» без псевдонима, «поле AS псевдоним», если человек его
+    // вписал — сборка происходит здесь, не в самой форме: HTML знает
+    // только про отдельные текстовые поля, склейка в синтаксис
+    // паспорта — забота диспетчера, не разметки (§3).
+    $columns = array_map(static function (string $field) use ($aliases): string {
+        $alias = trim((string) ($aliases[$field] ?? ''));
+        return $alias === '' ? $field : "$field AS $alias";
+    }, $checked);
+
     $spec = [
         'code'         => trim((string) ($_POST['code'] ?? '')),
         'source_table' => (string) ($_POST['source_table'] ?? ''),
-        'columns'      => array_values(array_filter((array) ($_POST['columns'] ?? []), fn($c) => $c !== '')),
+        'columns'      => $columns,
         'filter_field' => trim((string) ($_POST['filter_field'] ?? '')) !== '' ? (string) $_POST['filter_field'] : null,
         'filter_value' => trim((string) ($_POST['filter_value'] ?? '')) !== '' ? (string) $_POST['filter_value'] : null,
         'table_short'  => (string) ($_POST['table_short'] ?? ''),
