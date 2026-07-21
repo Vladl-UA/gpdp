@@ -61,6 +61,32 @@ const STRUCTURAL_FIELD_NAMES = ['id', 'rel_main', 'active'];
  */
 const SYSTEM_TABLE_PREFIX = 'model_';
 
+/**
+ * Второй зарезервированный префикс, решение 2026-07-21 (слой
+ * представления): паспорт `select_`/`report_` — метаинформация о
+ * презентационном слое, не о базовой модели (ДНК/РНК-разделение —
+ * model_ обслуживает базовый уровень, не презентационный). Без
+ * собственного префикса паспорт `presentation_selections` был бы
+ * виден обычному CRUD-контуру как предметная таблица — тот же способ
+ * защиты, что уже работает для model_.
+ */
+const PRESENTATION_TABLE_PREFIX = 'presentation_';
+
+/**
+ * Единая проверка «эта таблица зарезервирована ядром, невидима
+ * обычному CRUD-контуру» — одна точка правды вместо пяти мест,
+ * каждое из которых раньше проверяло str_starts_with($t, SYSTEM_
+ * TABLE_PREFIX) по отдельности (найдено при добавлении второго
+ * префикса — до этого момента совпадение с одним префиксом сходило
+ * за проверку «системная ли таблица», теперь это два раздельных
+ * факта, которые пять мест обязаны знать одинаково, не каждое по-своему).
+ */
+function is_reserved_table(string $table): bool
+{
+    return str_starts_with($table, SYSTEM_TABLE_PREFIX)
+        || str_starts_with($table, PRESENTATION_TABLE_PREFIX);
+}
+
 // Служебная таблица подписей — знание платформы, не предметной модели.
 const MODEL_REGISTRY_TABLE = 'model_registry';
 const MODEL_LABELS_TABLE   = 'model_labels';
@@ -329,6 +355,108 @@ function snapshot_build_formulas(PgSql\Connection $db_connection, array $structu
     return ['map' => $map, 'unresolved' => $unresolved];
 }
 
+/**
+ * Паспорт select_ (presentation_selections, слой представления,
+ * решение 2026-07-21): проверяет, что источник, отобранные поля и
+ * поле фильтра существуют и являются entity-полями ИМЕННО источника
+ * (§15 п.2 формул — тот же принцип: whitelist из полей своей же
+ * таблицы, не чужой цепочки). null — паспорт не разрешился, причину
+ * называет вызывающий (snapshot_build_selections/
+ * configurator_create_selection), не эта функция — она чистый
+ * структурный тест, к БД не обращается вовсе.
+ *
+ * $filter_field, если задан, СОЗНАТЕЛЬНО ограничен словарным полем
+ * (voc_/links_) — v1 умеет только «= конкретное значение словаря»,
+ * как в первом примере (voc_status = 'В работе'). Фильтр по сырому
+ * значению обычного поля (data_/int_/dec_/date_) — не забыт, а прямо
+ * отложен: там своя типовая развилка приведения значения, которую
+ * рано решать до первого работающего случая (WORKLOG.md 2026-07-21,
+ * шаг 1 из шести).
+ */
+function selection_parse(array $structure, string $source_table, string $columns, ?string $filter_field): ?array
+{
+    $table_fields = $structure['tables'][$source_table]['fields'] ?? null;
+    if ($table_fields === null) {
+        return null;
+    }
+
+    $column_list = array_values(array_filter(
+        array_map('trim', explode(',', $columns)),
+        fn(string $c): bool => $c !== ''
+    ));
+    if ($column_list === []) {
+        return null;
+    }
+    foreach ($column_list as $col) {
+        if (($table_fields[$col]['kind'] ?? '') !== 'entity_field') {
+            return null;
+        }
+    }
+
+    if ($filter_field !== null) {
+        if (($table_fields[$filter_field]['kind'] ?? '') !== 'entity_field') {
+            return null;
+        }
+        $prefix = field_prefix($filter_field);
+        if ($prefix !== 'voc' && $prefix !== 'links') {
+            return null;
+        }
+    }
+
+    return [
+        'source_table' => $source_table,
+        'columns'      => $column_list,
+        'filter_field' => $filter_field,
+    ];
+}
+
+/**
+ * Компилирует паспорта select_ в план — тот же приём, что
+ * snapshot_build_formulas(): читает presentation_selections JOIN
+ * model_registry (имя select_-представления — не source_table),
+ * сверяет каждый паспорт с $structure через selection_parse().
+ * НЕ резолвит filter_value в id (для этого нужна БД и живой словарь,
+ * не только структура) — тот шаг делает
+ * configurator_create_selection() при создании/пересборке; здесь
+ * только структурная валидность, тот же принцип разделения, что у
+ * formula_parse (чистый разбор) / snapshot_build_formulas (разбор +
+ * проверка по модели).
+ *
+ * НЕ вызывается из snapshot_init() пока — select_-представления после
+ * создания читаются как обычные зарегистрированные таблицы, обычным
+ * контуром (record_list и т.п.), этот план сегодня нужен только
+ * инструментам контроля (диагностика, пересборка после дрейфа
+ * модели — см. разговор 2026-07-21), которых ещё нет. Заводить лишний
+ * вызов в горячем пути без потребителя — §12/§15 п.8.
+ */
+function snapshot_build_selections(PgSql\Connection $db_connection, array $structure): array
+{
+    $map        = [];
+    $unresolved = [];
+
+    $rows = db_select($db_connection, '
+        SELECT r.data_element AS select_table, s.source_table, s.columns, s.filter_field, s.filter_value
+        FROM presentation_selections s
+        JOIN model_registry r ON r.id = s.dep_model_registry
+    ');
+
+    foreach ($rows as $row) {
+        $select_table = (string) $row['select_table'];
+        $filter_field = $row['filter_field'] !== null ? (string) $row['filter_field'] : null;
+
+        $plan = selection_parse($structure, (string) $row['source_table'], (string) $row['columns'], $filter_field);
+        if ($plan === null) {
+            $unresolved[] = "$select_table: паспорт не разрешился (источник/поля/фильтр разошлись со структурой)";
+            continue;
+        }
+
+        $plan['filter_value']  = $row['filter_value'] !== null ? (string) $row['filter_value'] : null;
+        $map[$select_table] = $plan;
+    }
+
+    return ['map' => $map, 'unresolved' => $unresolved];
+}
+
 /** Совместимая обёртка: только идентификатор сущности/структурного элемента. */
 function field_prefix(string $field_name): ?string
 {
@@ -493,7 +621,7 @@ function snapshot_build_structure(PgSql\Connection $db_connection): array
 
         // Служебные таблицы ядра (model_*) — не предметные данные,
         // классификации полей не подлежат вообще (см. константу выше).
-        if (str_starts_with($table_name, SYSTEM_TABLE_PREFIX)) {
+        if (is_reserved_table($table_name)) {
             continue;
         }
 
@@ -2178,8 +2306,7 @@ function record_form_view(
  */
 function table_group(string $table_name, array $table_schema): string
 {
-    $sys = defined('SYSTEM_TABLE_PREFIX') ? SYSTEM_TABLE_PREFIX : 'model_';
-    if (str_starts_with($table_name, $sys)) {
+    if (is_reserved_table($table_name)) {
         return 'system';
     }
     if (str_starts_with($table_name, 'voc_')) {
@@ -2246,7 +2373,6 @@ function schema_view(array $snapshot, string $table): array
 function model_diagnose(PgSql\Connection $db_connection): array
 {
     $structure = snapshot_build_structure($db_connection);
-    $sys       = defined('SYSTEM_TABLE_PREFIX') ? SYSTEM_TABLE_PREFIX : 'model_';
 
     // Сырые строки реестра (все active), без свёртки в map — чтобы
     // увидеть дубли, которые map затирает. Честный контракт
@@ -2320,8 +2446,8 @@ function model_diagnose(PgSql\Connection $db_connection): array
     $orphan_tables = [];
     $orphan_fields = [];
     foreach ($structure['tables'] as $t_name => $t_schema) {
-        if (str_starts_with($t_name, $sys)) {
-            continue; // системные таблицы реестром не адресуются
+        if (is_reserved_table($t_name)) {
+            continue; // системные таблицы реестром не адресуются (defense-in-depth: snapshot_build_structure их уже не отдаёт)
         }
         if (!isset($reg_addr["table||$t_name"])) {
             $orphan_tables[] = $t_name;

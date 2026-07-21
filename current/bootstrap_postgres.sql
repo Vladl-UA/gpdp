@@ -62,3 +62,52 @@ CREATE TABLE model_links (
     data_element       VARCHAR(64) NOT NULL PRIMARY KEY,
     data_target_table  VARCHAR(64) NOT NULL
 );
+
+-- ============================================================================
+-- НОВОЕ 2026-07-21 — не трогает ничего выше. На боевом gpdp_test уже
+-- есть model_registry/model_labels/model_formulas/model_links из
+-- прошлых сессий; выполнять на нём нужно ТОЛЬКО этот кусок, не файл
+-- целиком (CREATE TABLE без IF NOT EXISTS на уже существующих
+-- таблицах упадёт ошибкой «relation already exists»).
+--
+-- presentation_selections — паспорт select_ (слой представления,
+-- решение 2026-07-21, ARCHITECTURE.md §15 пройден по всем десяти
+-- пунктам явно). ПРЕЗЕНТАЦИОННЫЙ этаж, не базовый — сознательно НЕ
+-- model_*, свой префикс `presentation_` (core.php,
+-- PRESENTATION_TABLE_PREFIX), чтобы не смешивать ДНК-слой
+-- (model_labels/model_formulas — свойства САМОЙ модели) с РНК-слоем
+-- (select_ — способ НА модель посмотреть). Тот же 1:1-паттерн через
+-- dep_model_registry, что у model_labels/model_formulas выше:
+-- dep_model_registry указывает на СТРОКУ РЕЕСТРА САМОГО select_-
+-- представления (data_kind='table', data_element='select_<code>') —
+-- не на строку source_table. Инвариант «не более одного паспорта на
+-- select_» держит схема (PRIMARY KEY), не код.
+--
+-- Паспорт называет ИСТОЧНИК И РОЛИ, не SQL (§16 п.3 — тот же принцип,
+-- что у паспорта проекции словаря, просто на этаж выше): текст SQL
+-- нигде не хранится и из данных не исполняется, VIEW собирает код
+-- (configurator_create_selection) по этим ролям, ровно один раз, при
+-- создании/пересборке.
+CREATE TABLE presentation_selections (
+    dep_model_registry INTEGER      NOT NULL PRIMARY KEY,
+    source_table        VARCHAR(64) NOT NULL,
+    -- Список полей source_table через запятую — тот же приём, что
+    -- model_labels.data_label_template (компактный текст-шаблон, а не
+    -- дочерние строки «одна строка — одна колонка», §16 п.6 того же
+    -- духа). TEXT, не VARCHAR(255) — единственное сознательное
+    -- отступление от принятого в этом файле стиля колонок: список
+    -- полей у широкой выборки может превысить 255 байт, а обрезать
+    -- его молча — то самое тихое искажение факта, которого архитектура
+    -- избегает везде (§13, ошибка отказом, не приближением).
+    columns              TEXT        NOT NULL,
+    -- Фильтр — v1: одно поле, одно значение (человекочитаемая метка,
+    -- не id — резолвится при компиляции через lookup_id_by_label(),
+    -- helpers.php, уже существует). NULL — выборка без фильтра, все
+    -- строки source_table. Множественный фильтр, диапазоны (BETWEEN),
+    -- каскадные словари — сознательно вне охвата v1 (WORKLOG.md,
+    -- 2026-07-21 — расписан по шести пунктам возрастающей сложности).
+    filter_field         VARCHAR(64),
+    filter_value         VARCHAR(255),
+    CONSTRAINT fk_selections_registry FOREIGN KEY (dep_model_registry)
+        REFERENCES model_registry(id) ON DELETE CASCADE
+);

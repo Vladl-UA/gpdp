@@ -224,12 +224,10 @@ function labels_dispatch(PgSql\Connection $db_connection): void
         'model'        => ['relations' => $relations['map']],
     ];
 
-    $SYS_PREFIX = defined('SYSTEM_TABLE_PREFIX') ? SYSTEM_TABLE_PREFIX : 'model_';
-
     $selected = (string) ($_GET['table'] ?? '');
     $valid_selected = $selected !== ''
         && isset($structure['tables'][$selected])
-        && !str_starts_with($selected, $SYS_PREFIX);
+        && !is_reserved_table($selected);
 
     echo render_admin_page_open('Подписи и словари', 'labels');
     if ($valid_selected) {

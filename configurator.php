@@ -220,8 +220,9 @@ function configurator_validate_spec(array $input, array $live_structure): array
 
     if (!configurator_identifier_valid($table)) {
         $errors[] = 'Имя таблицы: только строчные латинские буквы, цифры, "_", начинается с буквы.';
-    } elseif (str_starts_with($table, SYSTEM_TABLE_PREFIX)) {
-        $errors[] = "Префикс \"" . SYSTEM_TABLE_PREFIX . "\" зарезервирован ядром (служебные таблицы модели).";
+    } elseif (is_reserved_table($table)) {
+        $errors[] = "Префиксы \"" . SYSTEM_TABLE_PREFIX . "\"/\"" . PRESENTATION_TABLE_PREFIX
+                  . "\" зарезервированы ядром (служебные таблицы модели и слоя представления).";
     } elseif (str_starts_with($table, 'voc_')) {
         $errors[] = 'Префикс "voc_" зарезервирован для словарей — создайте через режим "Словарь" выше, '
                   . 'это гарантирует обязательное поле data_name (§16, уровень 0).';
@@ -749,6 +750,160 @@ function configurator_create_view(PgSql\Connection $db_connection, array $spec, 
             return ['ok' => false, 'errors' => [
                 "Представление $view не создано — не зарегистрировано поле data_name, изменение откачено целиком: "
                 . implode('; ', $data_name_reg['errors']),
+            ]];
+        }
+
+        return ['ok' => true, 'errors' => []];
+    }, $application);
+}
+
+/**
+ * Создать select_<code> — VIEW из ОДНОЙ таблицы с отобранными полями
+ * и (опционально) фильтром «поле = значение словаря» (решение
+ * 2026-07-21, ARCHITECTURE.md §15 пройден явно по всем десяти пунктам
+ * — см. STATE.md журнал). Обобщение configurator_create_view() (07-17,
+ * гибридные словари): там жёстко `SELECT id, data_name ... WHERE
+ * $col = 1`, здесь произвольный список колонок и фильтр по конкретному
+ * значению, не зашитой единице.
+ *
+ * $spec: code, source_table, columns (array имён полей source_table),
+ * filter_field (?string), filter_value (?string — ЧЕЛОВЕЧЕСКАЯ метка
+ * словаря, не id: резолвится здесь через lookup_id_by_label(),
+ * helpers.php), table_short/table_full (подписи самого select_ как
+ * зарегистрированной таблицы).
+ *
+ * Паспорт (presentation_selections) пишется ПОСЛЕ успешной регистрации
+ * VIEW — dep_model_registry указывает на строку реестра САМОГО select_
+ * (data_kind='table'), не на source_table (§16 п.3 того же духа,
+ * что паспорт проекции словаря: роли, не SQL — CREATE VIEW ниже
+ * единственное место, где роли превращаются в текст запроса, и это
+ * происходит один раз, не на каждое чтение).
+ */
+function configurator_create_selection(PgSql\Connection $db_connection, array $spec, array $application): array
+{
+    return configurator_with_lock($db_connection, 'Создание выборки: select_' . $spec['code'], function () use ($db_connection, $spec): array {
+        $code = (string) $spec['code'];
+        $view = 'select_' . $code;
+
+        if (!configurator_identifier_valid($code)) {
+            return ['ok' => false, 'errors' => ['Код выборки: только строчные латинские буквы, цифры, "_", начинается с буквы.']];
+        }
+        if (strlen($view) > DB_IDENTIFIER_MAX_BYTES) {
+            return ['ok' => false, 'errors' => ["Имя \"$view\" длиннее " . DB_IDENTIFIER_MAX_BYTES . ' байт (лимит Postgres, NAMEDATALEN).']];
+        }
+
+        $source_table = (string) $spec['source_table'];
+        $columns      = array_values(array_map('strval', $spec['columns'] ?? []));
+        $columns_text = implode(', ', $columns);
+        $filter_field = $spec['filter_field'] !== null && $spec['filter_field'] !== ''
+            ? (string) $spec['filter_field'] : null;
+
+        // Структурная проверка — до всякого DDL, честное сообщение
+        // вместо голой ошибки Postgres (та же дисциплина, что у
+        // остальных структурных операций конфигуратора в этом файле).
+        $structure = ['tables' => snapshot_build_structure($db_connection)['tables']];
+        $plan = selection_parse($structure, $source_table, $columns_text, $filter_field);
+        if ($plan === null) {
+            return ['ok' => false, 'errors' => [
+                "Источник '$source_table', отобранные поля или поле фильтра '"
+                . ($filter_field ?? '—') . "' не совпадают со структурой — проверьте выбор.",
+            ]];
+        }
+
+        // Фильтр — резолв ЧЕЛОВЕЧЕСКОЙ метки в id. Собираем ТОЛЬКО
+        // словари (не весь snapshot_build() целиком — иначе чужая
+        // сломанная сущность где-то в модели блокировала бы создание
+        // ЭТОЙ, не связанной с ней, выборки; «ошибка отдельного
+        // элемента модели → локальная деградация», core.php snapshot_
+        // build()).
+        $filter_id = null;
+        if ($filter_field !== null) {
+            $presentation = snapshot_build_presentation($db_connection);
+            $dictionaries = snapshot_build_dictionaries(
+                $structure,
+                snapshot_templates($presentation),
+                snapshot_build_links($db_connection)
+            );
+            $dict = $dictionaries['map'][$filter_field] ?? null;
+            if ($dict === null) {
+                return ['ok' => false, 'errors' => ["Поле фильтра '$filter_field' — не словарь, значение не разрешить."]];
+            }
+            $resolved = lookup_id_by_label($db_connection, $dict, (string) $spec['filter_value']);
+            if (!$resolved['ok']) {
+                return ['ok' => false, 'errors' => [$resolved['error']]];
+            }
+            $filter_id = (int) $resolved['id'];
+        }
+
+        $select_list = 'id, ' . implode(', ', $columns);
+        $sql = "CREATE VIEW $view AS SELECT $select_list FROM $source_table";
+        if ($filter_field !== null) {
+            $sql .= " WHERE $filter_field = $filter_id";
+        }
+
+        $create = db_execute($db_connection, $sql);
+        if (!$create['ok']) {
+            return ['ok' => false, 'errors' => ['DDL: ' . $create['error']]];
+        }
+
+        $reg = configurator_register_element(
+            $db_connection, 'table', null, $view,
+            (string) $spec['table_short'], (string) $spec['table_full']
+        );
+        if (!$reg['ok']) {
+            return ['ok' => false, 'errors' => [
+                "Выборка $view не создана — реестр отверг регистрацию, изменение откачено целиком: "
+                . implode('; ', $reg['errors']),
+            ]];
+        }
+
+        // Подписи отобранных полей наследуются от source_table — те же
+        // слова уже стоят в реестре, спрашивать админа заново незачем
+        // (человек уже один раз назвал это поле, когда создавал его).
+        foreach ($columns as $col) {
+            $src_label = db_select($db_connection, '
+                SELECT l.data_short, l.data_full
+                FROM ' . MODEL_REGISTRY_TABLE . ' r
+                JOIN ' . MODEL_LABELS_TABLE . ' l ON l.dep_model_registry = r.id
+                WHERE r.data_kind = ? AND r.data_owner = ? AND r.data_element = ? AND r.active = 1
+            ', 'sss', ['field', $source_table, $col]);
+
+            $short = (string) ($src_label[0]['data_short'] ?? $col);
+            $full  = (string) ($src_label[0]['data_full'] ?? $col);
+
+            $col_reg = configurator_register_element($db_connection, 'field', $view, $col, $short, $full);
+            if (!$col_reg['ok']) {
+                return ['ok' => false, 'errors' => [
+                    "Выборка $view: поле '$col' не зарегистрировано, изменение откачено целиком: "
+                    . implode('; ', $col_reg['errors']),
+                ]];
+            }
+        }
+
+        // Паспорт — ПОСЛЕ регистрации самого select_ (нужен его id
+        // реестра). filter_value хранится ЧЕЛОВЕЧЕСКОЙ меткой, не id:
+        // id зависит от текущего состояния словаря и мог бы разъехаться
+        // молча при пересборке под другим id той же метки; метка —
+        // то, что человек реально выбрал, стабильный факт (§16, тот
+        // же принцип, что «текст SQL не хранится» — здесь «текущий id
+        // не хранится», оба про то, что паспорт несёт РОЛЬ, не
+        // сиюминутное состояние).
+        $passport = db_execute($db_connection, '
+            INSERT INTO presentation_selections
+                (dep_model_registry, source_table, columns, filter_field, filter_value)
+            VALUES (?, ?, ?, ?, ?)
+        ', 'issss', [
+            $reg['id'], $source_table, $columns_text,
+            $filter_field, $filter_field !== null ? (string) $spec['filter_value'] : null,
+        ]);
+        if (!$passport['ok']) {
+            // ok=false здесь откатывает ВСЮ транзакцию целиком
+            // (configurator_with_lock) — VIEW и регистрация полей
+            // тоже отменяются, а не только эта вставка. Сообщение не
+            // должно утверждать частичный успех, которого не будет.
+            return ['ok' => false, 'errors' => [
+                "Паспорт выборки (presentation_selections) не записан: "
+                . $passport['error'] . '. Изменение отменено целиком.',
             ]];
         }
 
@@ -1286,7 +1441,7 @@ if ($caction === 'diagnose') {
     $live_presentation = snapshot_build_presentation($db_connection);
     $t_schema = $live_structure['tables'][$table] ?? null;
 
-    if ($t_schema === null || str_starts_with($table, SYSTEM_TABLE_PREFIX)) {
+    if ($t_schema === null || is_reserved_table($table)) {
         render_configurator_table_not_found();
     } else {
         $t_labels = $live_presentation['labels']['table'][$table] ?? [];
