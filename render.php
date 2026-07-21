@@ -1320,7 +1320,7 @@ function render_table_directory(array $snapshot, array $actions, array $opts = [
 
     $tables = $snapshot['structure']['tables'] ?? [];
 
-    $by_group = ['main' => [], 'dict' => [], 'system' => []];
+    $by_group = ['main' => [], 'dict' => [], 'system' => [], 'selection' => []];
     foreach ($tables as $t_name => $t_schema) {
         $g = table_group($t_name, $t_schema);
         if ($g === 'dependent') {
@@ -1358,9 +1358,27 @@ function render_table_directory(array $snapshot, array $actions, array $opts = [
         }
     }
 
+    // Выборки (select_, решение 2026-07-21) — отдельно от «Главных»:
+    // это не предметная таблица, а срез существующей, падать в общий
+    // список вперемешку с well и подобными не должна (найдено живьём
+    // — Влад создал две выборки, они осели в «Главных», неотличимо).
+    // Раздел появляется, только когда выборки реально есть — пустой
+    // блок про несуществующую возможность хуже отсутствия блока (§12).
+    if ($by_group['selection'] !== []) {
+        echo '<h3>Выборки (select_)</h3>';
+        foreach ($by_group['selection'] as $t_name) {
+            echo render_schema_card(schema_view($snapshot, $t_name), $actions, '', 0);
+        }
+    }
+
     echo '<h3>Отчёты</h3><p><em>' . render_escape($reports_note) . '</em></p>';
 
-    echo '<h3>Служебные таблицы</h3>';
+    // Словари сворачиваются по умолчанию (найдено живьём 2026-07-21 —
+    // список voc_-таблиц разросся настолько, что заслонял «Главные» и
+    // новые «Выборки»). <details> — без JS, тот же html5-примитив,
+    // что уже используется в проекте нигде специально не документирован,
+    // но не требует ни строчки поведения в configurator.js.
+    echo '<details><summary><h3 style="display:inline">Служебные таблицы (словари)</h3></summary>';
     if ($by_group['dict'] === []) {
         echo '<p><em>нет</em></p>';
     } else {
@@ -1368,9 +1386,10 @@ function render_table_directory(array $snapshot, array $actions, array $opts = [
             echo render_schema_card(schema_view($snapshot, $t_name), $actions, $badge_of($t_name), 0);
         }
     }
+    echo '</details>';
 
     if ($show_system) {
-        echo '<h3>Системные таблицы</h3>';
+        echo '<details><summary><h3 style="display:inline">Системные таблицы</h3></summary>';
         if ($by_group['system'] === []) {
             echo '<p><em>нет</em></p>';
         } else {
@@ -1378,6 +1397,7 @@ function render_table_directory(array $snapshot, array $actions, array $opts = [
                 echo render_schema_card(schema_view($snapshot, $t_name), $actions, '', 0);
             }
         }
+        echo '</details>';
     }
 }
 
