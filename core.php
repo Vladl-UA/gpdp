@@ -398,7 +398,13 @@ function selection_parse(array $structure, string $source_table, string $columns
             return null;
         }
         $prefix = field_prefix($filter_field);
-        if ($prefix !== 'voc' && $prefix !== 'links') {
+        // Фильтруемо: voc_ (склад/адрес/проекция) и link_ (единственное,
+        // скаляр int, voc_handler). НЕ links_ (множественное) — хранится
+        // как integer[] (entities.php, ent_links), простое «= значение»
+        // для массива синтаксически не то, что нужно (нужен ANY()/@> —
+        // другая операция, не эта форма фильтра). Ошибка поймана до
+        // коммита при сверке физического хранения links_, не после.
+        if ($prefix !== 'voc' && $prefix !== 'link') {
             return null;
         }
     }

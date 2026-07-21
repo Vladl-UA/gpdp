@@ -805,6 +805,107 @@ function render_configurator_new_table(
     HTML;
 }
 
+/**
+ * Форма создания select_ (решение 2026-07-21). Тот же приём каскада,
+ * что уже работает в render_configurator_new_table() для
+ * view_source_filter (там — булево поле источника, здесь — любые
+ * поля источника чекбоксами + словарный фильтр); данные на клиент
+ * приходят одним JSON на таблицу, без обращений к серверу при смене
+ * источника — тот же выбор, что и у уже существующей формы.
+ *
+ * «Связанные таблицы» — только справочная панель (STATE.md журнал
+ * 2026-07-21): select_ v1 берёт поля ровно из ОДНОЙ выбранной
+ * таблицы, дочерние показаны, чтобы админ видел, где эта таблица
+ * стоит в дереве модели, не как источник дополнительных полей.
+ */
+function render_configurator_new_selection(
+    array $tables,
+    string $fields_json,
+    string $relations_json,
+    string $values_json
+): void {
+    $script_tag    = render_configurator_script();
+    $table_options = render_options($tables);
+
+    echo <<<HTML
+    <h2>Новая выборка (select_)</h2>
+    <p><small>Одна таблица-источник, отобранные поля, необязательный фильтр «поле = значение словаря».
+       Создаёт настоящее представление Postgres (<code>select_&lt;код&gt;</code>), не текстовый запрос.</small></p>
+    <form method="post" action="?_context=configurator&_action=create_selection" id="create-selection-form">
+
+      <p>Источник: <select id="sel-source" name="source_table" onchange="onSelectionSourceChange()">$table_options</select></p>
+
+      <div id="sel-related"><small>— выберите источник —</small></div>
+
+      <h3>Поля</h3>
+      <div id="sel-fields"><small>— выберите источник —</small></div>
+
+      <h3>Фильтр (необязательно)</h3>
+      <p>
+        Поле: <select id="sel-filter-field" name="filter_field" onchange="onSelectionFilterFieldChange()">
+                <option value="">— без фильтра —</option>
+              </select>
+        &nbsp;
+        Значение: <select id="sel-filter-value" name="filter_value" style="display:none"></select>
+      </p>
+
+      <h3>Подписи выборки</h3>
+      <p>Код (станет <code>select_&lt;код&gt;</code>): <input type="text" name="code" pattern="[a-z][a-z0-9_]*" required></p>
+      <p>Полная подпись: <input type="text" name="table_full" required>
+         Короткая подпись: <input type="text" name="table_short" required></p>
+
+      <p><input type="submit" value="Создать"></p>
+    </form>
+    <p><a href="?_context=configurator&_action=list">Отмена</a></p>
+
+    $script_tag
+    <script>
+    const selTableFields    = $fields_json;
+    const selTableRelations = $relations_json;
+    const selDictValues     = $values_json;
+
+    function onSelectionSourceChange() {
+      const table  = document.getElementById('sel-source').value;
+      const fields = selTableFields[table] || [];
+
+      document.getElementById('sel-fields').innerHTML = fields.length === 0
+        ? '<small>В этой таблице нет полей для выбора.</small>'
+        : fields.map(f =>
+            '<label><input type="checkbox" name="columns[]" value="' + f.name + '"> '
+            + f.label + ' <code>(' + f.name + ')</code></label><br>'
+          ).join('');
+
+      const related = selTableRelations[table] || [];
+      document.getElementById('sel-related').innerHTML = related.length === 0
+        ? '<small>Дочерних таблиц нет.</small>'
+        : '<small>Дочерние таблицы (для ориентира — поля отсюда не выбираются, это выборка из одной таблицы):&nbsp;'
+          + related.join(', ') + '</small>';
+
+      const filterField = document.getElementById('sel-filter-field');
+      const filterable  = fields.filter(f => f.filterable);
+      filterField.innerHTML = '<option value="">— без фильтра —</option>'
+        + filterable.map(f => '<option value="' + f.name + '">' + f.label + '</option>').join('');
+      onSelectionFilterFieldChange();
+    }
+
+    function onSelectionFilterFieldChange() {
+      const field = document.getElementById('sel-filter-field').value;
+      const valueSelect = document.getElementById('sel-filter-value');
+      if (!field) {
+        valueSelect.innerHTML = '';
+        valueSelect.style.display = 'none';
+        return;
+      }
+      const values = selDictValues[field] || [];
+      valueSelect.innerHTML = values.map(v => '<option value="' + v + '">' + v + '</option>').join('');
+      valueSelect.style.display = '';
+    }
+
+    onSelectionSourceChange(); // сразу заполнить под уже выбранный (первый) источник
+    </script>
+    HTML;
+}
+
 /** Заголовок и плашка расхождений — общая часть шапки любого действия
  *  конфигуратора, не зависящая от того, какое именно действие открыто. */
 function render_configurator_page_open(?string $flash, bool $flash_ok, array $diag, string $caction): void
@@ -1096,7 +1197,8 @@ function render_configurator_delete_confirm(string $table): void
  *  render_table_directory() (та же функция, что и на labels). */
 function render_configurator_directory(array $snapshot, array $referenced_as_dict): void
 {
-    echo '<h2>Таблицы</h2><p><a href="?_context=configurator&_action=new_table">+ новая таблица</a></p>';
+    echo '<h2>Таблицы</h2><p><a href="?_context=configurator&_action=new_table">+ новая таблица</a> &nbsp; '
+       . '<a href="?_context=configurator&_action=new_selection">+ новая выборка (select_)</a></p>';
     render_table_directory($snapshot, [
         'содержимое'    => 'index.php?_context=data&_table={t}&_action=view',
         'редактировать' => '?_context=configurator&_action=edit&table={t}',

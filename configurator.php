@@ -1224,6 +1224,31 @@ if ($caction === 'create_table' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
+if ($caction === 'create_selection' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $spec = [
+        'code'         => trim((string) ($_POST['code'] ?? '')),
+        'source_table' => (string) ($_POST['source_table'] ?? ''),
+        'columns'      => array_values(array_filter((array) ($_POST['columns'] ?? []), fn($c) => $c !== '')),
+        'filter_field' => trim((string) ($_POST['filter_field'] ?? '')) !== '' ? (string) $_POST['filter_field'] : null,
+        'filter_value' => trim((string) ($_POST['filter_value'] ?? '')) !== '' ? (string) $_POST['filter_value'] : null,
+        'table_short'  => (string) ($_POST['table_short'] ?? ''),
+        'table_full'   => (string) ($_POST['table_full'] ?? ''),
+    ];
+
+    if ($spec['columns'] === []) {
+        $msg = 'Не отмечено ни одного поля.';
+        header('Location: ?_context=configurator&_action=new_selection&_msg=' . rawurlencode($msg) . '&_ok=0');
+        exit;
+    }
+
+    $outcome = configurator_create_selection($db_connection, $spec, $application);
+    $msg = $outcome['ok']
+        ? "Выборка \"select_{$spec['code']}\" создана."
+        : implode(' | ', $outcome['errors']);
+    header('Location: ?_context=configurator&_action=list&_msg=' . rawurlencode($msg) . '&_ok=' . ($outcome['ok'] ? '1' : '0'));
+    exit;
+}
+
 if ($caction === 'delete_table' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $table   = (string) ($_POST['table'] ?? '');
     $outcome = configurator_delete_table($db_connection, $table, $application);
@@ -1364,6 +1389,78 @@ function configurator_link_target_items(array $structure, array $presentation): 
     return $items;
 }
 
+/**
+ * Данные для формы создания select_ (решение 2026-07-21). Живое
+ * чтение целиком (§8, админ-режим) — та же дисциплина, что у
+ * остальных построителей выше. Четыре части:
+ *   - tables — источники (любая таблица с data_name, тот же критерий,
+ *     что у link_target_items — не своя политика отбора);
+ *   - fields[table] — entity-поля каждой таблицы, для чекбоксов;
+ *   - relations[table] — ДОЧЕРНИЕ таблицы (snapshot_build_relations),
+ *     чисто информационная панель — select_ v1 берёт поля только из
+ *     ОДНОЙ выбранной таблицы (STATE.md журнал 2026-07-21), соседние
+ *     показаны для ориентира в дереве модели, не для отбора полей
+ *     из них — иначе это уже была бы форма report_, не select_;
+ *   - values[field] — метки словаря для полей voc_/links_ (список
+ *     значений выпадающего списка фильтра); собираются один раз тут,
+ *     не при каждой смене поля в форме — таблицы модели небольшие,
+ *     отдельный запрос на каждый чих был бы обороной от
+ *     несуществующей нагрузки (§13).
+ */
+function configurator_selection_form_data(PgSql\Connection $db_connection, array $structure, array $presentation): array
+{
+    $relations = snapshot_build_relations($structure);
+    $dictionaries = snapshot_build_dictionaries(
+        $structure,
+        snapshot_templates($presentation),
+        snapshot_build_links($db_connection)
+    );
+
+    $tables    = [];
+    $fields    = [];
+    $relmap    = [];
+
+    foreach ($structure['tables'] as $t_name => $t_schema) {
+        if (!isset($t_schema['fields']['data_name'])) {
+            continue;
+        }
+        $t_labels = $presentation['labels']['table'][$t_name] ?? [];
+        $t_full   = (string) ($t_labels['data_full'] ?? $t_name);
+        $tables[] = ['value' => $t_name, 'label' => "$t_full ($t_name)"];
+
+        $t_fields = [];
+        foreach ($t_schema['fields'] as $f_name => $f_schema) {
+            if (($f_schema['kind'] ?? '') !== 'entity_field') {
+                continue;
+            }
+            $f_labels = $presentation['labels']['field'][$t_name][$f_name] ?? [];
+            $prefix   = field_prefix($f_name);
+            $t_fields[] = [
+                'name'       => $f_name,
+                'label'      => (string) ($f_labels['data_short'] ?? $f_name),
+                'filterable' => $prefix === 'voc' || $prefix === 'link',
+            ];
+        }
+        $fields[$t_name] = $t_fields;
+
+        $relmap[$t_name] = array_map(
+            static fn(array $rel): string => $rel['child'],
+            $relations['map'][$t_name] ?? []
+        );
+    }
+
+    $values = [];
+    foreach ($dictionaries['map'] as $field_name => $dict) {
+        $prefix = field_prefix($field_name);
+        if ($prefix !== 'voc' && $prefix !== 'link') {
+            continue;
+        }
+        $values[$field_name] = array_values(lookup_labels($db_connection, $dict));
+    }
+
+    return ['tables' => $tables, 'fields' => $fields, 'relations' => $relmap, 'values' => $values];
+}
+
 // --- отрисовка -----------------------------------------------------------
 
 $flash    = isset($_GET['_msg']) ? (string) $_GET['_msg'] : null; // экранирует render_admin_flash()
@@ -1431,6 +1528,19 @@ if ($caction === 'diagnose') {
     render_configurator_new_table(
         $type_items, $parent_items, $link_target_items,
         $dict_items, $dict_labels_json, $view_source_bul_fields_json
+    );
+
+} elseif ($caction === 'new_selection') {
+
+    $live_structure    = ['tables' => snapshot_build_structure($db_connection)['tables']];
+    $live_presentation = snapshot_build_presentation($db_connection);
+    $form_data          = configurator_selection_form_data($db_connection, $live_structure, $live_presentation);
+
+    render_configurator_new_selection(
+        $form_data['tables'],
+        json_encode($form_data['fields'], JSON_UNESCAPED_UNICODE),
+        json_encode($form_data['relations'], JSON_UNESCAPED_UNICODE),
+        json_encode($form_data['values'], JSON_UNESCAPED_UNICODE)
     );
 
 } elseif ($caction === 'edit') {
