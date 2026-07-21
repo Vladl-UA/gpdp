@@ -1320,11 +1320,11 @@ function render_table_directory(array $snapshot, array $actions, array $opts = [
 
     $tables = $snapshot['structure']['tables'] ?? [];
 
-    $by_group = ['main' => [], 'dict' => [], 'system' => [], 'selection' => []];
+    $by_group = ['root' => [], 'dict' => [], 'system' => [], 'selection' => []];
     foreach ($tables as $t_name => $t_schema) {
         $g = table_group($t_name, $t_schema);
         if ($g === 'dependent') {
-            continue; // покажется под своей главной деревом
+            continue; // покажется под своим корнем деревом
         }
         $by_group[$g][] = $t_name;
     }
@@ -1337,7 +1337,7 @@ function render_table_directory(array $snapshot, array $actions, array $opts = [
         return isset($referenced[$t]) ? '<span class="badge">словарь</span>' : '';
     };
 
-    // Рекурсивный вывод главной с зависимыми внутри семейного блока.
+    // Рекурсивный вывод корня с зависимыми внутри семейного блока.
     $tree = static function (string $t_name, int $depth) use (
         &$tree, $snapshot, $actions, $badge_of
     ): void {
@@ -1347,37 +1347,46 @@ function render_table_directory(array $snapshot, array $actions, array $opts = [
         }
     };
 
-    echo '<h3>Главные таблицы</h3>';
-    if ($by_group['main'] === []) {
+    // Все четыре раздела — <details>, свёрнуты по умолчанию, единым
+    // приёмом (2026-07-21, Влад: начинать лучше со свёрнутых всех
+    // групп, раскрывать по выбору). Чистый HTML5, ни строчки JS.
+    //
+    // «Главные» переименованы в «Корневые» тем же заходом: «главные»
+    // читалось как «одна привилегированная центральная сущность» и
+    // вдобавок совпадало по звучанию со служебной таблицей `main`
+    // (только для smoke_test.php, к корням деревьев отношения не
+    // имеет) — корней на самом деле может быть несколько независимых
+    // (well — просто таблица без dep_/rel_main, не «главная» в
+    // каком-то особом смысле), и с появлением второго дерева эта
+    // путаница перестала быть безобидной.
+    echo '<details><summary><h3 style="display:inline">Корневые таблицы</h3></summary>';
+    if ($by_group['root'] === []) {
         echo '<p><em>нет</em></p>';
     } else {
-        foreach ($by_group['main'] as $t_name) {
+        foreach ($by_group['root'] as $t_name) {
             echo '<div class="schema-family">';
             $tree($t_name, 0);
             echo '</div>';
         }
     }
+    echo '</details>';
 
-    // Выборки (select_, решение 2026-07-21) — отдельно от «Главных»:
+    // Выборки (select_, решение 2026-07-21) — отдельно от «Корневых»:
     // это не предметная таблица, а срез существующей, падать в общий
     // список вперемешку с well и подобными не должна (найдено живьём
-    // — Влад создал две выборки, они осели в «Главных», неотличимо).
+    // — Влад создал две выборки, они осели в «Корневых», неотличимо).
     // Раздел появляется, только когда выборки реально есть — пустой
     // блок про несуществующую возможность хуже отсутствия блока (§12).
     if ($by_group['selection'] !== []) {
-        echo '<h3>Выборки (select_)</h3>';
+        echo '<details><summary><h3 style="display:inline">Выборки (select_)</h3></summary>';
         foreach ($by_group['selection'] as $t_name) {
             echo render_schema_card(schema_view($snapshot, $t_name), $actions, '', 0);
         }
+        echo '</details>';
     }
 
     echo '<h3>Отчёты</h3><p><em>' . render_escape($reports_note) . '</em></p>';
 
-    // Словари сворачиваются по умолчанию (найдено живьём 2026-07-21 —
-    // список voc_-таблиц разросся настолько, что заслонял «Главные» и
-    // новые «Выборки»). <details> — без JS, тот же html5-примитив,
-    // что уже используется в проекте нигде специально не документирован,
-    // но не требует ни строчки поведения в configurator.js.
     echo '<details><summary><h3 style="display:inline">Служебные таблицы (словари)</h3></summary>';
     if ($by_group['dict'] === []) {
         echo '<p><em>нет</em></p>';
