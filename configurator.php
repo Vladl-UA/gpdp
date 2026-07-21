@@ -1393,19 +1393,25 @@ function configurator_link_target_items(array $structure, array $presentation): 
  * Данные для формы создания select_ (решение 2026-07-21). Живое
  * чтение целиком (§8, админ-режим) — та же дисциплина, что у
  * остальных построителей выше. Четыре части:
- *   - tables — источники (любая таблица с data_name, тот же критерий,
- *     что у link_target_items — не своя политика отбора);
+ *   - tables — ЛЮБАЯ таблица (structure уже не несёт зарезервированных
+ *     — is_reserved_table в snapshot_build_structure). Не путать с
+ *     критерием link_target_items (там нужен data_name — цель ссылки
+ *     обязана быть словарём с подписью): источником select_ может
+ *     быть любая обычная таблица, у well, например, нет data_name
+ *     вовсе (у него data_number) — с фильтром по data_name форма
+ *     показывала одни словари, найдено живьём 2026-07-21, поправлено;
  *   - fields[table] — entity-поля каждой таблицы, для чекбоксов;
  *   - relations[table] — ДОЧЕРНИЕ таблицы (snapshot_build_relations),
  *     чисто информационная панель — select_ v1 берёт поля только из
  *     ОДНОЙ выбранной таблицы (STATE.md журнал 2026-07-21), соседние
  *     показаны для ориентира в дереве модели, не для отбора полей
  *     из них — иначе это уже была бы форма report_, не select_;
- *   - values[field] — метки словаря для полей voc_/links_ (список
- *     значений выпадающего списка фильтра); собираются один раз тут,
- *     не при каждой смене поля в форме — таблицы модели небольшие,
- *     отдельный запрос на каждый чих был бы обороной от
- *     несуществующей нагрузки (§13).
+ *   - values[field] — метки словаря для полей voc_/link_ (единственное
+ *     число — links_ хранится как integer[], простое «=» ему не
+ *     подходит, см. selection_parse) — список значений выпадающего
+ *     списка фильтра; собираются один раз тут, не при каждой смене
+ *     поля в форме — таблицы модели небольшие, отдельный запрос на
+ *     каждый чих был бы обороной от несуществующей нагрузки (§13).
  */
 function configurator_selection_form_data(PgSql\Connection $db_connection, array $structure, array $presentation): array
 {
@@ -1421,9 +1427,6 @@ function configurator_selection_form_data(PgSql\Connection $db_connection, array
     $relmap    = [];
 
     foreach ($structure['tables'] as $t_name => $t_schema) {
-        if (!isset($t_schema['fields']['data_name'])) {
-            continue;
-        }
         $t_labels = $presentation['labels']['table'][$t_name] ?? [];
         $t_full   = (string) ($t_labels['data_full'] ?? $t_name);
         $tables[] = ['value' => $t_name, 'label' => "$t_full ($t_name)"];
