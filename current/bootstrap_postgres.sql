@@ -68,7 +68,11 @@ CREATE TABLE model_links (
 -- есть model_registry/model_labels/model_formulas/model_links из
 -- прошлых сессий; выполнять на нём нужно ТОЛЬКО этот кусок, не файл
 -- целиком (CREATE TABLE без IF NOT EXISTS на уже существующих
--- таблицах упадёт ошибкой «relation already exists»).
+-- таблицах упадёт ошибкой «relation already exists» — ровно это и
+-- произошло при первой попытке 2026-07-21, отсюда и IF NOT EXISTS
+-- ниже, и отдельный файл current/add_presentation_selections.sql
+-- с тем же куском — им безопаснее пользоваться напрямую, не выделять
+-- вручную нужные строки из файла целиком).
 --
 -- presentation_selections — паспорт select_ (слой представления,
 -- решение 2026-07-21, ARCHITECTURE.md §15 пройден по всем десяти
@@ -88,7 +92,7 @@ CREATE TABLE model_links (
 -- нигде не хранится и из данных не исполняется, VIEW собирает код
 -- (configurator_create_selection) по этим ролям, ровно один раз, при
 -- создании/пересборке.
-CREATE TABLE presentation_selections (
+CREATE TABLE IF NOT EXISTS presentation_selections (
     dep_model_registry INTEGER      NOT NULL PRIMARY KEY,
     source_table        VARCHAR(64) NOT NULL,
     -- Список полей source_table через запятую — тот же приём, что
